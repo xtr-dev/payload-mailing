@@ -1,0 +1,105 @@
+{
+  "name": "@xtr-dev/payload-mailing",
+  "version": "1.0.0",
+  "description": "Template-based email system with scheduling and job processing for PayloadCMS",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run copyfiles && npm run build:types && npm run build:swc",
+    "build:swc": "swc ./src -d ./dist --config-file .swcrc --strip-leading-paths",
+    "build:types": "tsc --outDir dist --rootDir ./src",
+    "clean": "rimraf {dist,*.tsbuildinfo}",
+    "copyfiles": "copyfiles -u 1 \"src/**/*.{html,css,scss,ttf,woff,woff2,eot,svg,jpg,png,json}\" dist/",
+    "dev": "next dev dev --turbo",
+    "dev:generate-importmap": "npm run dev:payload generate:importmap",
+    "dev:generate-types": "npm run dev:payload generate:types",
+    "dev:payload": "cross-env PAYLOAD_CONFIG_PATH=./dev/payload.config.ts payload",
+    "generate:importmap": "npm run dev:generate-importmap",
+    "generate:types": "npm run dev:generate-types",
+    "lint": "eslint",
+    "lint:fix": "eslint ./src --fix",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "npm run test:int && npm run test:e2e",
+    "test:e2e": "playwright test",
+    "test:int": "vitest"
+  },
+  "keywords": [
+    "payloadcms",
+    "email",
+    "templates",
+    "scheduling",
+    "jobs",
+    "mailing",
+    "handlebars"
+  ],
+  "author": "XTR Development",
+  "license": "MIT",
+  "peerDependencies": {
+    "payload": "^3.37.0"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.8",
+    "nodemailer": "^6.9.8"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@payloadcms/db-mongodb": "^3.37.0",
+    "@payloadcms/db-postgres": "^3.37.0",
+    "@payloadcms/db-sqlite": "^3.37.0",
+    "@payloadcms/eslint-config": "^3.9.0",
+    "@payloadcms/next": "^3.37.0",
+    "@payloadcms/richtext-lexical": "^3.37.0",
+    "@payloadcms/ui": "^3.37.0",
+    "@playwright/test": "^1.52.0",
+    "@swc-node/register": "^1.10.9",
+    "@swc/cli": "^0.6.0",
+    "@types/node": "^22.5.4",
+    "@types/nodemailer": "^6.4.14",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "copyfiles": "^2.4.1",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.23.0",
+    "eslint-config-next": "^15.4.4",
+    "graphql": "^16.8.1",
+    "mongodb-memory-server": "^10.1.4",
+    "next": "^15.4.4",
+    "open": "^10.1.0",
+    "payload": "^3.37.0",
+    "prettier": "^3.4.2",
+    "qs-esm": "^7.0.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "rimraf": "^3.0.2",
+    "sharp": "^0.34.2",
+    "sort-package-json": "^2.10.0",
+    "typescript": "^5.7.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.1.2"
+  },
+  "engines": {
+    "node": "^18.20.2 || >=20.9.0",
+    "npm": ">=8.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xtr-dev/payload-mailing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xtr-dev/payload-mailing/issues"
+  },
+  "homepage": "https://github.com/xtr-dev/payload-mailing#readme",
+  "packageManager": "pnpm@10.12.4+sha512.5ea8b0deed94ed68691c9bad4c955492705c5eeb8a87ef86bc62c74a26b037b08ff9570f108b2e4dbd1dd1a9186fea925e527f141c648e85af45631074680184"
+}
