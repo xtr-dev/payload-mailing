@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.idea/
+payload-docs
+dist/
+/dev/payload.db
+tsconfig.tsbuildinfo
