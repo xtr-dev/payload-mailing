@@ -1,9 +1,11 @@
 import { Payload } from 'payload'
 import type { CollectionConfig, RichTextField } from 'payload'
 import { Transporter } from 'nodemailer'
-import {Email} from "../payload-types.js"
+import {Email, EmailTemplate} from "../payload-types.js"
 
-export type BaseEmail<TEmail = Email, TEmailTemplate = EmailTemplate> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'>}
+export type BaseEmail<TEmail extends Email = Email, TEmailTemplate extends EmailTemplate = EmailTemplate> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'> | TEmailTemplate['id'] | undefined | null}
+
+export type BaseEmailTemplate<TEmailTemplate extends EmailTemplate = EmailTemplate> = Omit<TEmailTemplate, 'id'>
 
 export type TemplateRendererHook = (template: string, variables: Record<string, any>) => string | Promise<string>
 
@@ -35,16 +37,6 @@ export interface MailingTransportConfig {
     user: string
     pass: string
   }
-}
-
-export interface EmailTemplate {
-  id: string
-  name: string
-  slug: string
-  subject: string
-  content: any // Lexical editor state
-  createdAt: string
-  updatedAt: string
 }
 
 

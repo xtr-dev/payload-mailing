@@ -1,6 +1,5 @@
 import { sendEmail } from '../sendEmail.js'
-import { Email } from '../payload-types.js'
-import {BaseEmail} from "../types/index.js"
+import {Email, EmailTemplate} from '../payload-types.js'
 
 export interface SendEmailTaskInput {
   // Template mode fields
@@ -21,6 +20,45 @@ export interface SendEmailTaskInput {
 
   // Allow any additional fields that users might have in their email collection
   [key: string]: any
+}
+
+/**
+ * Transforms task input into sendEmail options by separating template and data fields
+ */
+function transformTaskInputToSendEmailOptions(taskInput: SendEmailTaskInput) {
+  const sendEmailOptions: any = {
+    data: {}
+  }
+
+  // If using template mode, set template options
+  if (taskInput.templateSlug) {
+    sendEmailOptions.template = {
+      slug: taskInput.templateSlug,
+      variables: taskInput.variables || {}
+    }
+  }
+
+  // Standard email fields that should be copied to data
+  const standardFields = ['to', 'cc', 'bcc', 'subject', 'html', 'text', 'scheduledAt', 'priority']
+
+  // Template-specific fields that should not be copied to data
+  const templateFields = ['templateSlug', 'variables']
+
+  // Copy standard fields to data
+  standardFields.forEach(field => {
+    if (taskInput[field] !== undefined) {
+      sendEmailOptions.data[field] = taskInput[field]
+    }
+  })
+
+  // Copy any additional custom fields that aren't template or standard fields
+  Object.keys(taskInput).forEach(key => {
+    if (!templateFields.includes(key) && !standardFields.includes(key)) {
+      sendEmailOptions.data[key] = taskInput[key]
+    }
+  })
+
+  return sendEmailOptions
 }
 
 export const sendEmailJob = {
@@ -128,40 +166,11 @@ export const sendEmailJob = {
     const taskInput = input as SendEmailTaskInput
 
     try {
-      // Prepare options for sendEmail based on task input
-      const sendEmailOptions: any = {
-        data: {}
-      }
-
-      // If using template mode
-      if (taskInput.templateSlug) {
-        sendEmailOptions.template = {
-          slug: taskInput.templateSlug,
-          variables: taskInput.variables || {}
-        }
-      }
-
-      // Build data object from task input
-      const dataFields = ['to', 'cc', 'bcc', 'subject', 'html', 'text', 'scheduledAt', 'priority']
-      const additionalFields: string[] = []
-
-      // Copy standard fields
-      dataFields.forEach(field => {
-        if (taskInput[field] !== undefined) {
-          sendEmailOptions.data[field] = taskInput[field]
-        }
-      })
-
-      // Copy any additional custom fields
-      Object.keys(taskInput).forEach(key => {
-        if (!['templateSlug', 'variables', ...dataFields].includes(key)) {
-          sendEmailOptions.data[key] = taskInput[key]
-          additionalFields.push(key)
-        }
-      })
+      // Transform task input into sendEmail options using helper function
+      const sendEmailOptions = transformTaskInputToSendEmailOptions(taskInput)
 
       // Use the sendEmail helper to create the email
-      const email = await sendEmail<BaseEmail>(payload, sendEmailOptions)
+      const email = await sendEmail<Email>(payload, sendEmailOptions)
 
       return {
         output: {
@@ -171,8 +180,15 @@ export const sendEmailJob = {
       }
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(`Failed to queue email: ${errorMessage}`)
+      if (error instanceof Error) {
+        // Preserve original error and stack trace
+        const wrappedError = new Error(`Failed to queue email: ${error.message}`)
+        wrappedError.stack = error.stack
+        wrappedError.cause = error
+        throw wrappedError
+      } else {
+        throw new Error(`Failed to queue email: ${String(error)}`)
+      }
     }
   }
 }

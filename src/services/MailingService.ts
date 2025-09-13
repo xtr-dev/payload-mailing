@@ -5,10 +5,8 @@ import {
   MailingPluginConfig,
   TemplateVariables,
   MailingService as IMailingService,
-  EmailTemplate,
-  QueuedEmail,
   MailingTransportConfig,
-  BaseEmail
+  BaseEmail, BaseEmailTemplate
 } from '../types/index.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
@@ -287,7 +285,7 @@ export class MailingService implements IMailingService {
     const email = await this.payload.findByID({
       collection: this.emailsCollection as any,
       id: emailId,
-    }) as QueuedEmail
+    }) as BaseEmail
 
     const newAttempts = (email.attempts || 0) + 1
 
@@ -302,7 +300,7 @@ export class MailingService implements IMailingService {
     return newAttempts
   }
 
-  private async getTemplateBySlug(templateSlug: string): Promise<EmailTemplate | null> {
+  private async getTemplateBySlug(templateSlug: string): Promise<BaseEmailTemplate | null> {
     try {
       const { docs } = await this.payload.find({
         collection: this.templatesCollection as any,
@@ -314,7 +312,7 @@ export class MailingService implements IMailingService {
         limit: 1,
       })
 
-      return docs.length > 0 ? docs[0] as EmailTemplate : null
+      return docs.length > 0 ? docs[0] as BaseEmailTemplate : null
     } catch (error) {
       console.error(`Template with slug '${templateSlug}' not found:`, error)
       return null
@@ -379,7 +377,7 @@ export class MailingService implements IMailingService {
     })
   }
 
-  private async renderEmailTemplate(template: EmailTemplate, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
+  private async renderEmailTemplate(template: BaseEmailTemplate, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
     if (!template.content) {
       return { html: '', text: '' }
     }

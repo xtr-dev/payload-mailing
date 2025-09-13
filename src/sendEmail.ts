@@ -1,10 +1,9 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-import {Email} from "./payload-types.js"
-import {BaseEmail} from "./types/index.js"
+import {Email, EmailTemplate} from "./payload-types.js"
 
 // Options for sending emails
-export interface SendEmailOptions<T extends BaseEmail = BaseEmail> {
+export interface SendEmailOptions<T extends Email = Email> {
   // Template-based email
   template?: {
     slug: string
@@ -36,14 +35,14 @@ export interface SendEmailOptions<T extends BaseEmail = BaseEmail> {
  * })
  * ```
  */
-export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | number>(
+export const sendEmail = async <TEmail extends Email = Email>(
   payload: Payload,
-  options: SendEmailOptions<T>
-): Promise<T & {id: ID}> => {
+  options: SendEmailOptions<TEmail>
+): Promise<TEmail> => {
   const mailing = getMailing(payload)
   const collectionSlug = options.collectionSlug || mailing.collections.emails || 'emails'
 
-  let emailData: Partial<T> = { ...options.data } as Partial<T>
+  let emailData: Partial<TEmail> = { ...options.data } as Partial<TEmail>
 
   // If using a template, render it first
   if (options.template) {
@@ -59,7 +58,7 @@ export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | n
       subject,
       html,
       text,
-    } as Partial<T>
+    } as Partial<TEmail>
   }
 
   // Validate required fields
@@ -97,7 +96,12 @@ export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | n
     data: emailData
   })
 
-  return email as T & {id: ID}
+  // Validate that the created email has the expected structure
+  if (!email || typeof email !== 'object' || !email.id) {
+    throw new Error('Failed to create email: invalid response from database')
+  }
+
+  return email as TEmail
 }
 
 export default sendEmail
