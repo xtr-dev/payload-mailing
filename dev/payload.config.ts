@@ -1,12 +1,10 @@
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import {
-  BlocksFeature,
   FixedToolbarFeature,
   HeadingFeature,
   HorizontalRuleFeature,
   InlineToolbarFeature,
-  lexicalHTML,
 } from '@payloadcms/richtext-lexical'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import path from 'path'
@@ -17,7 +15,7 @@ import { fileURLToPath } from 'url'
 import { testEmailAdapter } from './helpers/testEmailAdapter.js'
 import { seed, seedUser } from './seed.js'
 import mailingPlugin from "../src/plugin.js"
-import { sendEmail } from "../src/utils/helpers.js"
+import {sendEmail} from "@xtr-dev/payload-mailing"
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -85,15 +83,19 @@ const buildConfigWithMemoryDB = async () => {
 
                   // Queue the welcome email using template slug
                   const emailId = await sendEmail(req.payload, {
-                    templateSlug: 'welcome-email',
-                    to: doc.email,
-                    variables: {
-                      firstName: doc.firstName || doc.email?.split('@')?.[0],
-                      siteName: 'PayloadCMS Mailing Demo',
-                      createdAt: new Date().toISOString(),
-                      isPremium: false,
-                      dashboardUrl: 'http://localhost:3000/admin',
+                    template: {
+                      slug: 'welcome-email',
+                      variables: {
+                        firstName: doc.firstName || doc.email?.split('@')?.[0],
+                        siteName: 'PayloadCMS Mailing Demo',
+                        createdAt: new Date().toISOString(),
+                        isPremium: false,
+                        dashboardUrl: 'http://localhost:3000/admin',
+                      },
                     },
+                    data: {
+                      to: doc.email,
+                    }
                   })
 
                   console.log('✅ Welcome email queued successfully. Email ID:', emailId)

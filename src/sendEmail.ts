@@ -1,22 +1,9 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-
-// Base type for email data that all emails must have
-// Compatible with PayloadCMS generated types that include null
-export interface BaseEmailData {
-  to: string | string[]
-  cc?: string | string[] | null
-  bcc?: string | string[] | null
-  subject?: string | null
-  html?: string | null
-  text?: string | null
-  scheduledAt?: string | Date | null
-  priority?: number | null
-  [key: string]: any
-}
+import {Email} from "./payload-types.js"
 
 // Options for sending emails
-export interface SendEmailOptions<T extends BaseEmailData = BaseEmailData> {
+export interface SendEmailOptions<T extends Email = Email> {
   // Template-based email
   template?: {
     slug: string
@@ -48,7 +35,7 @@ export interface SendEmailOptions<T extends BaseEmailData = BaseEmailData> {
  * })
  * ```
  */
-export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
+export const sendEmail = async <T extends Email = Email>(
   payload: Payload,
   options: SendEmailOptions<T>
 ): Promise<T> => {
@@ -92,11 +79,6 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
   }
   if (emailData.bcc) {
     emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
-  }
-
-  // Convert scheduledAt to ISO string if it's a Date
-  if (emailData.scheduledAt instanceof Date) {
-    emailData.scheduledAt = emailData.scheduledAt.toISOString()
   }
 
   // Create the email in the collection
