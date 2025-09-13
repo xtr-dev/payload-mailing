@@ -1,20 +1,19 @@
-import { Job } from 'payload/jobs'
-import { processOutboxJob, ProcessOutboxJobData } from './processOutboxJob'
-import { MailingService } from '../services/MailingService'
+import { processEmailsJob, ProcessEmailsJobData } from './processEmailsJob.js'
+import { MailingService } from '../services/MailingService.js'
 
-export const createMailingJobs = (mailingService: MailingService): Job[] => {
+export const createMailingJobs = (mailingService: MailingService): any[] => {
   return [
     {
-      slug: 'processOutbox',
-      handler: async ({ job, req }) => {
-        return processOutboxJob(
-          job as { data: ProcessOutboxJobData },
+      slug: 'processEmails',
+      handler: async ({ job, req }: { job: any; req: any }) => {
+        return processEmailsJob(
+          job as { data: ProcessEmailsJobData },
           { req, mailingService }
         )
       },
-      interfaceName: 'ProcessOutboxJob',
+      interfaceName: 'ProcessEmailsJob',
     },
   ]
 }
 
-export * from './processOutboxJob'
+export * from './processEmailsJob.js'

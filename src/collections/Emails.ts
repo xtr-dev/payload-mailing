@@ -1,11 +1,12 @@
-import { CollectionConfig } from 'payload/types'
+import type { CollectionConfig } from 'payload'
 
-const EmailOutbox: CollectionConfig = {
-  slug: 'email-outbox',
+const Emails: CollectionConfig = {
+  slug: 'emails',
   admin: {
     useAsTitle: 'subject',
     defaultColumns: ['subject', 'to', 'status', 'scheduledAt', 'sentAt'],
     group: 'Mailing',
+    description: 'Email delivery and status tracking',
   },
   access: {
     read: () => true,
@@ -17,7 +18,7 @@ const EmailOutbox: CollectionConfig = {
     {
       name: 'template',
       type: 'relationship',
-      relationTo: 'email-templates',
+      relationTo: 'email-templates' as const,
       admin: {
         description: 'Email template used (optional if custom content provided)',
       },
@@ -26,22 +27,25 @@ const EmailOutbox: CollectionConfig = {
       name: 'to',
       type: 'text',
       required: true,
+      hasMany: true,
       admin: {
-        description: 'Recipient email address(es), comma-separated',
+        description: 'Recipient email addresses',
       },
     },
     {
       name: 'cc',
       type: 'text',
+      hasMany: true,
       admin: {
-        description: 'CC email address(es), comma-separated',
+        description: 'CC email addresses',
       },
     },
     {
       name: 'bcc',
       type: 'text',
+      hasMany: true,
       admin: {
-        description: 'BCC email address(es), comma-separated',
+        description: 'BCC email addresses',
       },
     },
     {
@@ -161,20 +165,20 @@ const EmailOutbox: CollectionConfig = {
     },
   ],
   timestamps: true,
-  indexes: [
-    {
-      fields: {
-        status: 1,
-        scheduledAt: 1,
-      },
-    },
-    {
-      fields: {
-        priority: -1,
-        createdAt: 1,
-      },
-    },
-  ],
+  // indexes: [
+  //   {
+  //     fields: {
+  //       status: 1,
+  //       scheduledAt: 1,
+  //     },
+  //   },
+  //   {
+  //     fields: {
+  //       priority: -1,
+  //       createdAt: 1,
+  //     },
+  //   },
+  // ],
 }
 
-export default EmailOutbox
+export default Emails

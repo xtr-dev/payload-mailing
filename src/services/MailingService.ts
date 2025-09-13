@@ -6,22 +6,28 @@ import {
   SendEmailOptions, 
   MailingService as IMailingService,
   EmailTemplate,
-  OutboxEmail,
-  MailingTransportConfig
-} from '../types'
+  QueuedEmail,
+  MailingTransportConfig,
+  EmailObject
+} from '../types/index.js'
+import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
 export class MailingService implements IMailingService {
   private payload: Payload
   private config: MailingPluginConfig
-  private transporter: Transporter
+  private transporter!: Transporter
   private templatesCollection: string
-  private outboxCollection: string
+  private emailsCollection: string
 
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
     this.config = config
-    this.templatesCollection = config.collections?.templates || 'email-templates'
-    this.outboxCollection = config.collections?.outbox || 'email-outbox'
+    
+    const templatesConfig = config.collections?.templates
+    this.templatesCollection = typeof templatesConfig === 'string' ? templatesConfig : 'email-templates'
+    
+    const emailsConfig = config.collections?.emails
+    this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
     
     this.initializeTransporter()
     this.registerHandlebarsHelpers()
@@ -32,7 +38,7 @@ export class MailingService implements IMailingService {
       if ('sendMail' in this.config.transport) {
         this.transporter = this.config.transport
       } else {
-        this.transporter = nodemailer.createTransporter(this.config.transport as MailingTransportConfig)
+        this.transporter = nodemailer.createTransport(this.config.transport as MailingTransportConfig)
       }
     } else {
       throw new Error('Email transport configuration is required')
@@ -64,7 +70,7 @@ export class MailingService implements IMailingService {
       }).format(amount)
     })
 
-    Handlebars.registerHelper('ifEquals', function(arg1: any, arg2: any, options: any) {
+    Handlebars.registerHelper('ifEquals', function(this: any, arg1: any, arg2: any, options: any) {
       return (arg1 === arg2) ? options.fn(this) : options.inverse(this)
     })
 
@@ -75,29 +81,34 @@ export class MailingService implements IMailingService {
   }
 
   async sendEmail(options: SendEmailOptions): Promise<string> {
-    const outboxId = await this.scheduleEmail({
+    const emailId = await this.scheduleEmail({
       ...options,
       scheduledAt: new Date()
     })
 
-    await this.processOutboxItem(outboxId)
+    await this.processEmailItem(emailId)
     
-    return outboxId
+    return emailId
   }
 
   async scheduleEmail(options: SendEmailOptions): Promise<string> {
     let html = options.html || ''
     let text = options.text || ''
     let subject = options.subject || ''
+    let templateId: string | undefined = undefined
 
-    if (options.templateId) {
-      const template = await this.getTemplate(options.templateId)
+    if (options.templateSlug) {
+      const template = await this.getTemplateBySlug(options.templateSlug)
+      
       if (template) {
+        templateId = template.id
         const variables = options.variables || {}
-        
-        html = this.renderTemplate(template.htmlTemplate, variables)
-        text = template.textTemplate ? this.renderTemplate(template.textTemplate, variables) : ''
-        subject = this.renderTemplate(template.subject, variables)
+        const renderedContent = await this.renderEmailTemplate(template, variables)
+        html = renderedContent.html
+        text = renderedContent.text
+        subject = this.renderHandlebarsTemplate(template.subject, variables)
+      } else {
+        throw new Error(`Email template not found: ${options.templateSlug}`)
       }
     }
 
@@ -109,11 +120,11 @@ export class MailingService implements IMailingService {
       throw new Error('Email HTML content is required')
     }
 
-    const outboxData = {
-      template: options.templateId || undefined,
-      to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
-      cc: options.cc ? (Array.isArray(options.cc) ? options.cc.join(', ') : options.cc) : undefined,
-      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(', ') : options.bcc) : undefined,
+    const queueData = {
+      template: templateId,
+      to: Array.isArray(options.to) ? options.to : [options.to],
+      cc: options.cc ? (Array.isArray(options.cc) ? options.cc : [options.cc]) : undefined,
+      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]) : undefined,
       from: options.from || this.config.defaultFrom,
       replyTo: options.replyTo,
       subject: subject || options.subject,
@@ -127,18 +138,18 @@ export class MailingService implements IMailingService {
     }
 
     const result = await this.payload.create({
-      collection: this.outboxCollection,
-      data: outboxData,
+      collection: this.emailsCollection as any,
+      data: queueData,
     })
 
     return result.id as string
   }
 
-  async processOutbox(): Promise<void> {
+  async processEmails(): Promise<void> {
     const currentTime = new Date().toISOString()
     
     const { docs: pendingEmails } = await this.payload.find({
-      collection: this.outboxCollection,
+      collection: this.emailsCollection as any,
       where: {
         and: [
           {
@@ -167,7 +178,7 @@ export class MailingService implements IMailingService {
     })
 
     for (const email of pendingEmails) {
-      await this.processOutboxItem(email.id)
+      await this.processEmailItem(String(email.id))
     }
   }
 
@@ -177,7 +188,7 @@ export class MailingService implements IMailingService {
     const retryTime = new Date(Date.now() - retryDelay).toISOString()
 
     const { docs: failedEmails } = await this.payload.find({
-      collection: this.outboxCollection,
+      collection: this.emailsCollection as any,
       where: {
         and: [
           {
@@ -210,15 +221,15 @@ export class MailingService implements IMailingService {
     })
 
     for (const email of failedEmails) {
-      await this.processOutboxItem(email.id)
+      await this.processEmailItem(String(email.id))
     }
   }
 
-  private async processOutboxItem(outboxId: string): Promise<void> {
+  private async processEmailItem(emailId: string): Promise<void> {
     try {
       await this.payload.update({
-        collection: this.outboxCollection,
-        id: outboxId,
+        collection: this.emailsCollection as any,
+        id: emailId,
         data: {
           status: 'processing',
           lastAttemptAt: new Date().toISOString(),
@@ -226,11 +237,11 @@ export class MailingService implements IMailingService {
       })
 
       const email = await this.payload.findByID({
-        collection: this.outboxCollection,
-        id: outboxId,
-      }) as OutboxEmail
+        collection: this.emailsCollection as any,
+        id: emailId,
+      }) as QueuedEmail
 
-      const mailOptions = {
+      let emailObject: EmailObject = {
         from: email.from || this.config.defaultFrom,
         to: email.to,
         cc: email.cc || undefined,
@@ -239,13 +250,30 @@ export class MailingService implements IMailingService {
         subject: email.subject,
         html: email.html,
         text: email.text || undefined,
+        variables: email.variables,
+      }
+
+      // Apply emailWrapper hook if configured
+      if (this.config.emailWrapper) {
+        emailObject = await this.config.emailWrapper(emailObject)
+      }
+
+      const mailOptions = {
+        from: emailObject.from || this.config.defaultFrom,
+        to: emailObject.to,
+        cc: emailObject.cc || undefined,
+        bcc: emailObject.bcc || undefined,
+        replyTo: emailObject.replyTo || undefined,
+        subject: emailObject.subject,
+        html: emailObject.html,
+        text: emailObject.text || undefined,
       }
 
       await this.transporter.sendMail(mailOptions)
 
       await this.payload.update({
-        collection: this.outboxCollection,
-        id: outboxId,
+        collection: this.emailsCollection as any,
+        id: emailId,
         data: {
           status: 'sent',
           sentAt: new Date().toISOString(),
@@ -254,12 +282,12 @@ export class MailingService implements IMailingService {
       })
 
     } catch (error) {
-      const attempts = await this.incrementAttempts(outboxId)
+      const attempts = await this.incrementAttempts(emailId)
       const maxAttempts = this.config.retryAttempts || 3
 
       await this.payload.update({
-        collection: this.outboxCollection,
-        id: outboxId,
+        collection: this.emailsCollection as any,
+        id: emailId,
         data: {
           status: attempts >= maxAttempts ? 'failed' : 'pending',
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -268,22 +296,22 @@ export class MailingService implements IMailingService {
       })
 
       if (attempts >= maxAttempts) {
-        console.error(`Email ${outboxId} failed permanently after ${attempts} attempts:`, error)
+        console.error(`Email ${emailId} failed permanently after ${attempts} attempts:`, error)
       }
     }
   }
 
-  private async incrementAttempts(outboxId: string): Promise<number> {
+  private async incrementAttempts(emailId: string): Promise<number> {
     const email = await this.payload.findByID({
-      collection: this.outboxCollection,
-      id: outboxId,
-    }) as OutboxEmail
+      collection: this.emailsCollection as any,
+      id: emailId,
+    }) as QueuedEmail
 
     const newAttempts = (email.attempts || 0) + 1
 
     await this.payload.update({
-      collection: this.outboxCollection,
-      id: outboxId,
+      collection: this.emailsCollection as any,
+      id: emailId,
       data: {
         attempts: newAttempts,
       },
@@ -292,26 +320,49 @@ export class MailingService implements IMailingService {
     return newAttempts
   }
 
-  private async getTemplate(templateId: string): Promise<EmailTemplate | null> {
+  private async getTemplateBySlug(templateSlug: string): Promise<EmailTemplate | null> {
     try {
-      const template = await this.payload.findByID({
-        collection: this.templatesCollection,
-        id: templateId,
+      const { docs } = await this.payload.find({
+        collection: this.templatesCollection as any,
+        where: {
+          slug: {
+            equals: templateSlug,
+          },
+        },
+        limit: 1,
       })
-      return template as EmailTemplate
+      
+      return docs.length > 0 ? docs[0] as EmailTemplate : null
     } catch (error) {
-      console.error(`Template ${templateId} not found:`, error)
+      console.error(`Template with slug '${templateSlug}' not found:`, error)
       return null
     }
   }
 
-  private renderTemplate(template: string, variables: Record<string, any>): string {
+  private renderHandlebarsTemplate(template: string, variables: Record<string, any>): string {
     try {
       const compiled = Handlebars.compile(template)
       return compiled(variables)
     } catch (error) {
-      console.error('Template rendering error:', error)
+      console.error('Handlebars template rendering error:', error)
       return template
     }
   }
+
+  private async renderEmailTemplate(template: EmailTemplate, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
+    if (!template.content) {
+      return { html: '', text: '' }
+    }
+
+    // Serialize richtext to HTML and text
+    let html = serializeRichTextToHTML(template.content)
+    let text = serializeRichTextToText(template.content)
+
+    // Apply Handlebars variables to the rendered content
+    html = this.renderHandlebarsTemplate(html, variables)
+    text = this.renderHandlebarsTemplate(text, variables)
+
+    return { html, text }
+  }
+
 }

@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import { SendEmailOptions } from '../types'
+import { SendEmailOptions } from '../types/index.js'
 
 export const getMailing = (payload: Payload) => {
   const mailing = (payload as any).mailing
@@ -19,9 +19,9 @@ export const scheduleEmail = async (payload: Payload, options: SendEmailOptions)
   return mailing.service.scheduleEmail(options)
 }
 
-export const processOutbox = async (payload: Payload): Promise<void> => {
+export const processEmails = async (payload: Payload): Promise<void> => {
   const mailing = getMailing(payload)
-  return mailing.service.processOutbox()
+  return mailing.service.processEmails()
 }
 
 export const retryFailedEmails = async (payload: Payload): Promise<void> => {

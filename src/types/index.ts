@@ -1,16 +1,35 @@
 import { Payload } from 'payload'
+import type { CollectionConfig, RichTextField } from 'payload'
 import { Transporter } from 'nodemailer'
+
+export interface EmailObject {
+  to: string | string[]
+  cc?: string | string[]
+  bcc?: string | string[]
+  from?: string
+  replyTo?: string
+  subject: string
+  html: string
+  text?: string
+  variables?: Record<string, any>
+}
+
+export type EmailWrapperHook = (email: EmailObject) => EmailObject | Promise<EmailObject>
 
 export interface MailingPluginConfig {
   collections?: {
-    templates?: string
-    outbox?: string
+    templates?: string | Partial<CollectionConfig>
+    emails?: string | Partial<CollectionConfig>
   }
   defaultFrom?: string
   transport?: Transporter | MailingTransportConfig
   queue?: string
   retryAttempts?: number
   retryDelay?: number
+  emailWrapper?: EmailWrapperHook
+  richTextEditor?: RichTextField['editor']
+  onReady?: (payload: any) => Promise<void>
+  initOrder?: 'before' | 'after'
 }
 
 export interface MailingTransportConfig {
@@ -26,27 +45,20 @@ export interface MailingTransportConfig {
 export interface EmailTemplate {
   id: string
   name: string
+  slug: string
   subject: string
-  htmlTemplate: string
-  textTemplate?: string
-  variables?: TemplateVariable[]
+  content: any // Lexical editor state
   createdAt: string
   updatedAt: string
 }
 
-export interface TemplateVariable {
-  name: string
-  type: 'text' | 'number' | 'boolean' | 'date'
-  required: boolean
-  description?: string
-}
 
-export interface OutboxEmail {
+export interface QueuedEmail {
   id: string
-  templateId?: string
-  to: string | string[]
-  cc?: string | string[]
-  bcc?: string | string[]
+  template?: string
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
   from?: string
   replyTo?: string
   subject: string
@@ -65,7 +77,7 @@ export interface OutboxEmail {
 }
 
 export interface SendEmailOptions {
-  templateId?: string
+  templateSlug?: string
   to: string | string[]
   cc?: string | string[]
   bcc?: string | string[]
@@ -82,7 +94,7 @@ export interface SendEmailOptions {
 export interface MailingService {
   sendEmail(options: SendEmailOptions): Promise<string>
   scheduleEmail(options: SendEmailOptions): Promise<string>
-  processOutbox(): Promise<void>
+  processEmails(): Promise<void>
   retryFailedEmails(): Promise<void>
 }
 
