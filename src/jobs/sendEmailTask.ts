@@ -1,6 +1,5 @@
 import { sendEmail } from '../sendEmail.js'
 import {Email, EmailTemplate} from '../payload-types.js'
-import {BaseEmail} from "../types/index.js"
 
 export interface SendEmailTaskInput {
   // Template mode fields

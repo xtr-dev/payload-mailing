@@ -1,7 +1,6 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
 import {Email, EmailTemplate} from "./payload-types.js"
-import {BaseEmail} from "./types/index.js"
 
 // Options for sending emails
 export interface SendEmailOptions<T extends Email = Email> {
