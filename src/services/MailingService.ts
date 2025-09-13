@@ -40,8 +40,11 @@ export class MailingService implements IMailingService {
       } else {
         this.transporter = nodemailer.createTransport(this.config.transport as MailingTransportConfig)
       }
+    } else if (this.payload.email && 'sendMail' in this.payload.email) {
+      // Use Payload's configured mailer
+      this.transporter = this.payload.email
     } else {
-      throw new Error('Email transport configuration is required')
+      throw new Error('Email transport configuration is required either in plugin config or Payload config')
     }
   }
 
