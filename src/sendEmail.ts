@@ -1,9 +1,9 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-import {Email, EmailTemplate} from "./payload-types.js"
+import { BaseEmailDocument } from './types/index.js'
 
 // Options for sending emails
-export interface SendEmailOptions<T extends Email = Email> {
+export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
   // Template-based email
   template?: {
     slug: string
@@ -35,7 +35,7 @@ export interface SendEmailOptions<T extends Email = Email> {
  * })
  * ```
  */
-export const sendEmail = async <TEmail extends Email = Email>(
+export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocument>(
   payload: Payload,
   options: SendEmailOptions<TEmail>
 ): Promise<TEmail> => {
