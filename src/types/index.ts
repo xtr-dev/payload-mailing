@@ -18,15 +18,15 @@ export interface BaseEmailDocument {
   html: string
   text?: string | null
   variables?: JSONValue
-  scheduledAt?: string | null
-  sentAt?: string | null
+  scheduledAt?: string | Date | null
+  sentAt?: string | Date | null
   status?: 'pending' | 'processing' | 'sent' | 'failed' | null
   attempts?: number | null
-  lastAttemptAt?: string | null
+  lastAttemptAt?: string | Date | null
   error?: string | null
   priority?: number | null
-  createdAt?: string | null
-  updatedAt?: string | null
+  createdAt?: string | Date | null
+  updatedAt?: string | Date | null
 }
 
 export interface BaseEmailTemplateDocument {
@@ -35,8 +35,8 @@ export interface BaseEmailTemplateDocument {
   slug: string
   subject?: string | null
   content?: any
-  createdAt?: string | null
-  updatedAt?: string | null
+  createdAt?: string | Date | null
+  updatedAt?: string | Date | null
 }
 
 export type BaseEmail<TEmail extends BaseEmailDocument = BaseEmailDocument, TEmailTemplate extends BaseEmailTemplateDocument = BaseEmailTemplateDocument> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'> | TEmailTemplate['id'] | undefined | null}
@@ -88,11 +88,11 @@ export interface QueuedEmail {
   html: string
   text?: string | null
   variables?: JSONValue
-  scheduledAt?: string | null
-  sentAt?: string | null
+  scheduledAt?: string | Date | null
+  sentAt?: string | Date | null
   status: 'pending' | 'processing' | 'sent' | 'failed'
   attempts: number
-  lastAttemptAt?: string | null
+  lastAttemptAt?: string | Date | null
   error?: string | null
   priority?: number | null
   createdAt: string
