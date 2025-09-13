@@ -73,18 +73,22 @@ export class MailingService implements IMailingService {
     const engine = this.config.templateEngine || 'liquidjs'
 
     if (engine === 'liquidjs') {
-      this.initializeLiquidJS()
+      // LiquidJS will be initialized lazily on first use
+      this.liquid = null
     } else if (engine === 'mustache') {
-      // Mustache doesn't need initialization, we'll use it directly in renderTemplate
+      // Mustache will be loaded dynamically on first use
       this.liquid = null
     } else if (engine === 'simple') {
       this.liquid = null
     }
   }
 
-  private initializeLiquidJS(): void {
+  private async initializeLiquidJS(): Promise<void> {
+    if (this.liquid) return // Already initialized
+
     try {
-      const { Liquid: LiquidEngine } = require('liquidjs')
+      const liquidModule = await Function('return import("liquidjs")')() as any
+      const { Liquid: LiquidEngine } = liquidModule
       this.liquid = new LiquidEngine()
 
       // Register custom filters (equivalent to Handlebars helpers)
@@ -396,29 +400,43 @@ export class MailingService implements IMailingService {
 
     const engine = this.config.templateEngine || 'liquidjs'
 
-    // Use LiquidJS if available and configured
-    if (engine === 'liquidjs' && this.liquid) {
+    // Use LiquidJS if configured
+    if (engine === 'liquidjs') {
       try {
-        return await this.liquid.parseAndRender(template, variables)
+        await this.initializeLiquidJS()
+        if (this.liquid) {
+          return await this.liquid.parseAndRender(template, variables)
+        }
       } catch (error) {
         console.error('LiquidJS template rendering error:', error)
-        return template
       }
     }
 
     // Use Mustache if configured
     if (engine === 'mustache') {
       try {
-        const Mustache = require('mustache')
-        return Mustache.render(template, variables)
+        const mustacheResult = await this.renderWithMustache(template, variables)
+        if (mustacheResult !== null) {
+          return mustacheResult
+        }
       } catch (error) {
         console.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.')
-        return this.simpleVariableReplacement(template, variables)
       }
     }
 
     // Fallback to simple variable replacement
     return this.simpleVariableReplacement(template, variables)
+  }
+
+  private async renderWithMustache(template: string, variables: Record<string, any>): Promise<string | null> {
+    try {
+      // Dynamic import with proper typing
+      const mustacheModule = await Function('return import("mustache")')() as any
+      const Mustache = mustacheModule.default || mustacheModule
+      return Mustache.render(template, variables)
+    } catch (error) {
+      return null
+    }
   }
 
   private simpleVariableReplacement(template: string, variables: Record<string, any>): string {
