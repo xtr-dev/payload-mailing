@@ -1,3 +1,6 @@
+/**
+ * This config is only used to generate types.
+ */
 
 import { BaseDatabaseAdapter, buildConfig, Payload} from 'payload'
 import Emails from "./src/collections/Emails.js"
