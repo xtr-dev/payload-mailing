@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { MailingService } from '../services/MailingService.js'
 
 export interface ProcessEmailsJobData {
-  type: 'process-emails' | 'retry-failed'
+  // No type needed - always processes both pending and failed emails
 }
 
 export const processEmailsJob = async (
@@ -10,18 +10,19 @@ export const processEmailsJob = async (
   context: { req: PayloadRequest; mailingService: MailingService }
 ) => {
   const { mailingService } = context
-  const { type } = job.data
 
   try {
-    if (type === 'process-emails') {
-      await mailingService.processEmails()
-      console.log('Email processing completed successfully')
-    } else if (type === 'retry-failed') {
-      await mailingService.retryFailedEmails()
-      console.log('Failed email retry completed successfully')
-    }
+    console.log('🔄 Processing email queue (pending + failed emails)...')
+
+    // Process pending emails first
+    await mailingService.processEmails()
+
+    // Then retry failed emails
+    await mailingService.retryFailedEmails()
+
+    console.log('✅ Email queue processing completed successfully (pending and failed emails)')
   } catch (error) {
-    console.error(`${type} job failed:`, error)
+    console.error('❌ Email queue processing failed:', error)
     throw error
   }
 }
@@ -29,7 +30,6 @@ export const processEmailsJob = async (
 export const scheduleEmailsJob = async (
   payload: any,
   queueName: string,
-  jobType: 'process-emails' | 'retry-failed',
   delay?: number
 ) => {
   if (!payload.jobs) {
@@ -41,10 +41,10 @@ export const scheduleEmailsJob = async (
     await payload.jobs.queue({
       queue: queueName,
       task: 'processEmails',
-      input: { type: jobType },
+      input: {},
       waitUntil: delay ? new Date(Date.now() + delay) : undefined,
     })
   } catch (error) {
-    console.error(`Failed to schedule ${jobType} job:`, error)
+    console.error('Failed to schedule email processing job:', error)
   }
 }

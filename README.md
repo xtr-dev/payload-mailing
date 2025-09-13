@@ -2,7 +2,7 @@
 
 📧 **Template-based email system with scheduling and job processing for PayloadCMS**
 
-✨ **Simplified API**: Starting from v0.1.0, this plugin uses a simplified API that leverages PayloadCMS collections directly for better type safety and flexibility.
+⚠️ **Pre-release Warning**: This package is currently in active development (v0.0.x). Breaking changes may occur before v1.0.0. Not recommended for production use.
 
 ## Features
 
@@ -597,6 +597,81 @@ await processEmails(payload)
 // Retry failed emails
 await retryFailedEmails(payload)
 ```
+
+## PayloadCMS Task Integration
+
+The plugin provides a ready-to-use PayloadCMS task for queuing template emails:
+
+### 1. Add the task to your Payload config
+
+```typescript
+import { buildConfig } from 'payload/config'
+import { sendTemplateEmailTask } from '@xtr-dev/payload-mailing'
+
+export default buildConfig({
+  // ... your config
+  jobs: {
+    tasks: [
+      sendTemplateEmailTask,
+      // ... your other tasks
+    ]
+  }
+})
+```
+
+### 2. Queue emails from your code
+
+```typescript
+import type { SendTemplateEmailInput } from '@xtr-dev/payload-mailing'
+
+// Queue a template email
+const result = await payload.jobs.queue({
+  task: 'send-template-email',
+  input: {
+    templateSlug: 'welcome-email',
+    to: ['user@example.com'],
+    cc: ['manager@example.com'],
+    variables: {
+      firstName: 'John',
+      activationUrl: 'https://example.com/activate/123'
+    },
+    priority: 1,
+    // Add any custom fields from your email collection
+    customField: 'value'
+  } as SendTemplateEmailInput
+})
+
+// Queue a scheduled email
+await payload.jobs.queue({
+  task: 'send-template-email',
+  input: {
+    templateSlug: 'reminder-email',
+    to: ['user@example.com'],
+    variables: { eventName: 'Product Launch' },
+    scheduledAt: new Date('2024-01-15T10:00:00Z').toISOString(),
+    priority: 3
+  }
+})
+```
+
+### 3. Use in admin panel workflows
+
+The task can also be triggered from the Payload admin panel with a user-friendly form interface that includes:
+- Template slug selection
+- Email recipients (to, cc, bcc)
+- Template variables as JSON
+- Optional scheduling
+- Priority setting
+- Any custom fields you've added to your email collection
+
+### Task Benefits
+
+- ✅ **Easy Integration**: Just add to your tasks array
+- ✅ **Type Safety**: Full TypeScript support with `SendTemplateEmailInput`
+- ✅ **Admin UI**: Ready-to-use form interface
+- ✅ **Flexible**: Supports all your custom email collection fields
+- ✅ **Error Handling**: Comprehensive error reporting
+- ✅ **Queue Management**: Leverage Payload's job queue system
 
 ## Job Processing
 

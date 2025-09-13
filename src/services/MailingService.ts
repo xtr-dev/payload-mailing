@@ -13,12 +13,13 @@ import {
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
 export class MailingService implements IMailingService {
-  private payload: Payload
+  public payload: Payload
   private config: MailingPluginConfig
   private transporter!: Transporter | any
   private templatesCollection: string
   private emailsCollection: string
   private liquid: Liquid | null | false = null
+  private transporterInitialized = false
 
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
@@ -30,10 +31,15 @@ export class MailingService implements IMailingService {
     const emailsConfig = config.collections?.emails
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
 
-    this.initializeTransporter()
+    // Only initialize transporter if payload is properly set
+    if (payload && payload.db) {
+      this.initializeTransporter()
+    }
   }
 
   private initializeTransporter(): void {
+    if (this.transporterInitialized) return
+
     if (this.config.transport) {
       if ('sendMail' in this.config.transport) {
         this.transporter = this.config.transport
@@ -45,6 +51,17 @@ export class MailingService implements IMailingService {
       this.transporter = this.payload.email as any
     } else {
       throw new Error('Email transport configuration is required either in plugin config or Payload config')
+    }
+
+    this.transporterInitialized = true
+  }
+
+  private ensureInitialized(): void {
+    if (!this.payload || !this.payload.db) {
+      throw new Error('MailingService payload not properly initialized')
+    }
+    if (!this.transporterInitialized) {
+      this.initializeTransporter()
     }
   }
 
@@ -108,6 +125,7 @@ export class MailingService implements IMailingService {
   }
 
   async renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; text: string; subject: string }> {
+    this.ensureInitialized()
     const template = await this.getTemplateBySlug(templateSlug)
 
     if (!template) {
@@ -125,6 +143,7 @@ export class MailingService implements IMailingService {
   }
 
   async processEmails(): Promise<void> {
+    this.ensureInitialized()
     const currentTime = new Date().toISOString()
 
     const { docs: pendingEmails } = await this.payload.find({
@@ -162,6 +181,7 @@ export class MailingService implements IMailingService {
   }
 
   async retryFailedEmails(): Promise<void> {
+    this.ensureInitialized()
     const maxAttempts = this.config.retryAttempts || 3
     const retryDelay = this.config.retryDelay || 300000 // 5 minutes
     const retryTime = new Date(Date.now() - retryDelay).toISOString()

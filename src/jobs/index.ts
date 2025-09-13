@@ -1,4 +1,5 @@
 import { processEmailsJob, ProcessEmailsJobData } from './processEmailsJob.js'
+import { sendEmailJob } from './sendEmailTask.js'
 import { MailingService } from '../services/MailingService.js'
 
 export const createMailingJobs = (mailingService: MailingService): any[] => {
@@ -13,7 +14,9 @@ export const createMailingJobs = (mailingService: MailingService): any[] => {
       },
       interfaceName: 'ProcessEmailsJob',
     },
+    sendEmailJob,
   ]
 }
 
 export * from './processEmailsJob.js'
+export * from './sendEmailTask.js'
