@@ -2,6 +2,9 @@ import { Payload } from 'payload'
 import type { CollectionConfig, RichTextField } from 'payload'
 import { Transporter } from 'nodemailer'
 
+// JSON value type that matches Payload's JSON field type
+export type JSONValue = string | number | boolean | { [k: string]: unknown } | unknown[] | null | undefined
+
 // Generic base interfaces that work with any ID type and null values
 export interface BaseEmailDocument {
   id: string | number
@@ -14,7 +17,7 @@ export interface BaseEmailDocument {
   subject: string
   html: string
   text?: string | null
-  variables?: Record<string, any> | null
+  variables?: JSONValue
   scheduledAt?: string | null
   sentAt?: string | null
   status?: 'pending' | 'processing' | 'sent' | 'failed' | null
@@ -84,7 +87,7 @@ export interface QueuedEmail {
   subject: string
   html: string
   text?: string | null
-  variables?: Record<string, any> | null
+  variables?: JSONValue
   scheduledAt?: string | null
   sentAt?: string | null
   status: 'pending' | 'processing' | 'sent' | 'failed'
