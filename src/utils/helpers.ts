@@ -27,6 +27,30 @@ export interface SendEmailOptions<T extends BaseEmailData = BaseEmailData> {
   collectionSlug?: string // defaults to 'emails'
 }
 
+/**
+ * Parse and validate email addresses
+ * @internal
+ */
+export const parseAndValidateEmails = (emails: string | string[] | undefined): string[] | undefined => {
+  if (!emails) return undefined
+
+  let emailList: string[]
+  if (Array.isArray(emails)) {
+    emailList = emails
+  } else {
+    emailList = emails.split(',').map(email => email.trim()).filter(Boolean)
+  }
+
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const invalidEmails = emailList.filter(email => !emailRegex.test(email))
+  if (invalidEmails.length > 0) {
+    throw new Error(`Invalid email addresses: ${invalidEmails.join(', ')}`)
+  }
+
+  return emailList
+}
+
 export const getMailing = (payload: Payload) => {
   const mailing = (payload as any).mailing
   if (!mailing) {
@@ -105,36 +129,15 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
     throw new Error('Fields "subject" and "html" are required when not using a template')
   }
 
-  // Parse and validate email addresses
-  const parseEmails = (emails: string | string[] | undefined): string[] | undefined => {
-    if (!emails) return undefined
-
-    let emailList: string[]
-    if (Array.isArray(emails)) {
-      emailList = emails
-    } else {
-      emailList = emails.split(',').map(email => email.trim()).filter(Boolean)
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const invalidEmails = emailList.filter(email => !emailRegex.test(email))
-    if (invalidEmails.length > 0) {
-      throw new Error(`Invalid email addresses: ${invalidEmails.join(', ')}`)
-    }
-
-    return emailList
-  }
-
-  // Process email addresses
+  // Process email addresses using shared validation
   if (emailData.to) {
-    emailData.to = parseEmails(emailData.to as string | string[])
+    emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
   if (emailData.cc) {
-    emailData.cc = parseEmails(emailData.cc as string | string[])
+    emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }
   if (emailData.bcc) {
-    emailData.bcc = parseEmails(emailData.bcc as string | string[])
+    emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
   }
 
   // Convert scheduledAt to ISO string if it's a Date
