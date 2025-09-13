@@ -114,14 +114,13 @@ jobs:
           fi
 
           # Generate changelog using Claude (fail if it fails)
-          if ! command -v claude-code >/dev/null 2>&1; then
+          if ! command -v claude >/dev/null 2>&1; then
             echo "❌ ERROR: Claude CLI installation failed."
             exit 1
           fi
 
           echo "🤖 Generating changelog with Claude..."
-          CHANGELOG=$(timeout 240s claude-code << 'CLAUDE_EOF'
-          Please analyze the following git commits and generate a concise changelog in this exact format:
+          PROMPT="Please analyze the following git commits and generate a concise changelog in this exact format:
 
           ## Changes
 
@@ -143,9 +142,9 @@ jobs:
           Only include sections that have actual changes. Keep each bullet point concise and user-focused.
 
           Git commits to analyze:
-          $COMMITS
-          CLAUDE_EOF
-          )
+          $COMMITS"
+
+          CHANGELOG=$(timeout 240s claude -p "$PROMPT")
 
           # Check if changelog generation succeeded
           if [ $? -ne 0 ] || [ -z "$CHANGELOG" ]; then
