@@ -17,6 +17,7 @@ jobs:
       new-version: ${{ steps.version-bump.outputs.new-version }}
       current-version: ${{ steps.version-bump.outputs.current-version }}
       version-type: ${{ steps.version-type.outputs.type }}
+      package-name: ${{ steps.prerequisites.outputs.package-name }}
 
     steps:
       - name: Checkout code
@@ -28,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
@@ -47,6 +48,51 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
+
+      - name: Validate prerequisites and setup
+        id: prerequisites
+        run: |
+          # Extract package info
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          echo "package-name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+          echo "📦 Package: $PACKAGE_NAME"
+          echo "📌 Current Version: $CURRENT_VERSION"
+
+          # Validate version branches exist
+          echo "🔍 Validating version branches..."
+          MISSING_BRANCHES=""
+
+          for branch in "version/major" "version/minor" "version/patch"; do
+            if ! git ls-remote --heads origin "$branch" | grep -q "$branch"; then
+              MISSING_BRANCHES="$MISSING_BRANCHES $branch"
+            fi
+          done
+
+          if [ -n "$MISSING_BRANCHES" ]; then
+            echo "❌ ERROR: Missing required version branches:$MISSING_BRANCHES"
+            echo "Please create these branches first:"
+            for branch in $MISSING_BRANCHES; do
+              echo "  git checkout -b $branch && git push origin $branch"
+            done
+            exit 1
+          fi
+
+          echo "✅ All version branches exist"
+
+          # Validate Node.js version matches package.json engines
+          NODE_VERSION=$(node --version)
+          echo "🔍 Validating Node.js version: $NODE_VERSION"
+
+          # Basic validation - check if we're on Node 20+
+          if ! echo "$NODE_VERSION" | grep -qE "^v(20|21|22)\."; then
+            echo "⚠️  WARNING: Node.js version $NODE_VERSION may not match package.json engines requirements"
+          fi
+
+          echo "✅ Prerequisites validation complete"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -317,12 +363,12 @@ CLAUDE_EOF
           ### Installation
 
           \`\`\`bash
-          npm install @xtr-dev/payload-mailing@${{ steps.version-bump.outputs.new-version }}
+          npm install ${{ steps.prerequisites.outputs.package-name }}@${{ steps.version-bump.outputs.new-version }}
           \`\`\`
 
           ### Documentation
 
-          See the [README](https://github.com/xtr-dev/payload-mailing#readme) for usage instructions and full documentation."
+          See the [README](https://github.com/${{ github.repository }}#readme) for usage instructions and full documentation."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -335,7 +381,7 @@ CLAUDE_EOF
         if: needs.version-and-publish.outputs.new-version != ''
         run: |
           echo "🎉 Successfully published version ${{ needs.version-and-publish.outputs.new-version }} to NPM!"
-          echo "📦 Package: https://www.npmjs.com/package/@xtr-dev/payload-mailing"
-          echo "🏷️  GitHub Release: https://github.com/xtr-dev/payload-mailing/releases/tag/v${{ needs.version-and-publish.outputs.new-version }}"
+          echo "📦 Package: https://www.npmjs.com/package/${{ needs.version-and-publish.outputs.package-name }}"
+          echo "🏷️  GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.version-and-publish.outputs.new-version }}"
           echo "🔄 Version Type: ${{ needs.version-and-publish.outputs.version-type }}"
           echo "📈 Version Change: v${{ needs.version-and-publish.outputs.current-version }} → v${{ needs.version-and-publish.outputs.new-version }}"
