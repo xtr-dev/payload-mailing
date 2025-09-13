@@ -100,6 +100,23 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     emailData.from = validated && validated.length > 0 ? validated[0] : undefined
   }
 
+  // Normalize Date objects to ISO strings for consistent database storage
+  if (emailData.scheduledAt instanceof Date) {
+    emailData.scheduledAt = emailData.scheduledAt.toISOString()
+  }
+  if (emailData.sentAt instanceof Date) {
+    emailData.sentAt = emailData.sentAt.toISOString()
+  }
+  if (emailData.lastAttemptAt instanceof Date) {
+    emailData.lastAttemptAt = emailData.lastAttemptAt.toISOString()
+  }
+  if (emailData.createdAt instanceof Date) {
+    emailData.createdAt = emailData.createdAt.toISOString()
+  }
+  if (emailData.updatedAt instanceof Date) {
+    emailData.updatedAt = emailData.updatedAt.toISOString()
+  }
+
   // Create the email in the collection with proper typing
   const email = await payload.create({
     collection: collectionSlug,
