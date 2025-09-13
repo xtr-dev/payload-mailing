@@ -83,11 +83,21 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
-  if (emailData.cc) {
+  if (emailData.cc && emailData.cc !== null) {
     emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }
-  if (emailData.bcc) {
+  if (emailData.bcc && emailData.bcc !== null) {
     emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
+  }
+  if (emailData.replyTo && emailData.replyTo !== null) {
+    const validated = parseAndValidateEmails(emailData.replyTo as string | string[])
+    // replyTo should be a single email, so take the first one if array
+    emailData.replyTo = validated && validated.length > 0 ? validated[0] : undefined
+  }
+  if (emailData.from && emailData.from !== null) {
+    const validated = parseAndValidateEmails(emailData.from as string | string[])
+    // from should be a single email, so take the first one if array
+    emailData.from = validated && validated.length > 0 ? validated[0] : undefined
   }
 
   // Create the email in the collection with proper typing
