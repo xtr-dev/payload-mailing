@@ -3,71 +3,18 @@ name: Version and Publish
 on:
   push:
     branches:
-      - main
+      - 'major/**'
+      - 'minor/**'
+      - 'patch/**'
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
-  validate:
-    if: github.event_name == 'pull_request' && (startsWith(github.event.pull_request.head.ref, 'major/') || startsWith(github.event.pull_request.head.ref, 'minor/') || startsWith(github.event.pull_request.head.ref, 'patch/'))
+  prepare-release:
+    if: github.event_name == 'push' && (startsWith(github.ref_name, 'major/') || startsWith(github.ref_name, 'minor/') || startsWith(github.ref_name, 'patch/'))
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Run build
-        run: pnpm build
-
-      - name: Validate version branch
-        run: |
-          echo "✅ Version branch validation passed"
-          if [[ "${{ github.event.pull_request.head.ref }}" =~ ^major/ ]]; then
-            echo "🚀 This will create a MAJOR release when merged"
-          elif [[ "${{ github.event.pull_request.head.ref }}" =~ ^minor/ ]]; then
-            echo "✨ This will create a MINOR release when merged"
-          else
-            echo "🐛 This will create a PATCH release when merged"
-          fi
-
-  version-and-publish:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    outputs:
-      new-version: ${{ steps.version-bump.outputs.new-version }}
-      current-version: ${{ steps.version-bump.outputs.current-version }}
-      version-type: ${{ steps.version-type.outputs.type }}
-      package-name: ${{ steps.prerequisites.outputs.package-name }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -79,7 +26,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -97,30 +43,6 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
-
-      - name: Validate prerequisites and setup
-        id: prerequisites
-        run: |
-          # Extract package info
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-
-          echo "package-name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
-          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-          echo "📦 Package: $PACKAGE_NAME"
-          echo "📌 Current Version: $CURRENT_VERSION"
-
-          # Validate Node.js version matches package.json engines
-          NODE_VERSION=$(node --version)
-          echo "🔍 Validating Node.js version: $NODE_VERSION"
-
-          # Basic validation - check if we're on Node 20+
-          if ! echo "$NODE_VERSION" | grep -qE "^v(20|21|22)\."; then
-            echo "⚠️  WARNING: Node.js version $NODE_VERSION may not match package.json engines requirements"
-          fi
-
-          echo "✅ Prerequisites validation complete"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -134,27 +56,19 @@ jobs:
       - name: Determine version bump type
         id: version-type
         run: |
-          if [[ "${{ github.event.pull_request.head.ref }}" =~ ^major/ ]]; then
+          BRANCH_NAME="${{ github.ref_name }}"
+          if [[ "$BRANCH_NAME" =~ ^major/ ]]; then
             echo "type=major" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.pull_request.head.ref }}" =~ ^minor/ ]]; then
+          elif [[ "$BRANCH_NAME" =~ ^minor/ ]]; then
             echo "type=minor" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.pull_request.head.ref }}" =~ ^patch/ ]]; then
-            echo "type=patch" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            # Default to patch for direct pushes to main
+          elif [[ "$BRANCH_NAME" =~ ^patch/ ]]; then
             echo "type=patch" >> $GITHUB_OUTPUT
           else
             echo "type=none" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
-      - name: Configure git
-        if: steps.version-type.outputs.type != 'none'
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Generate changelog with Claude
-        if: steps.version-type.outputs.type != 'none'
         id: changelog
         run: |
           # Get commits since last tag
@@ -214,8 +128,12 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Create version bump script
-        if: steps.version-type.outputs.type != 'none'
         run: |
           # Create Node.js script to safely bump version
           cat > bump-version.js << 'VERSION_SCRIPT_EOF'
@@ -255,35 +173,10 @@ jobs:
           }
           VERSION_SCRIPT_EOF
 
-      - name: Create single atomic commit with all changes
-        if: steps.version-type.outputs.type != 'none'
-        id: version-bump
+      - name: Bump version and create merge branch
+        id: prepare
         run: |
-          # Extract version type for commit title
           VERSION_TYPE="${{ steps.version-type.outputs.type }}"
-
-          # Create clean commit message title
-          if [ "$VERSION_TYPE" = "major" ]; then
-            COMMIT_TITLE="🚀 Major Release"
-          elif [ "$VERSION_TYPE" = "minor" ]; then
-            COMMIT_TITLE="✨ Minor Release"
-          else
-            COMMIT_TITLE="🐛 Patch Release"
-          fi
-
-          # Get the safe base commit (last release tag or fallback)
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            BASE_COMMIT=$(git rev-list -n 1 $LAST_TAG)
-          else
-            # Fallback: get commit from 1 week ago or first commit
-            BASE_COMMIT=$(git rev-list --since="1 week ago" --reverse HEAD | head -1 || git rev-list --max-parents=0 HEAD)
-          fi
-
-          echo "Base commit for squash: $BASE_COMMIT"
-
-          # Safely reset to base (soft reset preserves working directory)
-          git reset --soft $BASE_COMMIT
 
           # Bump version using our safe Node.js script
           VERSION_OUTPUT=$(node bump-version.js $VERSION_TYPE)
@@ -293,86 +186,196 @@ jobs:
           echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
+          # Create merge branch name
+          MERGE_BRANCH="merge/${{ github.ref_name }}"
+          echo "merge-branch=$MERGE_BRANCH" >> $GITHUB_OUTPUT
+
+          # Create or update merge branch
+          if git ls-remote --exit-code --heads origin $MERGE_BRANCH; then
+            echo "Merge branch $MERGE_BRANCH exists, checking out and updating"
+            git fetch origin $MERGE_BRANCH
+            git checkout -B $MERGE_BRANCH origin/$MERGE_BRANCH
+            git merge --no-ff ${{ github.ref_name }} -m "Update merge branch with latest changes from ${{ github.ref_name }}"
+          else
+            echo "Creating new merge branch $MERGE_BRANCH"
+            git checkout -b $MERGE_BRANCH
+          fi
+
           # Synchronize pnpm lockfile if it exists
           if [ -f pnpm-lock.yaml ]; then
             echo "Synchronizing pnpm lockfile..."
             pnpm install --frozen-lockfile --ignore-scripts || echo "Lockfile sync completed with warnings"
           fi
 
-          # Create single atomic commit with everything
+          # Clean up temporary files
+          rm -f bump-version.js
+
+          # Commit version bump and changes
           git add -A
+
+          # Create commit message title
+          if [ "$VERSION_TYPE" = "major" ]; then
+            COMMIT_TITLE="🚀 Major Release v$NEW_VERSION"
+          elif [ "$VERSION_TYPE" = "minor" ]; then
+            COMMIT_TITLE="✨ Minor Release v$NEW_VERSION"
+          else
+            COMMIT_TITLE="🐛 Patch Release v$NEW_VERSION"
+          fi
+
           COMMIT_MSG="$COMMIT_TITLE
 
           ${{ steps.changelog.outputs.changelog }}"
 
-          git commit -m "$COMMIT_MSG" || {
-            echo "Commit failed, checking git status:"
-            git status
-            git diff --cached
-            exit 1
-          }
+          git commit -m "$COMMIT_MSG" || echo "No changes to commit"
+
+          # Push merge branch
+          git push origin $MERGE_BRANCH
+
+      - name: Create or update pull request
+        run: |
+          MERGE_BRANCH="${{ steps.prepare.outputs.merge-branch }}"
+          NEW_VERSION="${{ steps.prepare.outputs.new-version }}"
+          VERSION_TYPE="${{ steps.version-type.outputs.type }}"
+
+          # Create PR title and body
+          if [ "$VERSION_TYPE" = "major" ]; then
+            PR_TITLE="🚀 Release v$NEW_VERSION (Major)"
+          elif [ "$VERSION_TYPE" = "minor" ]; then
+            PR_TITLE="✨ Release v$NEW_VERSION (Minor)"
+          else
+            PR_TITLE="🐛 Release v$NEW_VERSION (Patch)"
+          fi
+
+          PR_BODY="## Release v$NEW_VERSION
+
+          This PR contains the prepared release for version **v$NEW_VERSION** ($VERSION_TYPE release).
+
+          ${{ steps.changelog.outputs.changelog }}
+
+          ### Pre-Release Checklist
+          - [x] Version bumped in package.json
+          - [x] Changelog generated automatically
+          - [x] Tests passing
+          - [x] Build successful
+
+          **⚠️ Merging this PR will automatically publish to NPM and create a GitHub release.**
+
+          ---
+          🤖 This PR was created automatically from branch \`${{ github.ref_name }}\`"
+
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head $MERGE_BRANCH --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING_PR" ] && [ "$EXISTING_PR" != "null" ]; then
+            echo "Updating existing PR #$EXISTING_PR"
+            gh pr edit $EXISTING_PR --title "$PR_TITLE" --body "$PR_BODY"
+          else
+            echo "Creating new PR"
+            gh pr create --title "$PR_TITLE" --body "$PR_BODY" --head $MERGE_BRANCH --base main
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  version-and-publish:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'merge/')
+    runs-on: ubuntu-latest
+    outputs:
+      new-version: ${{ steps.extract-version.outputs.new-version }}
+      package-name: ${{ steps.extract-version.outputs.package-name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Extract version and package info
+        id: extract-version
+        run: |
+          # Extract package info from the merged commit
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          NEW_VERSION=$(node -p "require('./package.json').version")
+
+          echo "package-name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          echo "📦 Package: $PACKAGE_NAME"
+          echo "🚀 New Version: v$NEW_VERSION"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run final tests
+        run: pnpm test
+
+      - name: Run final build
+        run: pnpm build
+
+      - name: Create git tag
+        run: |
+          NEW_VERSION="${{ steps.extract-version.outputs.new-version }}"
+
+          # Get the commit message (which contains the changelog)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+
+          # Configure git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           # Create git tag
           git tag -a "v$NEW_VERSION" -m "Version $NEW_VERSION
 
-          ${{ steps.changelog.outputs.changelog }}"
+          $COMMIT_MSG"
 
-          echo "Created single atomic commit with version $CURRENT_VERSION → $NEW_VERSION"
-
-          # Clean up temporary files
-          rm -f bump-version.js
-
-      - name: Push version changes safely
-        if: steps.version-type.outputs.type != 'none'
-        run: |
-          # Check if we need to force push (if git history was rewritten)
-          CURRENT_REMOTE_HEAD=$(git ls-remote origin main | cut -f1)
-          LOCAL_REMOTE_HEAD=$(git rev-parse origin/main)
-
-          if [ "$CURRENT_REMOTE_HEAD" != "$LOCAL_REMOTE_HEAD" ]; then
-            echo "⚠️  Remote main has been updated by another process"
-            echo "Current remote HEAD: $CURRENT_REMOTE_HEAD"
-            echo "Local remote HEAD: $LOCAL_REMOTE_HEAD"
-            echo "❌ ABORTING: Cannot safely force push. Another workflow may be running."
-            exit 1
-          fi
-
-          # Safe force push with lease (only if remote hasn't changed)
-          echo "🚀 Pushing squashed commit to main..."
-          git push --force-with-lease origin main || {
-            echo "❌ ERROR: Force push failed. This likely means:"
-            echo "1. Another workflow pushed to main after this one started"
-            echo "2. Branch protection rules are preventing the push"
-            echo "3. Insufficient permissions"
-            exit 1
-          }
-
-          echo "🏷️  Pushing tags..."
+          # Push tags
           git push origin --tags
 
       - name: Publish to NPM
-        if: steps.version-type.outputs.type != 'none'
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        if: steps.version-type.outputs.type != 'none'
         run: |
-          gh release create "v${{ steps.version-bump.outputs.new-version }}" \
-            --title "Release v${{ steps.version-bump.outputs.new-version }}" \
-            --notes "# Release v${{ steps.version-bump.outputs.new-version }}
+          NEW_VERSION="${{ steps.extract-version.outputs.new-version }}"
 
-          ${{ steps.changelog.outputs.changelog }}
+          # Get the commit message (which contains the changelog)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+
+          gh release create "v$NEW_VERSION" \
+            --title "Release v$NEW_VERSION" \
+            --notes "$COMMIT_MSG
 
           ---
-
-          **Version Info**: ${{ steps.version-type.outputs.type }} release (v${{ steps.version-bump.outputs.current-version }} → v${{ steps.version-bump.outputs.new-version }})
 
           ### Installation
 
           \`\`\`bash
-          npm install ${{ steps.prerequisites.outputs.package-name }}@${{ steps.version-bump.outputs.new-version }}
+          npm install ${{ steps.extract-version.outputs.package-name }}@$NEW_VERSION
           \`\`\`
 
           ### Documentation
@@ -382,7 +385,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   notify-success:
-    if: github.event_name == 'push'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'merge/')
     needs: version-and-publish
     runs-on: ubuntu-latest
     steps:
@@ -392,5 +395,3 @@ jobs:
           echo "🎉 Successfully published version ${{ needs.version-and-publish.outputs.new-version }} to NPM!"
           echo "📦 Package: https://www.npmjs.com/package/${{ needs.version-and-publish.outputs.package-name }}"
           echo "🏷️  GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.version-and-publish.outputs.new-version }}"
-          echo "🔄 Version Type: ${{ needs.version-and-publish.outputs.version-type }}"
-          echo "📈 Version Change: v${{ needs.version-and-publish.outputs.current-version }} → v${{ needs.version-and-publish.outputs.new-version }}"
