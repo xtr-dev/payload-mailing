@@ -208,25 +208,22 @@ export const sendEmailJob = {
       })
 
       return {
-        success: true,
-        emailId: email.id,
-        message: `Email queued successfully with ID: ${email.id}`,
-        mode: taskInput.templateSlug ? 'template' : 'direct',
-        templateSlug: taskInput.templateSlug || null,
-        subject: subject,
-        recipients: emailData.to?.length || 0,
-        scheduledAt: emailData.scheduledAt || null
+        output: {
+          success: true,
+          emailId: email.id,
+          message: `Email queued successfully with ID: ${email.id}`,
+          mode: taskInput.templateSlug ? 'template' : 'direct',
+          templateSlug: taskInput.templateSlug || null,
+          subject: subject,
+          recipients: emailData.to?.length || 0,
+          scheduledAt: emailData.scheduledAt || null
+        }
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
-      return {
-        success: false,
-        error: errorMessage,
-        templateSlug: taskInput.templateSlug,
-        message: `Failed to queue email: ${errorMessage}`
-      }
+      throw new Error(`Failed to queue email: ${errorMessage}`)
     }
   }
 }
