@@ -15,13 +15,15 @@ export { default as Emails } from './collections/Emails.js'
 export { mailingJobs, sendEmailJob } from './jobs/index.js'
 export type { SendEmailTaskInput } from './jobs/sendEmailTask.js'
 
+// Main email sending function
+export { sendEmail, type BaseEmailData, type SendEmailOptions } from './sendEmail.js'
+export { default as sendEmailDefault } from './sendEmail.js'
+
 // Utility functions for developers
 export {
   getMailing,
   renderTemplate,
   processEmails,
   retryFailedEmails,
-  sendEmail,
-  type BaseEmailData,
-  type SendEmailOptions,
+  parseAndValidateEmails,
 } from './utils/helpers.js'
