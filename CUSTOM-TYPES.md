@@ -53,6 +53,9 @@ Your Payload configuration determines which types are used. The plugin automatic
 The base interfaces provided by the plugin:
 
 ```typescript
+// JSON value type that matches Payload's JSON field type
+type JSONValue = string | number | boolean | { [k: string]: unknown } | unknown[] | null | undefined
+
 interface BaseEmailDocument {
   id: string | number
   template?: any
@@ -64,7 +67,7 @@ interface BaseEmailDocument {
   subject: string
   html: string
   text?: string | null
-  variables?: Record<string, any> | null
+  variables?: JSONValue  // Supports any JSON-compatible value
   scheduledAt?: string | null
   sentAt?: string | null
   status?: 'pending' | 'processing' | 'sent' | 'failed' | null
