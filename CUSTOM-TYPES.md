@@ -44,6 +44,8 @@ The plugin works with:
 - **String IDs**: `id: string`
 - **Number IDs**: `id: number`
 - **Nullable fields**: Fields can be `null`, `undefined`, or have values
+- **Date fields**: Timestamp fields support both `Date` objects and `string` (ISO) formats
+- **JSON variables**: Variables field supports any JSON-compatible value type
 - **Generated types**: Works with `payload generate:types` output
 
 Your Payload configuration determines which types are used. The plugin automatically adapts to your setup.
@@ -68,15 +70,15 @@ interface BaseEmailDocument {
   html: string
   text?: string | null
   variables?: JSONValue  // Supports any JSON-compatible value
-  scheduledAt?: string | null
-  sentAt?: string | null
+  scheduledAt?: string | Date | null
+  sentAt?: string | Date | null
   status?: 'pending' | 'processing' | 'sent' | 'failed' | null
   attempts?: number | null
-  lastAttemptAt?: string | null
+  lastAttemptAt?: string | Date | null
   error?: string | null
   priority?: number | null
-  createdAt?: string | null
-  updatedAt?: string | null
+  createdAt?: string | Date | null
+  updatedAt?: string | Date | null
 }
 
 interface BaseEmailTemplateDocument {
@@ -85,8 +87,8 @@ interface BaseEmailTemplateDocument {
   slug: string
   subject?: string | null
   content?: any
-  createdAt?: string | null
-  updatedAt?: string | null
+  createdAt?: string | Date | null
+  updatedAt?: string | Date | null
 }
 ```
 
