@@ -1,5 +1,6 @@
 import { sendEmail } from '../sendEmail.js'
 import { Email } from '../payload-types.js'
+import {BaseEmail} from "../types/index.js"
 
 export interface SendEmailTaskInput {
   // Template mode fields
@@ -116,6 +117,12 @@ export const sendEmailJob = {
       }
     }
   ],
+  outputSchema: [
+    {
+      name: 'id',
+      type: 'text' as const
+    }
+  ],
   handler: async ({ input, payload }: any) => {
     // Cast input to our expected type
     const taskInput = input as SendEmailTaskInput
@@ -154,18 +161,12 @@ export const sendEmailJob = {
       })
 
       // Use the sendEmail helper to create the email
-      const email = await sendEmail<Email>(payload, sendEmailOptions)
+      const email = await sendEmail<BaseEmail>(payload, sendEmailOptions)
 
       return {
         output: {
           success: true,
-          emailId: email.id,
-          message: `Email queued successfully with ID: ${email.id}`,
-          mode: taskInput.templateSlug ? 'template' : 'direct',
-          templateSlug: taskInput.templateSlug || null,
-          subject: email.subject,
-          recipients: Array.isArray(email.to) ? email.to.length : 1,
-          scheduledAt: email.scheduledAt || null
+          id: email.id,
         }
       }
 

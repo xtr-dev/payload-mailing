@@ -36,10 +36,10 @@ export interface SendEmailOptions<T extends BaseEmail = BaseEmail> {
  * })
  * ```
  */
-export const sendEmail = async <T extends BaseEmail = BaseEmail>(
+export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | number>(
   payload: Payload,
   options: SendEmailOptions<T>
-): Promise<T> => {
+): Promise<T & {id: ID}> => {
   const mailing = getMailing(payload)
   const collectionSlug = options.collectionSlug || mailing.collections.emails || 'emails'
 
@@ -97,7 +97,7 @@ export const sendEmail = async <T extends BaseEmail = BaseEmail>(
     data: emailData
   })
 
-  return email as T
+  return email as T & {id: ID}
 }
 
 export default sendEmail
