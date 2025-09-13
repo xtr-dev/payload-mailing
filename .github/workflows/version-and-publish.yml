@@ -120,6 +120,13 @@ jobs:
           fi
 
           echo "🤖 Generating changelog with Claude..."
+
+          # Debug Claude CLI installation
+          echo "🔍 Debugging Claude CLI..."
+          which claude || echo "Claude not in PATH"
+          claude --version || echo "Claude version check failed"
+
+          # Try Claude CLI first, fallback to manual changelog if it fails
           PROMPT="Please analyze the following git commits and generate a concise changelog in this exact format:
 
           ## Changes
@@ -144,17 +151,32 @@ jobs:
           Git commits to analyze:
           $COMMITS"
 
-          CHANGELOG=$(timeout 240s claude -p "$PROMPT")
+          # Try Claude CLI with authentication bypass for CI
+          if claude -p --dangerously-skip-permissions "$PROMPT" > /tmp/changelog.txt 2>/tmp/claude_error.txt; then
+            CHANGELOG=$(cat /tmp/changelog.txt)
+            echo "✅ Successfully generated changelog with Claude CLI"
+          else
+            echo "⚠️ Claude CLI failed, using fallback changelog generation"
+            cat /tmp/claude_error.txt || echo "No error details available"
+
+            # Fallback: Generate changelog from commit messages
+            CHANGELOG="## Changes
+
+          ### 🔧 Improvements
+          $(echo "$COMMITS" | sed 's/^[a-f0-9]* /- /' | head -10)
+
+          *Note: This changelog was generated automatically from commit messages. For detailed AI-generated changelogs, Claude CLI authentication would be needed.*"
+          fi
 
           # Check if changelog generation succeeded
-          if [ $? -ne 0 ] || [ -z "$CHANGELOG" ]; then
-            echo "❌ ERROR: Failed to generate changelog with Claude. Workflow cannot continue."
+          if [ -z "$CHANGELOG" ]; then
+            echo "❌ ERROR: Failed to generate any changelog. Workflow cannot continue."
             echo "Debug info - Commits to analyze:"
             echo "$COMMITS"
             exit 1
           fi
 
-          echo "✅ Successfully generated changelog with Claude"
+          echo "✅ Changelog generation completed"
 
           # Save changelog to output
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
