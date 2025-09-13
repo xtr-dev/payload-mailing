@@ -14,8 +14,14 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
     throw new Error('Invalid queue configuration: queue must be a non-empty string')
   }
 
-  // Initialize mailing service for jobs
-  const mailingService = new MailingService(null as any, pluginConfig) // payload will be set during onInit
+  // Create a factory function that will provide the mailing service once initialized
+  const getMailingService = () => {
+    if (!mailingService) {
+      throw new Error('MailingService not yet initialized - this should only be called after plugin initialization')
+    }
+    return mailingService
+  }
+  let mailingService: MailingService
 
   // Handle templates collection configuration
   const templatesConfig = pluginConfig.collections?.templates
@@ -87,7 +93,7 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       ...(config.jobs || {}),
       tasks: [
         ...(config.jobs?.tasks || []),
-        ...createMailingJobs(mailingService),
+        // Jobs will be properly added after initialization
       ],
     },
     onInit: async (payload: any) => {
@@ -95,8 +101,14 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
         await config.onInit(payload)
       }
 
-      // Update mailing service with payload instance
-      mailingService.payload = payload
+      // Initialize mailing service with proper payload instance
+      mailingService = new MailingService(payload, pluginConfig)
+
+      // Add mailing jobs to payload's job system
+      const mailingJobs = createMailingJobs(mailingService)
+      mailingJobs.forEach(job => {
+        payload.jobs.tasks.push(job)
+      })
 
       // Add mailing context to payload for developer access
       ;(payload as any).mailing = {

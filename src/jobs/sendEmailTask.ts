@@ -116,8 +116,19 @@ export const sendEmailJob = {
     }
   ],
   handler: async ({ input, payload }: any) => {
-    // Cast input to our expected type
+    // Get mailing context from payload
+    const mailingContext = (payload as any).mailing
+    if (!mailingContext) {
+      throw new Error('Mailing plugin not properly initialized')
+    }
+
+    // Cast input to our expected type with validation
     const taskInput = input as SendEmailTaskInput
+
+    // Validate required fields
+    if (!taskInput.to) {
+      throw new Error('Field "to" is required')
+    }
 
     try {
       let html: string
@@ -145,11 +156,25 @@ export const sendEmailJob = {
         text = taskInput.text
       }
 
-      // Parse email addresses
+      // Parse and validate email addresses
       const parseEmails = (emails: string | string[] | undefined): string[] | undefined => {
         if (!emails) return undefined
-        if (Array.isArray(emails)) return emails
-        return emails.split(',').map(email => email.trim()).filter(Boolean)
+
+        let emailList: string[]
+        if (Array.isArray(emails)) {
+          emailList = emails
+        } else {
+          emailList = emails.split(',').map(email => email.trim()).filter(Boolean)
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        const invalidEmails = emailList.filter(email => !emailRegex.test(email))
+        if (invalidEmails.length > 0) {
+          throw new Error(`Invalid email addresses: ${invalidEmails.join(', ')}`)
+        }
+
+        return emailList
       }
 
       // Prepare email data
@@ -176,9 +201,9 @@ export const sendEmailJob = {
         }
       })
 
-      // Create the email in the collection
+      // Create the email in the collection using configurable collection name
       const email = await payload.create({
-        collection: 'emails', // Default collection name
+        collection: mailingContext.collections.emails,
         data: emailData
       })
 
