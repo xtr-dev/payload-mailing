@@ -97,87 +97,83 @@ jobs:
           echo "source-version=$SOURCE_VERSION" >> $GITHUB_OUTPUT
           echo "target-version=$TARGET_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Generate changelog from commits
-        id: changelog
+      - name: Get commit information for Claude
+        id: commits
         run: |
           # Get commits since last tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
             COMMITS=$(git log --oneline --no-merges --since="1 week ago" || echo "No recent commits")
-            echo "📝 Generating changelog from commits since 1 week ago (no previous tags found)"
+            echo "📝 Getting commits since 1 week ago (no previous tags found)"
           else
             COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD || echo "No new commits")
-            echo "📝 Generating changelog from commits since tag: $LAST_TAG"
+            echo "📝 Getting commits since tag: $LAST_TAG"
           fi
 
-          echo "Commits to process:"
+          echo "Commits found:"
           echo "$COMMITS"
 
-          # Categorize commits based on conventional commit patterns and keywords
-          FEATURES=""
-          BUGFIXES=""
-          IMPROVEMENTS=""
-          DOCS=""
+      - name: Generate changelog with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: |
+            Please analyze the recent git commits and update the CHANGELOG.md file with a new release entry.
 
-          while IFS= read -r commit; do
-            if [[ -z "$commit" ]]; then continue; fi
+            Add a new section at the top of CHANGELOG.md with today's date in this format:
 
-            # Extract commit message (remove hash)
-            MSG=$(echo "$commit" | sed 's/^[a-f0-9]* //')
+            ## [Unreleased] - $(date +%Y-%m-%d)
 
-            # Categorize based on patterns
-            if echo "$MSG" | grep -qiE "^(feat|feature|add|new):|🚀|✨"; then
-              FEATURES="${FEATURES}- $MSG"$'\n'
-            elif echo "$MSG" | grep -qiE "^(fix|bug):|🐛|❌|🔧.*fix"; then
-              BUGFIXES="${BUGFIXES}- $MSG"$'\n'
-            elif echo "$MSG" | grep -qiE "^(docs|doc):|📚|📝"; then
-              DOCS="${DOCS}- $MSG"$'\n'
-            else
-              IMPROVEMENTS="${IMPROVEMENTS}- $MSG"$'\n'
+            Organize the commits into these categories based on their content and conventional commit patterns:
+
+            ### 🚀 Features
+            - List any new features, major additions, or enhancements
+
+            ### 🐛 Bug Fixes
+            - List any bug fixes, error corrections, or issue resolutions
+
+            ### 🔧 Improvements
+            - List any refactoring, code improvements, or optimizations
+
+            ### 📚 Documentation
+            - List any documentation updates, README changes, or comment improvements
+
+            ### ⚡ Performance
+            - List any performance improvements or optimizations
+
+            Only include sections that have actual changes. Keep descriptions concise and user-focused.
+
+            The recent commits to analyze are visible in the git history. Please examine them and create a comprehensive changelog entry.
+
+            If CHANGELOG.md doesn't exist, create it with a proper header and the new release section.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Read generated changelog
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            # Extract the latest changelog entry (from top until next ## or end of file)
+            CHANGELOG=$(sed -n '/^## \[Unreleased\]/,/^## /p' CHANGELOG.md | sed '$d' | head -n -1)
+
+            # If that doesn't work, try a different approach
+            if [ -z "$CHANGELOG" ]; then
+              # Get first section after any header
+              CHANGELOG=$(sed -n '/^## /,/^## /p' CHANGELOG.md | head -n -1)
             fi
-          done <<< "$COMMITS"
 
-          # Build changelog
-          CHANGELOG="## Changes"
+            # Final fallback - just get the first meaningful section
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG=$(head -20 CHANGELOG.md | grep -A 20 "^## ")
+            fi
 
-          if [[ -n "$FEATURES" ]]; then
-            CHANGELOG="$CHANGELOG
-
-          ### 🚀 Features
-          $FEATURES"
-          fi
-
-          if [[ -n "$BUGFIXES" ]]; then
-            CHANGELOG="$CHANGELOG
-
-          ### 🐛 Bug Fixes
-          $BUGFIXES"
-          fi
-
-          if [[ -n "$IMPROVEMENTS" ]]; then
-            CHANGELOG="$CHANGELOG
-
-          ### 🔧 Improvements
-          $IMPROVEMENTS"
-          fi
-
-          if [[ -n "$DOCS" ]]; then
-            CHANGELOG="$CHANGELOG
-
-          ### 📚 Documentation
-          $DOCS"
-          fi
-
-          # If no commits found, create a simple message
-          if [[ -z "$FEATURES$BUGFIXES$IMPROVEMENTS$DOCS" ]]; then
+            echo "📖 Extracted changelog from CHANGELOG.md:"
+            echo "$CHANGELOG"
+          else
+            echo "⚠️ CHANGELOG.md not found, creating fallback"
             CHANGELOG="## Changes
 
-          ### 🔧 Improvements
-          - Version update and maintenance changes"
+            ### 🔧 Improvements
+            - Version update and maintenance changes"
           fi
-
-          echo "Generated changelog:"
-          echo "$CHANGELOG"
 
           # Save changelog to output
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
