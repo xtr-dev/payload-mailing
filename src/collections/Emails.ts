@@ -8,12 +8,6 @@ const Emails: CollectionConfig = {
     group: 'Mailing',
     description: 'Email delivery and status tracking',
   },
-  access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
-  },
   fields: [
     {
       name: 'template',

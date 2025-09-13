@@ -8,12 +8,6 @@ export const createEmailTemplatesCollection = (editor?: RichTextField['editor'])
     defaultColumns: ['name', 'subject', 'updatedAt'],
     group: 'Mailing',
   },
-  access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
-  },
   fields: [
     {
       name: 'name',
