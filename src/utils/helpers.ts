@@ -5,8 +5,8 @@ import { TemplateVariables } from '../types/index.js'
  * Parse and validate email addresses
  * @internal
  */
-export const parseAndValidateEmails = (emails: string | string[] | undefined): string[] | undefined => {
-  if (!emails) return undefined
+export const parseAndValidateEmails = (emails: string | string[] | null | undefined): string[] | undefined => {
+  if (!emails || emails === null) return undefined
 
   let emailList: string[]
   if (Array.isArray(emails)) {
