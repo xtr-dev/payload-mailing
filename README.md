@@ -95,14 +95,6 @@ const directEmail = await payload.create({
 })
 ```
 
-## Why This Approach is Better
-
-- ✅ **Full Type Safety**: Use your generated Payload types
-- ✅ **No Learning Curve**: Just use `payload.create()` like any collection
-- ✅ **Maximum Flexibility**: Add any custom fields to your email collection
-- ✅ **Payload Integration**: Leverage validation, hooks, access control
-- ✅ **Consistent API**: One way to create data in Payload
-
 ## Configuration
 
 ### Plugin Options
