@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import { SendEmailOptions } from '../types/index.js'
+import { TemplateVariables } from '../types/index.js'
 
 export const getMailing = (payload: Payload) => {
   const mailing = (payload as any).mailing
@@ -9,14 +9,9 @@ export const getMailing = (payload: Payload) => {
   return mailing
 }
 
-export const sendEmail = async (payload: Payload, options: SendEmailOptions): Promise<string> => {
+export const renderTemplate = async (payload: Payload, templateSlug: string, variables: TemplateVariables): Promise<{ html: string; text: string; subject: string }> => {
   const mailing = getMailing(payload)
-  return mailing.service.sendEmail(options)
-}
-
-export const scheduleEmail = async (payload: Payload, options: SendEmailOptions): Promise<string> => {
-  const mailing = getMailing(payload)
-  return mailing.service.scheduleEmail(options)
+  return mailing.service.renderTemplate(templateSlug, variables)
 }
 
 export const processEmails = async (payload: Payload): Promise<void> => {

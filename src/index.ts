@@ -16,8 +16,7 @@ export { default as Emails } from './collections/Emails.js'
 // Utility functions for developers
 export {
   getMailing,
-  sendEmail,
-  scheduleEmail,
+  renderTemplate,
   processEmails,
   retryFailedEmails,
 } from './utils/helpers.js'

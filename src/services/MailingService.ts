@@ -3,7 +3,7 @@ import { Liquid } from 'liquidjs'
 import nodemailer, { Transporter } from 'nodemailer'
 import {
   MailingPluginConfig,
-  SendEmailOptions,
+  TemplateVariables,
   MailingService as IMailingService,
   EmailTemplate,
   QueuedEmail,
@@ -107,69 +107,21 @@ export class MailingService implements IMailingService {
     }
   }
 
-  async sendEmail(options: SendEmailOptions): Promise<string> {
-    const emailId = await this.scheduleEmail({
-      ...options,
-      scheduledAt: new Date()
-    })
+  async renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; text: string; subject: string }> {
+    const template = await this.getTemplateBySlug(templateSlug)
 
-    await this.processEmailItem(emailId)
-
-    return emailId
-  }
-
-  async scheduleEmail(options: SendEmailOptions): Promise<string> {
-    let html = options.html || ''
-    let text = options.text || ''
-    let subject = options.subject || ''
-    let templateId: string | undefined = undefined
-
-    if (options.templateSlug) {
-      const template = await this.getTemplateBySlug(options.templateSlug)
-
-      if (template) {
-        templateId = template.id
-        const variables = options.variables || {}
-        const renderedContent = await this.renderEmailTemplate(template, variables)
-        html = renderedContent.html
-        text = renderedContent.text
-        subject = await this.renderTemplate(template.subject, variables)
-      } else {
-        throw new Error(`Email template not found: ${options.templateSlug}`)
-      }
+    if (!template) {
+      throw new Error(`Email template not found: ${templateSlug}`)
     }
 
-    if (!subject && !options.subject) {
-      throw new Error('Email subject is required')
+    const emailContent = await this.renderEmailTemplate(template, variables)
+    const subject = await this.renderTemplateString(template.subject, variables)
+
+    return {
+      html: emailContent.html,
+      text: emailContent.text,
+      subject
     }
-
-    if (!html && !options.html) {
-      throw new Error('Email HTML content is required')
-    }
-
-    const queueData = {
-      template: templateId,
-      to: Array.isArray(options.to) ? options.to : [options.to],
-      cc: options.cc ? (Array.isArray(options.cc) ? options.cc : [options.cc]) : undefined,
-      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]) : undefined,
-      from: options.from || this.getDefaultFrom(),
-      replyTo: options.replyTo,
-      subject: subject || options.subject,
-      html,
-      text,
-      variables: options.variables,
-      scheduledAt: options.scheduledAt?.toISOString(),
-      status: 'pending' as const,
-      attempts: 0,
-      priority: options.priority || 5,
-    }
-
-    const result = await this.payload.create({
-      collection: this.emailsCollection as any,
-      data: queueData,
-    })
-
-    return result.id as string
   }
 
   async processEmails(): Promise<void> {
@@ -366,7 +318,7 @@ export class MailingService implements IMailingService {
     }
   }
 
-  private async renderTemplate(template: string, variables: Record<string, any>): Promise<string> {
+  private async renderTemplateString(template: string, variables: Record<string, any>): Promise<string> {
     // Use custom template renderer if provided
     if (this.config.templateRenderer) {
       try {
@@ -434,8 +386,8 @@ export class MailingService implements IMailingService {
     let text = serializeRichTextToText(template.content)
 
     // Apply template variables to the rendered content
-    html = await this.renderTemplate(html, variables)
-    text = await this.renderTemplate(text, variables)
+    html = await this.renderTemplateString(html, variables)
+    text = await this.renderTemplateString(text, variables)
 
     return { html, text }
   }

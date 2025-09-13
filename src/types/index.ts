@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import type { CollectionConfig, RichTextField } from 'payload'
+import type { CollectionConfig, RichTextField, TypedCollection } from 'payload'
 import { Transporter } from 'nodemailer'
 
 export interface EmailObject {
@@ -83,26 +83,15 @@ export interface QueuedEmail {
   updatedAt: string
 }
 
-export interface SendEmailOptions {
-  templateSlug?: string
-  to: string | string[]
-  cc?: string | string[]
-  bcc?: string | string[]
-  from?: string
-  replyTo?: string
-  subject?: string
-  html?: string
-  text?: string
-  variables?: Record<string, any>
-  scheduledAt?: Date
-  priority?: number
+// Simple helper type for template variables
+export interface TemplateVariables {
+  [key: string]: any
 }
 
 export interface MailingService {
-  sendEmail(options: SendEmailOptions): Promise<string>
-  scheduleEmail(options: SendEmailOptions): Promise<string>
   processEmails(): Promise<void>
   retryFailedEmails(): Promise<void>
+  renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; text: string; subject: string }>
 }
 
 export interface MailingContext {
