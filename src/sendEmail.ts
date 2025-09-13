@@ -1,9 +1,32 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-import {Email, EmailTemplate} from "./payload-types.js"
+
+// Generic email interface that can work with any ID type
+export interface BaseEmailDocument {
+  id: string | number
+  template?: any
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
+  from?: string
+  replyTo?: string
+  subject: string
+  html: string
+  text?: string
+  variables?: Record<string, any>
+  scheduledAt?: string
+  sentAt?: string
+  status?: 'pending' | 'processing' | 'sent' | 'failed'
+  attempts?: number
+  lastAttemptAt?: string
+  error?: string
+  priority?: number
+  createdAt?: string
+  updatedAt?: string
+}
 
 // Options for sending emails
-export interface SendEmailOptions<T extends Email = Email> {
+export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
   // Template-based email
   template?: {
     slug: string
@@ -35,7 +58,7 @@ export interface SendEmailOptions<T extends Email = Email> {
  * })
  * ```
  */
-export const sendEmail = async <TEmail extends Email = Email>(
+export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocument>(
   payload: Payload,
   options: SendEmailOptions<TEmail>
 ): Promise<TEmail> => {

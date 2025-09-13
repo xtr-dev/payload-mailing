@@ -1,11 +1,44 @@
 import { Payload } from 'payload'
 import type { CollectionConfig, RichTextField } from 'payload'
 import { Transporter } from 'nodemailer'
-import {Email, EmailTemplate} from "../payload-types.js"
 
-export type BaseEmail<TEmail extends Email = Email, TEmailTemplate extends EmailTemplate = EmailTemplate> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'> | TEmailTemplate['id'] | undefined | null}
+// Generic base interfaces that work with any ID type
+export interface BaseEmailDocument {
+  id: string | number
+  template?: any
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
+  from?: string
+  replyTo?: string
+  subject: string
+  html: string
+  text?: string
+  variables?: Record<string, any>
+  scheduledAt?: string
+  sentAt?: string
+  status?: 'pending' | 'processing' | 'sent' | 'failed'
+  attempts?: number
+  lastAttemptAt?: string
+  error?: string
+  priority?: number
+  createdAt?: string
+  updatedAt?: string
+}
 
-export type BaseEmailTemplate<TEmailTemplate extends EmailTemplate = EmailTemplate> = Omit<TEmailTemplate, 'id'>
+export interface BaseEmailTemplateDocument {
+  id: string | number
+  name: string
+  slug: string
+  subject?: string
+  content?: any
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type BaseEmail<TEmail extends BaseEmailDocument = BaseEmailDocument, TEmailTemplate extends BaseEmailTemplateDocument = BaseEmailTemplateDocument> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'> | TEmailTemplate['id'] | undefined | null}
+
+export type BaseEmailTemplate<TEmailTemplate extends BaseEmailTemplateDocument = BaseEmailTemplateDocument> = Omit<TEmailTemplate, 'id'>
 
 export type TemplateRendererHook = (template: string, variables: Record<string, any>) => string | Promise<string>
 

@@ -1,5 +1,4 @@
-import { sendEmail } from '../sendEmail.js'
-import {Email, EmailTemplate} from '../payload-types.js'
+import { sendEmail, BaseEmailDocument } from '../sendEmail.js'
 
 export interface SendEmailTaskInput {
   // Template mode fields
@@ -170,7 +169,7 @@ export const sendEmailJob = {
       const sendEmailOptions = transformTaskInputToSendEmailOptions(taskInput)
 
       // Use the sendEmail helper to create the email
-      const email = await sendEmail<Email>(payload, sendEmailOptions)
+      const email = await sendEmail<BaseEmailDocument>(payload, sendEmailOptions)
 
       return {
         output: {

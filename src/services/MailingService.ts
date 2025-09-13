@@ -6,7 +6,7 @@ import {
   TemplateVariables,
   MailingService as IMailingService,
   MailingTransportConfig,
-  BaseEmail, BaseEmailTemplate
+  BaseEmail, BaseEmailTemplate, BaseEmailDocument, BaseEmailTemplateDocument
 } from '../types/index.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
@@ -131,7 +131,7 @@ export class MailingService implements IMailingService {
     }
 
     const emailContent = await this.renderEmailTemplate(template, variables)
-    const subject = await this.renderTemplateString(template.subject, variables)
+    const subject = await this.renderTemplateString(template.subject || '', variables)
 
     return {
       html: emailContent.html,
@@ -236,7 +236,7 @@ export class MailingService implements IMailingService {
       const email = await this.payload.findByID({
         collection: this.emailsCollection as any,
         id: emailId,
-      }) as BaseEmail
+      }) as BaseEmailDocument
 
       const mailOptions = {
         from: email.from,
@@ -300,7 +300,7 @@ export class MailingService implements IMailingService {
     return newAttempts
   }
 
-  private async getTemplateBySlug(templateSlug: string): Promise<BaseEmailTemplate | null> {
+  private async getTemplateBySlug(templateSlug: string): Promise<BaseEmailTemplateDocument | null> {
     try {
       const { docs } = await this.payload.find({
         collection: this.templatesCollection as any,
@@ -312,7 +312,7 @@ export class MailingService implements IMailingService {
         limit: 1,
       })
 
-      return docs.length > 0 ? docs[0] as BaseEmailTemplate : null
+      return docs.length > 0 ? docs[0] as BaseEmailTemplateDocument : null
     } catch (error) {
       console.error(`Template with slug '${templateSlug}' not found:`, error)
       return null
@@ -377,7 +377,7 @@ export class MailingService implements IMailingService {
     })
   }
 
-  private async renderEmailTemplate(template: BaseEmailTemplate, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
+  private async renderEmailTemplate(template: BaseEmailTemplateDocument, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
     if (!template.content) {
       return { html: '', text: '' }
     }
