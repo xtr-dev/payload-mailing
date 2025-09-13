@@ -4,7 +4,7 @@ import {Email, EmailTemplate} from "./payload-types.js"
 import {BaseEmail} from "./types/index.js"
 
 // Options for sending emails
-export interface SendEmailOptions<T extends BaseEmail = BaseEmail> {
+export interface SendEmailOptions<T extends Email = Email> {
   // Template-based email
   template?: {
     slug: string
@@ -36,9 +36,9 @@ export interface SendEmailOptions<T extends BaseEmail = BaseEmail> {
  * })
  * ```
  */
-export const sendEmail = async <TEmail extends Email = Email, TEmailTemplate extends EmailTemplate = EmailTemplate>(
+export const sendEmail = async <TEmail extends Email = Email>(
   payload: Payload,
-  options: SendEmailOptions<BaseEmail<TEmail, TEmailTemplate>>
+  options: SendEmailOptions<TEmail>
 ): Promise<TEmail> => {
   const mailing = getMailing(payload)
   const collectionSlug = options.collectionSlug || mailing.collections.emails || 'emails'
@@ -96,6 +96,11 @@ export const sendEmail = async <TEmail extends Email = Email, TEmailTemplate ext
     collection: collectionSlug,
     data: emailData
   })
+
+  // Validate that the created email has the expected structure
+  if (!email || typeof email !== 'object' || !email.id) {
+    throw new Error('Failed to create email: invalid response from database')
+  }
 
   return email as TEmail
 }
