@@ -21,4 +21,7 @@ export {
   renderTemplate,
   processEmails,
   retryFailedEmails,
+  sendEmail,
+  type BaseEmailData,
+  type SendEmailOptions,
 } from './utils/helpers.js'

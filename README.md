@@ -56,41 +56,50 @@ export default buildConfig({
 })
 ```
 
-### 2. Send emails using Payload collections
+### 2. Send emails with type-safe helper
 
 ```typescript
-import { renderTemplate } from '@xtr-dev/payload-mailing'
+import { sendEmail } from '@xtr-dev/payload-mailing'
+import { Email } from './payload-types' // Your generated types
 
-// Option 1: Using templates with variables
-const { html, text, subject } = await renderTemplate(payload, 'welcome-email', {
-  firstName: 'John',
-  welcomeUrl: 'https://yoursite.com/welcome'
-})
-
-// Create email using Payload's collection API (full type safety!)
-const email = await payload.create({
-  collection: 'emails',
+// Option 1: Using templates with full type safety
+const email = await sendEmail<Email>(payload, {
+  template: {
+    slug: 'welcome-email',
+    variables: {
+      firstName: 'John',
+      welcomeUrl: 'https://yoursite.com/welcome'
+    }
+  },
   data: {
-    to: ['user@example.com'],
-    subject,
-    html,
-    text,
+    to: 'user@example.com',
     // Schedule for later (optional)
     scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    // Add any custom fields you've defined
     priority: 1,
-    customField: 'your-value', // Your custom collection fields work!
+    // Your custom fields are type-safe!
+    customField: 'your-value',
   }
 })
 
-// Option 2: Direct HTML email (no template needed)
-const directEmail = await payload.create({
-  collection: 'emails',
+// Option 2: Direct HTML email (no template)
+const directEmail = await sendEmail<Email>(payload, {
   data: {
-    to: ['user@example.com'],
+    to: ['user@example.com', 'another@example.com'],
     subject: 'Welcome!',
     html: '<h1>Welcome John!</h1><p>Thanks for joining!</p>',
     text: 'Welcome John! Thanks for joining!',
+    // All your custom fields work with TypeScript autocomplete!
+    customField: 'value',
+  }
+})
+
+// Option 3: Use payload.create() directly for full control
+const manualEmail = await payload.create({
+  collection: 'emails',
+  data: {
+    to: ['user@example.com'],
+    subject: 'Hello',
+    html: '<p>Hello World</p>',
   }
 })
 ```
@@ -839,6 +848,55 @@ import {
   EmailWrapperHook
 } from '@xtr-dev/payload-mailing'
 ```
+
+## API Reference
+
+### `sendEmail<T>(payload, options)`
+
+Type-safe email sending with automatic template rendering and validation.
+
+```typescript
+import { sendEmail } from '@xtr-dev/payload-mailing'
+import { Email } from './payload-types'
+
+const email = await sendEmail<Email>(payload, {
+  template: {
+    slug: 'template-slug',
+    variables: { /* template variables */ }
+  },
+  data: {
+    to: 'user@example.com',
+    // Your custom fields are type-safe here!
+  }
+})
+```
+
+**Type Parameters:**
+- `T extends BaseEmailData` - Your generated Email type for full type safety
+
+**Options:**
+- `template.slug` - Template slug to render
+- `template.variables` - Variables to pass to template
+- `data` - Email data (merged with template output)
+- `collectionSlug` - Custom collection name (defaults to 'emails')
+
+### `renderTemplate(payload, slug, variables)`
+
+Render an email template without sending.
+
+```typescript
+const { html, text, subject } = await renderTemplate(
+  payload,
+  'welcome-email',
+  { name: 'John' }
+)
+```
+
+### Helper Functions
+
+- `getMailing(payload)` - Get mailing context
+- `processEmails(payload)` - Manually trigger email processing
+- `retryFailedEmails(payload)` - Manually retry failed emails
 
 ## Migration Guide (v0.0.x → v0.1.0)
 
