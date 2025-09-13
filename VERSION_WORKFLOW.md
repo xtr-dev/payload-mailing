@@ -84,7 +84,7 @@ Make sure these secrets are configured in your GitHub repository:
 
 - ✅ Automatic version bumping based on branch
 - ✅ AI-generated changelog using Claude Code CLI
-- ✅ Appends changelog to PR merge commit message
+- ✅ Squashes all PR commits into single clean commit
 - ✅ Runs tests before publishing
 - ✅ Builds the package before publishing
 - ✅ Creates git tags with changelog in tag message
@@ -103,9 +103,36 @@ The workflow automatically generates a standardized changelog for each release u
 - ⚡ **Performance** - Performance optimizations
 
 The generated changelog is included in:
-- The PR merge commit message (automatically appended)
+- The single squashed release commit message
 - The git tag message
 - The GitHub release notes
+
+## Git History Structure
+
+The workflow creates an ultra-clean git history by squashing all commits from the PR into a single release commit:
+
+**Before Squashing:**
+```
+abc123 feat: add email scheduling
+def456 fix: validation bug
+ghi789 docs: update readme
+jkl012 test: add unit tests
+```
+
+**After Squashing:**
+```
+abc123 ✨ Minor Release
+
+## Changes
+### 🚀 Features
+- Add email scheduling feature
+### 🐛 Bug Fixes
+- Fix validation error handling
+### 📚 Documentation
+- Update readme with new examples
+```
+
+This results in one meaningful commit per release with all changes summarized in the AI-generated changelog.
 
 ## Version Branch Maintenance
 

@@ -130,7 +130,7 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Update merge commit with changelog
+      - name: Create single squashed commit with changelog
         if: steps.version-type.outputs.type != 'none'
         run: |
           # Extract version type for commit title
@@ -149,10 +149,21 @@ jobs:
 
           ${{ steps.changelog.outputs.changelog }}"
 
-          # Amend the merge commit with the clean message
-          git commit --amend -m "$NEW_MSG"
+          # Get the previous commit (before the merge/PR commits)
+          # This assumes we want to squash everything since the last release
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            BASE_COMMIT=$LAST_TAG
+          else
+            # If no tags, use the commit before this PR
+            BASE_COMMIT=$(git log --oneline --skip=10 -1 --format="%H" 2>/dev/null || git log --max-parents=0 --format="%H")
+          fi
 
-      - name: Version bump
+          # Reset to the base and create a single squashed commit
+          git reset --soft $BASE_COMMIT
+          git commit -m "$NEW_MSG"
+
+      - name: Version bump and finalize commit
         if: steps.version-type.outputs.type != 'none'
         id: version-bump
         run: |
@@ -177,7 +188,7 @@ jobs:
             git add pnpm-lock.yaml
           fi
 
-          # Amend the merge commit to include version changes
+          # Amend the squashed commit to include version changes
           git commit --amend --no-edit
 
           # Create git tag
@@ -185,7 +196,7 @@ jobs:
 
           ${{ steps.changelog.outputs.changelog }}"
 
-          echo "Version bumped from $CURRENT_VERSION to $NEW_VERSION"
+          echo "Created single squashed commit with version bump from $CURRENT_VERSION to $NEW_VERSION"
 
       - name: Push version changes
         if: steps.version-type.outputs.type != 'none'
