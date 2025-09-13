@@ -1,4 +1,5 @@
-import { sendEmail, BaseEmailDocument } from '../sendEmail.js'
+import { sendEmail } from '../sendEmail.js'
+import { BaseEmailDocument } from '../types/index.js'
 
 export interface SendEmailTaskInput {
   // Template mode fields

@@ -1,29 +1,6 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-
-// Generic email interface that can work with any ID type
-export interface BaseEmailDocument {
-  id: string | number
-  template?: any
-  to: string[]
-  cc?: string[]
-  bcc?: string[]
-  from?: string
-  replyTo?: string
-  subject: string
-  html: string
-  text?: string
-  variables?: Record<string, any>
-  scheduledAt?: string
-  sentAt?: string
-  status?: 'pending' | 'processing' | 'sent' | 'failed'
-  attempts?: number
-  lastAttemptAt?: string
-  error?: string
-  priority?: number
-  createdAt?: string
-  updatedAt?: string
-}
+import { BaseEmailDocument } from './types/index.js'
 
 // Options for sending emails
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
