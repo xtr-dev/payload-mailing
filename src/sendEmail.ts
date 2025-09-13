@@ -2,15 +2,16 @@ import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
 
 // Base type for email data that all emails must have
+// Compatible with PayloadCMS generated types that include null
 export interface BaseEmailData {
   to: string | string[]
-  cc?: string | string[]
-  bcc?: string | string[]
-  subject?: string
-  html?: string
-  text?: string
-  scheduledAt?: string | Date
-  priority?: number
+  cc?: string | string[] | null
+  bcc?: string | string[] | null
+  subject?: string | null
+  html?: string | null
+  text?: string | null
+  scheduledAt?: string | Date | null
+  priority?: number | null
   [key: string]: any
 }
 
@@ -82,7 +83,7 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
     throw new Error('Fields "subject" and "html" are required when not using a template')
   }
 
-  // Process email addresses using shared validation
+  // Process email addresses using shared validation (handle null values)
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
