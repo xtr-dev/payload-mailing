@@ -7,11 +7,60 @@ on:
   pull_request:
     branches:
       - main
-    types: [closed]
+    types: [opened, synchronize, reopened]
 
 jobs:
+  validate:
+    if: github.event_name == 'pull_request' && (startsWith(github.event.pull_request.head.ref, 'major/') || startsWith(github.event.pull_request.head.ref, 'minor/') || startsWith(github.event.pull_request.head.ref, 'patch/'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Run build
+        run: pnpm build
+
+      - name: Validate version branch
+        run: |
+          echo "✅ Version branch validation passed"
+          if [[ "${{ github.event.pull_request.head.ref }}" =~ ^major/ ]]; then
+            echo "🚀 This will create a MAJOR release when merged"
+          elif [[ "${{ github.event.pull_request.head.ref }}" =~ ^minor/ ]]; then
+            echo "✨ This will create a MINOR release when merged"
+          else
+            echo "🐛 This will create a PATCH release when merged"
+          fi
+
   version-and-publish:
-    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (startsWith(github.event.pull_request.head.ref, 'major/') || startsWith(github.event.pull_request.head.ref, 'minor/') || startsWith(github.event.pull_request.head.ref, 'patch/')))
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       new-version: ${{ steps.version-bump.outputs.new-version }}
@@ -333,7 +382,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   notify-success:
-    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (startsWith(github.event.pull_request.head.ref, 'major/') || startsWith(github.event.pull_request.head.ref, 'minor/') || startsWith(github.event.pull_request.head.ref, 'patch/')))
+    if: github.event_name == 'push'
     needs: version-and-publish
     runs-on: ubuntu-latest
     steps:
