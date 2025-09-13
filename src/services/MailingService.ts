@@ -238,8 +238,16 @@ export class MailingService implements IMailingService {
         id: emailId,
       }) as BaseEmailDocument
 
+      // Combine from and fromName for nodemailer
+      let fromField = email.from
+      if (email.fromName && email.from) {
+        fromField = `"${email.fromName}" <${email.from}>`
+      } else if (email.from) {
+        fromField = email.from
+      }
+
       const mailOptions = {
-        from: email.from,
+        from: fromField,
         to: email.to,
         cc: email.cc || undefined,
         bcc: email.bcc || undefined,

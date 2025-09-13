@@ -50,6 +50,13 @@ const Emails: CollectionConfig = {
       },
     },
     {
+      name: 'fromName',
+      type: 'text',
+      admin: {
+        description: 'Sender display name (optional, e.g., "John Doe" for "John Doe <john@example.com>")',
+      },
+    },
+    {
       name: 'replyTo',
       type: 'text',
       admin: {

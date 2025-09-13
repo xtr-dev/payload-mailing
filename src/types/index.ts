@@ -13,6 +13,7 @@ export interface BaseEmailDocument {
   cc?: string[] | null
   bcc?: string[] | null
   from?: string | null
+  fromName?: string | null
   replyTo?: string | null
   subject: string
   html: string
@@ -83,6 +84,7 @@ export interface QueuedEmail {
   cc?: string[] | null
   bcc?: string[] | null
   from?: string | null
+  fromName?: string | null
   replyTo?: string | null
   subject: string
   html: string

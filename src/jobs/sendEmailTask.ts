@@ -15,6 +15,9 @@ export interface SendEmailTaskInput {
   to: string | string[]
   cc?: string | string[]
   bcc?: string | string[]
+  from?: string
+  fromName?: string
+  replyTo?: string
   scheduledAt?: string | Date // ISO date string or Date object
   priority?: number
 
@@ -39,7 +42,7 @@ function transformTaskInputToSendEmailOptions(taskInput: SendEmailTaskInput) {
   }
 
   // Standard email fields that should be copied to data
-  const standardFields = ['to', 'cc', 'bcc', 'subject', 'html', 'text', 'scheduledAt', 'priority']
+  const standardFields = ['to', 'cc', 'bcc', 'from', 'fromName', 'replyTo', 'subject', 'html', 'text', 'scheduledAt', 'priority']
 
   // Template-specific fields that should not be copied to data
   const templateFields = ['templateSlug', 'variables']
@@ -133,6 +136,30 @@ export const sendEmailJob = {
       label: 'BCC (Blind Carbon Copy)',
       admin: {
         description: 'Optional comma-separated list of BCC email addresses'
+      }
+    },
+    {
+      name: 'from',
+      type: 'text' as const,
+      label: 'From Email',
+      admin: {
+        description: 'Optional sender email address (uses default if not provided)'
+      }
+    },
+    {
+      name: 'fromName',
+      type: 'text' as const,
+      label: 'From Name',
+      admin: {
+        description: 'Optional sender display name (e.g., "John Doe")'
+      }
+    },
+    {
+      name: 'replyTo',
+      type: 'text' as const,
+      label: 'Reply To',
+      admin: {
+        description: 'Optional reply-to email address'
       }
     },
     {
