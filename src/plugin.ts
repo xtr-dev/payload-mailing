@@ -3,53 +3,8 @@ import { MailingPluginConfig, MailingContext } from './types/index.js'
 import { MailingService } from './services/MailingService.js'
 import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 import Emails from './collections/Emails.js'
+import { createMailingJobs, scheduleEmailsJob } from './jobs/index.js'
 
-// Helper function to schedule the email processing job
-async function scheduleEmailProcessingJob(payload: any, queueName: string, delayMs: number = 60000): Promise<boolean> {
-  if (!queueName || typeof queueName !== 'string') {
-    throw new Error('Invalid queueName: must be a non-empty string')
-  }
-
-  const jobSlug = 'process-email-queue'
-
-  // Check if there's already a scheduled job for this task
-  const existingJobs = await payload.find({
-    collection: 'payload-jobs',
-    where: {
-      and: [
-        {
-          taskSlug: {
-            equals: jobSlug,
-          },
-        },
-        {
-          hasCompleted: {
-            equals: false,
-          },
-        },
-      ],
-    },
-    limit: 1,
-  })
-
-  // If no existing job, schedule a new one
-  if (existingJobs.docs.length === 0) {
-    await payload.create({
-      collection: 'payload-jobs',
-      data: {
-        taskSlug: jobSlug,
-        input: {},
-        queue: queueName,
-        waitUntil: new Date(Date.now() + delayMs),
-      },
-    })
-    console.log(`🔄 Scheduled email processing job in queue: ${queueName}`)
-    return true
-  } else {
-    console.log(`✅ Email processing job already scheduled in queue: ${queueName}`)
-    return false
-  }
-}
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
   const queueName = pluginConfig.queue || 'default'
@@ -58,6 +13,9 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
   if (!queueName || typeof queueName !== 'string') {
     throw new Error('Invalid queue configuration: queue must be a non-empty string')
   }
+
+  // Initialize mailing service for jobs
+  const mailingService = new MailingService(null as any, pluginConfig) // payload will be set during onInit
 
   // Handle templates collection configuration
   const templatesConfig = pluginConfig.collections?.templates
@@ -129,61 +87,7 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       ...(config.jobs || {}),
       tasks: [
         ...(config.jobs?.tasks || []),
-        {
-          slug: 'process-email-queue',
-          handler: async ({ job, req }: { job: any; req: any }) => {
-            const payload = (req as any).payload
-            let jobResult = null
-
-            try {
-              const mailingService = new MailingService(payload, pluginConfig)
-
-              console.log('🔄 Processing email queue (pending + failed emails)...')
-
-              // Process pending emails first
-              await mailingService.processEmails()
-
-              // Then retry failed emails
-              await mailingService.retryFailedEmails()
-
-              jobResult = {
-                output: {
-                  success: true,
-                  message: 'Email queue processed successfully (pending and failed emails)'
-                }
-              }
-
-              console.log('✅ Email queue processing completed successfully')
-
-            } catch (error) {
-              console.error('❌ Error processing email queue:', error)
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-
-              jobResult = new Error(`Email queue processing failed: ${errorMessage}`)
-            }
-
-            // Always reschedule the next job (success or failure) using duplicate prevention
-            let rescheduled = false
-            try {
-              rescheduled = await scheduleEmailProcessingJob(payload, queueName, 300000) // Reschedule in 5 minutes
-              if (rescheduled) {
-                console.log(`🔄 Rescheduled next email processing job in ${queueName} queue`)
-              }
-            } catch (rescheduleError) {
-              console.error('❌ Failed to reschedule email processing job:', rescheduleError)
-              // If rescheduling fails, we should warn but not fail the current job
-              // since the email processing itself may have succeeded
-              console.warn('⚠️  Email processing completed but next job could not be scheduled')
-            }
-
-            // Return the original result or throw the error
-            if (jobResult instanceof Error) {
-              throw jobResult
-            }
-            return jobResult
-          },
-          interfaceName: 'ProcessEmailQueueJob',
-        },
+        ...createMailingJobs(mailingService),
       ],
     },
     onInit: async (payload: any) => {
@@ -191,8 +95,8 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
         await config.onInit(payload)
       }
 
-      // Initialize mailing service
-      const mailingService = new MailingService(payload, pluginConfig)
+      // Update mailing service with payload instance
+      mailingService.payload = payload
 
       // Add mailing context to payload for developer access
       ;(payload as any).mailing = {
@@ -207,9 +111,10 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
 
       console.log('PayloadCMS Mailing Plugin initialized successfully')
 
-      // Schedule the email processing job if not already scheduled
+      // Schedule the initial email processing job
       try {
-        await scheduleEmailProcessingJob(payload, queueName)
+        await scheduleEmailsJob(payload, queueName, 60000) // Schedule in 1 minute
+        console.log(`🔄 Scheduled initial email processing job in queue: ${queueName}`)
       } catch (error) {
         console.error('Failed to schedule email processing job:', error)
       }
