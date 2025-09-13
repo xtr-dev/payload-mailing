@@ -63,15 +63,39 @@ export class MailingService implements IMailingService {
     }
   }
 
+  /**
+   * Sanitizes a display name for use in email headers to prevent header injection
+   * and ensure proper formatting
+   */
+  private sanitizeDisplayName(name: string): string {
+    return name
+      .trim()
+      // Remove/replace newlines and carriage returns to prevent header injection
+      .replace(/[\r\n]/g, ' ')
+      // Remove control characters (except space and printable characters)
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+      // Escape quotes to prevent malformed headers
+      .replace(/"/g, '\\"')
+  }
+
+  /**
+   * Formats an email address with optional display name
+   */
+  private formatEmailAddress(email: string, displayName?: string | null): string {
+    if (displayName && displayName.trim()) {
+      const sanitizedName = this.sanitizeDisplayName(displayName)
+      return `"${sanitizedName}" <${email}>`
+    }
+    return email
+  }
+
   private getDefaultFrom(): string {
     const fromEmail = this.config.defaultFrom
     const fromName = this.config.defaultFromName
 
     // Check if fromName exists, is not empty after trimming, and fromEmail exists
     if (fromName && fromName.trim() && fromEmail) {
-      // Escape quotes in the display name to prevent malformed headers
-      const escapedName = fromName.replace(/"/g, '\\"')
-      return `"${escapedName}" <${fromEmail}>`
+      return this.formatEmailAddress(fromEmail, fromName)
     }
 
     return fromEmail || ''
@@ -238,12 +262,12 @@ export class MailingService implements IMailingService {
         id: emailId,
       }) as BaseEmailDocument
 
-      // Combine from and fromName for nodemailer
-      let fromField = email.from
-      if (email.fromName && email.from) {
-        fromField = `"${email.fromName}" <${email.from}>`
-      } else if (email.from) {
-        fromField = email.from
+      // Combine from and fromName for nodemailer using proper sanitization
+      let fromField: string
+      if (email.from) {
+        fromField = this.formatEmailAddress(email.from, email.fromName)
+      } else {
+        fromField = this.getDefaultFrom()
       }
 
       const mailOptions = {

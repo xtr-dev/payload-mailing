@@ -100,6 +100,17 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     emailData.from = validated && validated.length > 0 ? validated[0] : undefined
   }
 
+  // Sanitize fromName to prevent header injection
+  if (emailData.fromName && emailData.fromName !== null) {
+    emailData.fromName = emailData.fromName
+      .trim()
+      // Remove/replace newlines and carriage returns to prevent header injection
+      .replace(/[\r\n]/g, ' ')
+      // Remove control characters (except space and printable characters)
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+      // Note: We don't escape quotes here as that's handled in MailingService
+  }
+
   // Normalize Date objects to ISO strings for consistent database storage
   if (emailData.scheduledAt instanceof Date) {
     emailData.scheduledAt = emailData.scheduledAt.toISOString()
