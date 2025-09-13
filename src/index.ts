@@ -12,7 +12,7 @@ export { default as EmailTemplates, createEmailTemplatesCollection } from './col
 export { default as Emails } from './collections/Emails.js'
 
 // Jobs (includes the send email task)
-export { createMailingJobs, sendEmailJob } from './jobs/index.js'
+export { mailingJobs, sendEmailJob } from './jobs/index.js'
 export type { SendEmailTaskInput } from './jobs/sendEmailTask.js'
 
 // Utility functions for developers

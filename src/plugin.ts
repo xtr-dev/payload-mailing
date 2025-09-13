@@ -3,7 +3,7 @@ import { MailingPluginConfig, MailingContext } from './types/index.js'
 import { MailingService } from './services/MailingService.js'
 import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 import Emails from './collections/Emails.js'
-import { createMailingJobs, scheduleEmailsJob } from './jobs/index.js'
+import { mailingJobs, scheduleEmailsJob } from './jobs/index.js'
 
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
@@ -14,14 +14,6 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
     throw new Error('Invalid queue configuration: queue must be a non-empty string')
   }
 
-  // Create a factory function that will provide the mailing service once initialized
-  const getMailingService = () => {
-    if (!mailingService) {
-      throw new Error('MailingService not yet initialized - this should only be called after plugin initialization')
-    }
-    return mailingService
-  }
-  let mailingService: MailingService
 
   // Handle templates collection configuration
   const templatesConfig = pluginConfig.collections?.templates
@@ -93,7 +85,7 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       ...(config.jobs || {}),
       tasks: [
         ...(config.jobs?.tasks || []),
-        // Jobs will be properly added after initialization
+        ...mailingJobs,
       ],
     },
     onInit: async (payload: any) => {
@@ -102,13 +94,7 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       }
 
       // Initialize mailing service with proper payload instance
-      mailingService = new MailingService(payload, pluginConfig)
-
-      // Add mailing jobs to payload's job system
-      const mailingJobs = createMailingJobs(mailingService)
-      mailingJobs.forEach(job => {
-        payload.jobs.tasks.push(job)
-      })
+      const mailingService = new MailingService(payload, pluginConfig)
 
       // Add mailing context to payload for developer access
       ;(payload as any).mailing = {
