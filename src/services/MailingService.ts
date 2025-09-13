@@ -48,6 +48,20 @@ export class MailingService implements IMailingService {
     }
   }
 
+  private getDefaultFrom(): string {
+    const fromEmail = this.config.defaultFrom
+    const fromName = this.config.defaultFromName
+
+    // Check if fromName exists, is not empty after trimming, and fromEmail exists
+    if (fromName && fromName.trim() && fromEmail) {
+      // Escape quotes in the display name to prevent malformed headers
+      const escapedName = fromName.replace(/"/g, '\\"')
+      return `"${escapedName}" <${fromEmail}>`
+    }
+
+    return fromEmail || ''
+  }
+
   private registerHandlebarsHelpers(): void {
     Handlebars.registerHelper('formatDate', (date: Date, format?: string) => {
       if (!date) return ''
@@ -128,7 +142,7 @@ export class MailingService implements IMailingService {
       to: Array.isArray(options.to) ? options.to : [options.to],
       cc: options.cc ? (Array.isArray(options.cc) ? options.cc : [options.cc]) : undefined,
       bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]) : undefined,
-      from: options.from || this.config.defaultFrom,
+      from: options.from || this.getDefaultFrom(),
       replyTo: options.replyTo,
       subject: subject || options.subject,
       html,
@@ -245,7 +259,7 @@ export class MailingService implements IMailingService {
       }) as QueuedEmail
 
       let emailObject: EmailObject = {
-        from: email.from || this.config.defaultFrom,
+        from: email.from || this.getDefaultFrom(),
         to: email.to,
         cc: email.cc || undefined,
         bcc: email.bcc || undefined,
@@ -262,7 +276,7 @@ export class MailingService implements IMailingService {
       }
 
       const mailOptions = {
-        from: emailObject.from || this.config.defaultFrom,
+        from: emailObject.from,
         to: emailObject.to,
         cc: emailObject.cc || undefined,
         bcc: emailObject.bcc || undefined,

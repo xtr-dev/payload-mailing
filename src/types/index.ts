@@ -22,6 +22,7 @@ export interface MailingPluginConfig {
     emails?: string | Partial<CollectionConfig>
   }
   defaultFrom?: string
+  defaultFromName?: string
   transport?: Transporter | MailingTransportConfig
   queue?: string
   retryAttempts?: number
