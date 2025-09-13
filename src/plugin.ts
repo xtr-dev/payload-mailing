@@ -1,4 +1,4 @@
-import type { Config } from 'payload'
+import type {CollectionConfig, Config, Field} from 'payload'
 import { MailingPluginConfig, MailingContext } from './types/index.js'
 import { MailingService } from './services/MailingService.js'
 import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
@@ -29,7 +29,7 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       ...baseTemplatesCollection.access,
       ...templatesOverrides.access,
     },
-  }
+  } satisfies CollectionConfig
 
   // Handle emails collection configuration
   const emailsConfig = pluginConfig.collections?.emails
@@ -51,19 +51,20 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       ...emailsOverrides.access,
     },
     // Update relationship fields to point to correct templates collection
-    fields: (emailsOverrides.fields || Emails.fields).map((field: any) => {
+    fields: (emailsOverrides.fields || Emails.fields).map((field: Field) => {
       if (field &&
           typeof field === 'object' &&
+          'name' in field &&
           field.name === 'template' &&
           field.type === 'relationship') {
         return {
           ...field,
           relationTo: templatesSlug,
-        }
+        } as typeof field
       }
       return field
     }),
-  }
+  } satisfies CollectionConfig
 
   return {
     ...config,
