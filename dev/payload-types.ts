@@ -100,7 +100,8 @@ export interface Config {
   };
   jobs: {
     tasks: {
-      'process-email-queue': ProcessEmailQueueJob;
+      processEmails: ProcessEmailsJob;
+      'send-email': TaskSendEmail;
       inline: {
         input: unknown;
         output: unknown;
@@ -232,21 +233,17 @@ export interface Email {
    */
   template?: (string | null) | EmailTemplate;
   /**
-   * Template slug used for this email
+   * Recipient email addresses
    */
-  templateSlug?: string | null;
+  to: string[];
   /**
-   * Recipient email address(es), comma-separated
+   * CC email addresses
    */
-  to: string;
+  cc?: string[] | null;
   /**
-   * CC email address(es), comma-separated
+   * BCC email addresses
    */
-  cc?: string | null;
-  /**
-   * BCC email address(es), comma-separated
-   */
-  bcc?: string | null;
+  bcc?: string[] | null;
   /**
    * Sender email address (optional, uses default if not provided)
    */
@@ -362,7 +359,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'process-email-queue';
+        taskSlug: 'inline' | 'processEmails' | 'send-email';
         taskID: string;
         input?:
           | {
@@ -395,7 +392,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'process-email-queue') | null;
+  taskSlug?: ('inline' | 'processEmails' | 'send-email') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -542,7 +539,6 @@ export interface EmailTemplatesSelect<T extends boolean = true> {
  */
 export interface EmailsSelect<T extends boolean = true> {
   template?: T;
-  templateSlug?: T;
   to?: T;
   cc?: T;
   bcc?: T;
@@ -627,10 +623,67 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "ProcessEmailQueueJob".
+ * via the `definition` "ProcessEmailsJob".
  */
-export interface ProcessEmailQueueJob {
+export interface ProcessEmailsJob {
   input?: unknown;
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSend-email".
+ */
+export interface TaskSendEmail {
+  input: {
+    /**
+     * Use a template (leave empty for direct email)
+     */
+    templateSlug?: string | null;
+    /**
+     * JSON object with variables for template rendering
+     */
+    variables?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Email subject (required if not using template)
+     */
+    subject?: string | null;
+    /**
+     * HTML email content (required if not using template)
+     */
+    html?: string | null;
+    /**
+     * Plain text email content (optional)
+     */
+    text?: string | null;
+    /**
+     * Comma-separated list of email addresses
+     */
+    to: string;
+    /**
+     * Optional comma-separated list of CC email addresses
+     */
+    cc?: string | null;
+    /**
+     * Optional comma-separated list of BCC email addresses
+     */
+    bcc?: string | null;
+    /**
+     * Optional date/time to schedule email for future delivery
+     */
+    scheduledAt?: string | null;
+    /**
+     * Email priority (1 = highest, 10 = lowest)
+     */
+    priority?: number | null;
+  };
   output?: unknown;
 }
 /**

@@ -1,22 +1,9 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-
-// Base type for email data that all emails must have
-// Compatible with PayloadCMS generated types that include null
-export interface BaseEmailData {
-  to: string | string[]
-  cc?: string | string[] | null
-  bcc?: string | string[] | null
-  subject?: string | null
-  html?: string | null
-  text?: string | null
-  scheduledAt?: string | Date | null
-  priority?: number | null
-  [key: string]: any
-}
+import {Email} from "./payload-types.js"
 
 // Options for sending emails
-export interface SendEmailOptions<T extends BaseEmailData = BaseEmailData> {
+export interface SendEmailOptions<T extends Email = Email> {
   // Template-based email
   template?: {
     slug: string
@@ -48,7 +35,7 @@ export interface SendEmailOptions<T extends BaseEmailData = BaseEmailData> {
  * })
  * ```
  */
-export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
+export const sendEmail = async <T extends Email = Email>(
   payload: Payload,
   options: SendEmailOptions<T>
 ): Promise<T> => {
@@ -79,8 +66,17 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
     throw new Error('Field "to" is required for sending emails')
   }
 
-  if (!emailData.subject || !emailData.html) {
-    throw new Error('Fields "subject" and "html" are required when not using a template')
+  // Validate required fields based on whether template was used
+  if (options.template) {
+    // When using template, subject and html should have been set by renderTemplate
+    if (!emailData.subject || !emailData.html) {
+      throw new Error(`Template rendering failed: template "${options.template.slug}" did not provide required subject and html content`)
+    }
+  } else {
+    // When not using template, user must provide subject and html directly
+    if (!emailData.subject || !emailData.html) {
+      throw new Error('Fields "subject" and "html" are required when sending direct emails without a template')
+    }
   }
 
   // Process email addresses using shared validation (handle null values)
@@ -94,18 +90,13 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
     emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
   }
 
-  // Convert scheduledAt to ISO string if it's a Date
-  if (emailData.scheduledAt instanceof Date) {
-    emailData.scheduledAt = emailData.scheduledAt.toISOString()
-  }
-
-  // Create the email in the collection
+  // Create the email in the collection with proper typing
   const email = await payload.create({
-    collection: collectionSlug as any,
-    data: emailData as any
+    collection: collectionSlug,
+    data: emailData
   })
 
-  return email as unknown as T
+  return email as T
 }
 
 export default sendEmail

@@ -16,7 +16,7 @@ export { mailingJobs, sendEmailJob } from './jobs/index.js'
 export type { SendEmailTaskInput } from './jobs/sendEmailTask.js'
 
 // Main email sending function
-export { sendEmail, type BaseEmailData, type SendEmailOptions } from './sendEmail.js'
+export { sendEmail, type SendEmailOptions } from './sendEmail.js'
 export { default as sendEmailDefault } from './sendEmail.js'
 
 // Utility functions for developers

@@ -19,13 +19,13 @@
       "@payload-config": [
         "./payload.config.ts"
       ],
-      "temp-project": [
+      "@xtr-dev/payload-mailing": [
         "../src/index.ts"
       ],
-      "temp-project/client": [
+      "@xtr-dev/payload-mailing/client": [
         "../src/exports/client.ts"
       ],
-      "temp-project/rsc": [
+      "@xtr-dev/payload-mailing/rsc": [
         "../src/exports/rsc.ts"
       ]
     },
