@@ -282,56 +282,6 @@ const buildConfigWithMemoryDB = async () => {
           ],
         }),
 
-        emailWrapper: (email) => {
-          // Example: wrap email content in a custom layout
-          const wrappedHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>${email.subject}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
-                .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; }
-                .header { background: #007bff; color: white; padding: 20px; text-align: center; }
-                .content { padding: 30px; }
-                .footer { background: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #6c757d; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h1>My Company</h1>
-                </div>
-                <div class="content">
-                  ${email.html}
-                </div>
-                <div class="footer">
-                  This email was sent from My Company. If you have questions, contact support@mycompany.com
-                </div>
-              </div>
-            </body>
-            </html>
-          `
-
-          const wrappedText = `
-MY COMPANY
-==========
-
-${email.text || email.html?.replace(/<[^>]*>/g, '')}
-
----
-This email was sent from My Company.
-If you have questions, contact support@mycompany.com
-          `
-
-          return {
-            ...email,
-            html: wrappedHtml,
-            text: wrappedText.trim(),
-          }
-        },
 
         // Called after mailing plugin is fully initialized
         onReady: async (payload) => {
