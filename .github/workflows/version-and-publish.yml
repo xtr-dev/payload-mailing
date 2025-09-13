@@ -124,30 +124,30 @@ jobs:
 
           echo "🤖 Generating changelog with Claude..."
           CHANGELOG=$(timeout 240s claude-code << 'CLAUDE_EOF'
-Please analyze the following git commits and generate a concise changelog in this exact format:
+          Please analyze the following git commits and generate a concise changelog in this exact format:
 
-## Changes
+          ## Changes
 
-### 🚀 Features
-- Brief description of new features
+          ### 🚀 Features
+          - Brief description of new features
 
-### 🐛 Bug Fixes
-- Brief description of bug fixes
+          ### 🐛 Bug Fixes
+          - Brief description of bug fixes
 
-### 🔧 Improvements
-- Brief description of improvements/refactoring
+          ### 🔧 Improvements
+          - Brief description of improvements/refactoring
 
-### 📚 Documentation
-- Brief description of documentation changes
+          ### 📚 Documentation
+          - Brief description of documentation changes
 
-### ⚡ Performance
-- Brief description of performance improvements
+          ### ⚡ Performance
+          - Brief description of performance improvements
 
-Only include sections that have actual changes. Keep each bullet point concise and user-focused.
+          Only include sections that have actual changes. Keep each bullet point concise and user-focused.
 
-Git commits to analyze:
-$COMMITS
-CLAUDE_EOF
+          Git commits to analyze:
+          $COMMITS
+          CLAUDE_EOF
           )
 
           # Check if changelog generation succeeded
