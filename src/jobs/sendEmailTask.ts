@@ -1,4 +1,4 @@
-import { renderTemplate } from '../utils/helpers.js'
+import { sendEmail, type BaseEmailData } from '../utils/helpers.js'
 
 export interface SendEmailTaskInput {
   // Template mode fields
@@ -116,96 +116,44 @@ export const sendEmailJob = {
     }
   ],
   handler: async ({ input, payload }: any) => {
-    // Get mailing context from payload
-    const mailingContext = (payload as any).mailing
-    if (!mailingContext) {
-      throw new Error('Mailing plugin not properly initialized')
-    }
-
-    // Cast input to our expected type with validation
+    // Cast input to our expected type
     const taskInput = input as SendEmailTaskInput
 
-    // Validate required fields
-    if (!taskInput.to) {
-      throw new Error('Field "to" is required')
-    }
-
     try {
-      let html: string
-      let text: string | undefined
-      let subject: string
+      // Prepare options for sendEmail based on task input
+      const sendEmailOptions: any = {
+        data: {}
+      }
 
-      // Check if using template or direct email
+      // If using template mode
       if (taskInput.templateSlug) {
-        // Template mode: render the template
-        const rendered = await renderTemplate(
-          payload,
-          taskInput.templateSlug,
-          taskInput.variables || {}
-        )
-        html = rendered.html
-        text = rendered.text
-        subject = rendered.subject
-      } else {
-        // Direct email mode: use provided content
-        if (!taskInput.subject || !taskInput.html) {
-          throw new Error('Subject and HTML content are required when not using a template')
+        sendEmailOptions.template = {
+          slug: taskInput.templateSlug,
+          variables: taskInput.variables || {}
         }
-        subject = taskInput.subject
-        html = taskInput.html
-        text = taskInput.text
       }
 
-      // Parse and validate email addresses
-      const parseEmails = (emails: string | string[] | undefined): string[] | undefined => {
-        if (!emails) return undefined
+      // Build data object from task input
+      const dataFields = ['to', 'cc', 'bcc', 'subject', 'html', 'text', 'scheduledAt', 'priority']
+      const additionalFields: string[] = []
 
-        let emailList: string[]
-        if (Array.isArray(emails)) {
-          emailList = emails
-        } else {
-          emailList = emails.split(',').map(email => email.trim()).filter(Boolean)
+      // Copy standard fields
+      dataFields.forEach(field => {
+        if (taskInput[field] !== undefined) {
+          sendEmailOptions.data[field] = taskInput[field]
         }
+      })
 
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        const invalidEmails = emailList.filter(email => !emailRegex.test(email))
-        if (invalidEmails.length > 0) {
-          throw new Error(`Invalid email addresses: ${invalidEmails.join(', ')}`)
-        }
-
-        return emailList
-      }
-
-      // Prepare email data
-      const emailData: any = {
-        to: parseEmails(taskInput.to),
-        cc: parseEmails(taskInput.cc),
-        bcc: parseEmails(taskInput.bcc),
-        subject,
-        html,
-        text,
-        priority: taskInput.priority || 5,
-      }
-
-      // Add scheduled date if provided
-      if (taskInput.scheduledAt) {
-        emailData.scheduledAt = new Date(taskInput.scheduledAt).toISOString()
-      }
-
-      // Add any additional fields from input (excluding the ones we've already handled)
-      const handledFields = ['templateSlug', 'to', 'cc', 'bcc', 'variables', 'scheduledAt', 'priority']
+      // Copy any additional custom fields
       Object.keys(taskInput).forEach(key => {
-        if (!handledFields.includes(key)) {
-          emailData[key] = taskInput[key]
+        if (!['templateSlug', 'variables', ...dataFields].includes(key)) {
+          sendEmailOptions.data[key] = taskInput[key]
+          additionalFields.push(key)
         }
       })
 
-      // Create the email in the collection using configurable collection name
-      const email = await payload.create({
-        collection: mailingContext.collections.emails,
-        data: emailData
-      })
+      // Use the sendEmail helper to create the email
+      const email = await sendEmail<BaseEmailData>(payload, sendEmailOptions)
 
       return {
         output: {
@@ -214,15 +162,14 @@ export const sendEmailJob = {
           message: `Email queued successfully with ID: ${email.id}`,
           mode: taskInput.templateSlug ? 'template' : 'direct',
           templateSlug: taskInput.templateSlug || null,
-          subject: subject,
-          recipients: emailData.to?.length || 0,
-          scheduledAt: emailData.scheduledAt || null
+          subject: email.subject,
+          recipients: Array.isArray(email.to) ? email.to.length : 1,
+          scheduledAt: email.scheduledAt || null
         }
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-
       throw new Error(`Failed to queue email: ${errorMessage}`)
     }
   }
