@@ -84,6 +84,7 @@ Make sure these secrets are configured in your GitHub repository:
 
 - ✅ Automatic version bumping based on branch
 - ✅ AI-generated changelog using Claude Code CLI
+- ✅ Appends changelog to PR merge commit message
 - ✅ Runs tests before publishing
 - ✅ Builds the package before publishing
 - ✅ Creates git tags with changelog in tag message
@@ -102,7 +103,7 @@ The workflow automatically generates a standardized changelog for each release u
 - ⚡ **Performance** - Performance optimizations
 
 The generated changelog is included in:
-- The version bump commit message
+- The PR merge commit message (automatically appended)
 - The git tag message
 - The GitHub release notes
 

@@ -130,6 +130,23 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Update merge commit with changelog
+        if: steps.version-type.outputs.type != 'none'
+        run: |
+          # Get the merge commit (HEAD)
+          MERGE_COMMIT=$(git rev-parse HEAD)
+
+          # Get original commit message
+          ORIGINAL_MSG=$(git log -1 --format=%B)
+
+          # Create new commit message with changelog
+          NEW_MSG="$ORIGINAL_MSG
+
+          ${{ steps.changelog.outputs.changelog }}"
+
+          # Amend the merge commit with the new message
+          git commit --amend -m "$NEW_MSG"
+
       - name: Version bump
         if: steps.version-type.outputs.type != 'none'
         id: version-bump
@@ -145,7 +162,7 @@ jobs:
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-          # Create commit with changelog
+          # Stage version changes
           git add package.json
           # Add lockfile if it exists (npm version might create package-lock.json)
           if [ -f package-lock.json ]; then
@@ -154,9 +171,9 @@ jobs:
           if [ -f pnpm-lock.yaml ]; then
             git add pnpm-lock.yaml
           fi
-          git commit -m "chore: bump version to v$NEW_VERSION
 
-          ${{ steps.changelog.outputs.changelog }}"
+          # Amend the merge commit to include version changes
+          git commit --amend --no-edit
 
           # Create git tag
           git tag -a "v$NEW_VERSION" -m "Version $NEW_VERSION
@@ -168,7 +185,7 @@ jobs:
       - name: Push version changes
         if: steps.version-type.outputs.type != 'none'
         run: |
-          git push origin main
+          git push --force-with-lease origin main
           git push origin --tags
 
       - name: Publish to NPM
