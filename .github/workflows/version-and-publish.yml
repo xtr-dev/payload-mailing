@@ -13,6 +13,10 @@ jobs:
   version-and-publish:
     if: github.event_name == 'push' || (github.event.pull_request.merged == true && (contains(github.event.pull_request.head.ref, 'version/major') || contains(github.event.pull_request.head.ref, 'version/minor') || contains(github.event.pull_request.head.ref, 'version/patch')))
     runs-on: ubuntu-latest
+    outputs:
+      new-version: ${{ steps.version-bump.outputs.new-version }}
+      current-version: ${{ steps.version-bump.outputs.current-version }}
+      version-type: ${{ steps.version-type.outputs.type }}
 
     steps:
       - name: Checkout code
@@ -26,16 +30,32 @@ jobs:
         with:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 
       - name: Run build
-        run: npm run build
+        run: pnpm build
 
       - name: Determine version bump type
         id: version-type
@@ -118,7 +138,7 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
-          # Bump version
+          # Bump version (npm is used for version command as pnpm doesn't have equivalent)
           npm version ${{ steps.version-type.outputs.type }} --no-git-tag-version
 
           # Get new version
@@ -126,7 +146,14 @@ jobs:
           echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
           # Create commit with changelog
-          git add package.json package-lock.json
+          git add package.json
+          # Add lockfile if it exists (npm version might create package-lock.json)
+          if [ -f package-lock.json ]; then
+            git add package-lock.json
+          fi
+          if [ -f pnpm-lock.yaml ]; then
+            git add pnpm-lock.yaml
+          fi
           git commit -m "chore: bump version to v$NEW_VERSION
 
           ${{ steps.changelog.outputs.changelog }}"
@@ -146,38 +173,34 @@ jobs:
 
       - name: Publish to NPM
         if: steps.version-type.outputs.type != 'none'
-        run: npm publish --access public
+        run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         if: steps.version-type.outputs.type != 'none'
-        uses: actions/create-release@v1
+        run: |
+          gh release create "v${{ steps.version-bump.outputs.new-version }}" \
+            --title "Release v${{ steps.version-bump.outputs.new-version }}" \
+            --notes "# Release v${{ steps.version-bump.outputs.new-version }}
+
+          ${{ steps.changelog.outputs.changelog }}
+
+          ---
+
+          **Version Info**: ${{ steps.version-type.outputs.type }} release (v${{ steps.version-bump.outputs.current-version }} → v${{ steps.version-bump.outputs.new-version }})
+
+          ### Installation
+
+          \`\`\`bash
+          npm install @xtr-dev/payload-mailing@${{ steps.version-bump.outputs.new-version }}
+          \`\`\`
+
+          ### Documentation
+
+          See the [README](https://github.com/xtr-dev/payload-mailing#readme) for usage instructions and full documentation."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version-bump.outputs.new-version }}
-          release_name: Release v${{ steps.version-bump.outputs.new-version }}
-          body: |
-            # Release v${{ steps.version-bump.outputs.new-version }}
-
-            ${{ steps.changelog.outputs.changelog }}
-
-            ---
-
-            **Version Info**: ${{ steps.version-type.outputs.type }} release (v${{ steps.version-bump.outputs.current-version }} → v${{ steps.version-bump.outputs.new-version }})
-
-            ### Installation
-
-            ```bash
-            npm install @xtr-dev/payload-mailing@${{ steps.version-bump.outputs.new-version }}
-            ```
-
-            ### Documentation
-
-            See the [README](https://github.com/xtr-dev/payload-mailing#readme) for usage instructions and full documentation.
-          draft: false
-          prerelease: false
 
   notify-success:
     if: github.event_name == 'push' || (github.event.pull_request.merged == true && (contains(github.event.pull_request.head.ref, 'version/major') || contains(github.event.pull_request.head.ref, 'version/minor') || contains(github.event.pull_request.head.ref, 'version/patch')))
@@ -185,7 +208,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Success notification
+        if: needs.version-and-publish.outputs.new-version != ''
         run: |
           echo "🎉 Successfully published version ${{ needs.version-and-publish.outputs.new-version }} to NPM!"
           echo "📦 Package: https://www.npmjs.com/package/@xtr-dev/payload-mailing"
           echo "🏷️  GitHub Release: https://github.com/xtr-dev/payload-mailing/releases/tag/v${{ needs.version-and-publish.outputs.new-version }}"
+          echo "🔄 Version Type: ${{ needs.version-and-publish.outputs.version-type }}"
+          echo "📈 Version Change: v${{ needs.version-and-publish.outputs.current-version }} → v${{ needs.version-and-publish.outputs.new-version }}"
