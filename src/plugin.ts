@@ -1,96 +1,143 @@
-import { Config } from 'payload/config'
-import { MailingPluginConfig, MailingContext } from './types'
-import { MailingService } from './services/MailingService'
-import { createMailingJobs } from './jobs'
-import EmailTemplates from './collections/EmailTemplates'
-import EmailOutbox from './collections/EmailOutbox'
-import { scheduleOutboxJob } from './jobs/processOutboxJob'
+import type {CollectionConfig, Config, Field} from 'payload'
+import { MailingPluginConfig, MailingContext } from './types/index.js'
+import { MailingService } from './services/MailingService.js'
+import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
+import Emails from './collections/Emails.js'
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
-  const templatesSlug = pluginConfig.collections?.templates || 'email-templates'
-  const outboxSlug = pluginConfig.collections?.outbox || 'email-outbox'
   const queueName = pluginConfig.queue || 'default'
 
-  // Update collection slugs if custom ones are provided
-  const templatesCollection = {
-    ...EmailTemplates,
-    slug: templatesSlug,
-  }
+  // Handle templates collection configuration
+  const templatesConfig = pluginConfig.collections?.templates
+  const templatesSlug = typeof templatesConfig === 'string' ? templatesConfig : 'email-templates'
+  const templatesOverrides = typeof templatesConfig === 'object' ? templatesConfig : {}
 
-  const outboxCollection = {
-    ...EmailOutbox,
-    slug: outboxSlug,
-    fields: EmailOutbox.fields.map(field => {
-      if (field.name === 'template' && field.type === 'relationship') {
+  // Create base templates collection with custom editor if provided
+  const baseTemplatesCollection = createEmailTemplatesCollection(pluginConfig.richTextEditor)
+
+  const templatesCollection = {
+    ...baseTemplatesCollection,
+    slug: templatesSlug,
+    ...templatesOverrides,
+    // Ensure admin config is properly merged
+    admin: {
+      ...baseTemplatesCollection.admin,
+      ...templatesOverrides.admin,
+    },
+    // Ensure access config is properly merged
+    access: {
+      ...baseTemplatesCollection.access,
+      ...templatesOverrides.access,
+    },
+  } satisfies CollectionConfig
+
+  // Handle emails collection configuration
+  const emailsConfig = pluginConfig.collections?.emails
+  const emailsSlug = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
+  const emailsOverrides = typeof emailsConfig === 'object' ? emailsConfig : {}
+
+  const emailsCollection = {
+    ...Emails,
+    slug: emailsSlug,
+    ...emailsOverrides,
+    // Ensure admin config is properly merged
+    admin: {
+      ...Emails.admin,
+      ...emailsOverrides.admin,
+    },
+    // Ensure access config is properly merged
+    access: {
+      ...Emails.access,
+      ...emailsOverrides.access,
+    },
+    // Update relationship fields to point to correct templates collection
+    fields: (emailsOverrides.fields || Emails.fields).map((field: Field) => {
+      if (field &&
+          typeof field === 'object' &&
+          'name' in field &&
+          field.name === 'template' &&
+          field.type === 'relationship') {
         return {
           ...field,
           relationTo: templatesSlug,
-        }
+        } as typeof field
       }
       return field
     }),
-  }
+  } satisfies CollectionConfig
 
   return {
     ...config,
     collections: [
       ...(config.collections || []),
       templatesCollection,
-      outboxCollection,
+      emailsCollection,
     ],
     jobs: {
       ...(config.jobs || {}),
       tasks: [
         ...(config.jobs?.tasks || []),
-        // Jobs will be added via onInit hook
+        {
+          slug: 'process-email-queue',
+          handler: async ({ job, req }: { job: any; req: any }) => {
+            try {
+              const mailingService = new MailingService((req as any).payload, pluginConfig)
+
+              console.log('🔄 Processing email queue (pending + failed emails)...')
+
+              // Process pending emails first
+              await mailingService.processEmails()
+
+              // Then retry failed emails
+              await mailingService.retryFailedEmails()
+
+              return {
+                output: {
+                  success: true,
+                  message: 'Email queue processed successfully (pending and failed emails)'
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error processing email queue:', error)
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+              // Properly fail the job by throwing the error
+              throw new Error(`Email queue processing failed: ${errorMessage}`)
+            }
+          },
+          interfaceName: 'ProcessEmailQueueJob',
+        },
       ],
     },
-    onInit: async (payload) => {
-      // Call original onInit if it exists
-      if (config.onInit) {
+    onInit: async (payload: any) => {
+      if (pluginConfig.initOrder === 'after' && config.onInit) {
         await config.onInit(payload)
       }
 
       // Initialize mailing service
       const mailingService = new MailingService(payload, pluginConfig)
-      
-      // Add mailing jobs
-      const mailingJobs = createMailingJobs(mailingService)
-      if (payload.jobs) {
-        mailingJobs.forEach(job => {
-          payload.jobs.addTask(job)
-        })
-      }
-
-      // Schedule periodic outbox processing (every 5 minutes)
-      const schedulePeriodicJob = async () => {
-        await scheduleOutboxJob(payload, queueName, 'process-outbox', 5 * 60 * 1000) // 5 minutes
-        setTimeout(schedulePeriodicJob, 5 * 60 * 1000) // Schedule next run
-      }
-
-      // Schedule periodic retry job (every 30 minutes)
-      const scheduleRetryJob = async () => {
-        await scheduleOutboxJob(payload, queueName, 'retry-failed', 30 * 60 * 1000) // 30 minutes
-        setTimeout(scheduleRetryJob, 30 * 60 * 1000) // Schedule next run
-      }
-
-      // Start periodic jobs if jobs are enabled
-      if (payload.jobs) {
-        setTimeout(schedulePeriodicJob, 5 * 60 * 1000) // Start after 5 minutes
-        setTimeout(scheduleRetryJob, 15 * 60 * 1000) // Start after 15 minutes
-      }
 
       // Add mailing context to payload for developer access
       ;(payload as any).mailing = {
+        payload,
         service: mailingService,
         config: pluginConfig,
         collections: {
           templates: templatesSlug,
-          outbox: outboxSlug,
+          emails: emailsSlug,
         },
       } as MailingContext
 
       console.log('PayloadCMS Mailing Plugin initialized successfully')
+
+      // Call onReady callback if provided
+      if (pluginConfig.onReady) {
+        await pluginConfig.onReady(payload)
+      }
+
+      if (pluginConfig.initOrder !== 'after' && config.onInit) {
+        await config.onInit(payload)
+      }
     },
   }
 }

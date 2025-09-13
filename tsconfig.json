@@ -17,7 +17,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "emitDeclarationOnly": true,
+    "emitDeclarationOnly": false,
     "target": "ES2022",
     "composite": true,
     "declaration": true,

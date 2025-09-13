@@ -1,17 +1,12 @@
-import { CollectionConfig } from 'payload/types'
+import type { CollectionConfig, RichTextField } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
-const EmailTemplates: CollectionConfig = {
+export const createEmailTemplatesCollection = (editor?: RichTextField['editor']): CollectionConfig => ({
   slug: 'email-templates',
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'subject', 'updatedAt'],
     group: 'Mailing',
-  },
-  access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
   },
   fields: [
     {
@@ -23,83 +18,49 @@ const EmailTemplates: CollectionConfig = {
       },
     },
     {
+      name: 'slug',
+      type: 'text',
+      required: true,
+      unique: true,
+      admin: {
+        description: 'Unique identifier for this template (e.g., "welcome-email", "password-reset")',
+      },
+      hooks: {
+        beforeChange: [
+          ({ value }) => {
+            if (value) {
+              return value.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+            }
+            return value
+          },
+        ],
+      },
+    },
+    {
       name: 'subject',
       type: 'text',
       required: true,
       admin: {
-        description: 'Email subject line (supports Handlebars variables)',
+        description: 'Email subject line. You can use Handlebars variables like {{firstName}} or {{siteName}}.',
       },
     },
     {
-      name: 'htmlTemplate',
-      type: 'textarea',
+      name: 'content',
+      type: 'richText',
       required: true,
+      editor: editor || lexicalEditor({
+        features: ({ defaultFeatures }) => [
+          ...defaultFeatures,
+        ],
+      }),
       admin: {
-        description: 'HTML email template (supports Handlebars syntax)',
-        rows: 10,
-      },
-    },
-    {
-      name: 'textTemplate',
-      type: 'textarea',
-      admin: {
-        description: 'Plain text email template (supports Handlebars syntax)',
-        rows: 8,
-      },
-    },
-    {
-      name: 'variables',
-      type: 'array',
-      admin: {
-        description: 'Define variables that can be used in this template',
-      },
-      fields: [
-        {
-          name: 'name',
-          type: 'text',
-          required: true,
-          admin: {
-            description: 'Variable name (e.g., "firstName", "orderTotal")',
-          },
-        },
-        {
-          name: 'type',
-          type: 'select',
-          required: true,
-          options: [
-            { label: 'Text', value: 'text' },
-            { label: 'Number', value: 'number' },
-            { label: 'Boolean', value: 'boolean' },
-            { label: 'Date', value: 'date' },
-          ],
-          defaultValue: 'text',
-        },
-        {
-          name: 'required',
-          type: 'checkbox',
-          defaultValue: false,
-          admin: {
-            description: 'Is this variable required when sending emails?',
-          },
-        },
-        {
-          name: 'description',
-          type: 'text',
-          admin: {
-            description: 'Optional description of what this variable represents',
-          },
-        },
-      ],
-    },
-    {
-      name: 'previewData',
-      type: 'json',
-      admin: {
-        description: 'Sample data for previewing this template (JSON format)',
+        description: 'Email content with rich text formatting. Supports Handlebars variables like {{firstName}} and helpers like {{formatDate createdAt "long"}}. Content is converted to HTML and plain text automatically.',
       },
     },
   ],
   timestamps: true,
-}
+})
 
+// Default export for backward compatibility
+const EmailTemplates = createEmailTemplatesCollection()
 export default EmailTemplates

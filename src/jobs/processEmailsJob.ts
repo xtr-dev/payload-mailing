@@ -1,21 +1,21 @@
-import { PayloadRequest } from 'payload/types'
-import { MailingService } from '../services/MailingService'
+import type { PayloadRequest } from 'payload'
+import { MailingService } from '../services/MailingService.js'
 
-export interface ProcessOutboxJobData {
-  type: 'process-outbox' | 'retry-failed'
+export interface ProcessEmailsJobData {
+  type: 'process-emails' | 'retry-failed'
 }
 
-export const processOutboxJob = async (
-  job: { data: ProcessOutboxJobData },
+export const processEmailsJob = async (
+  job: { data: ProcessEmailsJobData },
   context: { req: PayloadRequest; mailingService: MailingService }
 ) => {
   const { mailingService } = context
   const { type } = job.data
 
   try {
-    if (type === 'process-outbox') {
-      await mailingService.processOutbox()
-      console.log('Outbox processing completed successfully')
+    if (type === 'process-emails') {
+      await mailingService.processEmails()
+      console.log('Email processing completed successfully')
     } else if (type === 'retry-failed') {
       await mailingService.retryFailedEmails()
       console.log('Failed email retry completed successfully')
@@ -26,10 +26,10 @@ export const processOutboxJob = async (
   }
 }
 
-export const scheduleOutboxJob = async (
+export const scheduleEmailsJob = async (
   payload: any,
   queueName: string,
-  jobType: 'process-outbox' | 'retry-failed',
+  jobType: 'process-emails' | 'retry-failed',
   delay?: number
 ) => {
   if (!payload.jobs) {
@@ -40,7 +40,7 @@ export const scheduleOutboxJob = async (
   try {
     await payload.jobs.queue({
       queue: queueName,
-      task: 'processOutbox',
+      task: 'processEmails',
       input: { type: jobType },
       waitUntil: delay ? new Date(Date.now() + delay) : undefined,
     })

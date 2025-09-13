@@ -1,6 +1,6 @@
 {
   "name": "@xtr-dev/payload-mailing",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Template-based email system with scheduling and job processing for PayloadCMS",
   "type": "module",
   "main": "dist/index.js",
@@ -13,12 +13,13 @@
     }
   },
   "scripts": {
-    "build": "npm run copyfiles && npm run build:types && npm run build:swc",
-    "build:swc": "swc ./src -d ./dist --config-file .swcrc --strip-leading-paths",
-    "build:types": "tsc --outDir dist --rootDir ./src",
+    "build": "npm run clean && npm run build:tsc",
+    "build:tsc": "tsc --project ./tsconfig.build.json",
     "clean": "rimraf {dist,*.tsbuildinfo}",
     "copyfiles": "copyfiles -u 1 \"src/**/*.{html,css,scss,ttf,woff,woff2,eot,svg,jpg,png,json}\" dist/",
     "dev": "next dev dev --turbo",
+    "dev:memory": "cd dev && USE_MEMORY_DB=true npm run dev",
+    "dev:start": "cd dev && node start-dev.js",
     "dev:generate-importmap": "npm run dev:payload generate:importmap",
     "dev:generate-types": "npm run dev:payload generate:types",
     "dev:payload": "cross-env PAYLOAD_CONFIG_PATH=./dev/payload.config.ts payload",
@@ -38,7 +39,7 @@
     "scheduling",
     "jobs",
     "mailing",
-    "handlebars"
+    "richtext"
   ],
   "author": "XTR Development",
   "license": "MIT",

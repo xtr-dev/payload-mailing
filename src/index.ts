@@ -1,25 +1,23 @@
 // Main plugin export
-export { default as mailingPlugin } from './plugin'
-export { mailingPlugin } from './plugin'
+export { mailingPlugin, default as mailingPluginDefault } from './plugin.js'
 
 // Types
-export * from './types'
+export * from './types/index.js'
 
 // Services
-export { MailingService } from './services/MailingService'
+export { MailingService } from './services/MailingService.js'
 
 // Collections
-export { default as EmailTemplates } from './collections/EmailTemplates'
-export { default as EmailOutbox } from './collections/EmailOutbox'
+export { default as EmailTemplates, createEmailTemplatesCollection } from './collections/EmailTemplates.js'
+export { default as Emails } from './collections/Emails.js'
 
-// Jobs
-export * from './jobs'
+// Jobs are integrated into the plugin configuration
 
 // Utility functions for developers
 export {
   getMailing,
   sendEmail,
   scheduleEmail,
-  processOutbox,
+  processEmails,
   retryFailedEmails,
-} from './utils/helpers'
+} from './utils/helpers.js'
