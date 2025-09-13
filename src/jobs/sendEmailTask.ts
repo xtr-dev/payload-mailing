@@ -1,5 +1,5 @@
 import { sendEmail } from '../sendEmail.js'
-import { Email } from '../payload-types.js'
+import {Email, EmailTemplate} from '../payload-types.js'
 import {BaseEmail} from "../types/index.js"
 
 export interface SendEmailTaskInput {
@@ -161,7 +161,7 @@ export const sendEmailJob = {
       })
 
       // Use the sendEmail helper to create the email
-      const email = await sendEmail<BaseEmail>(payload, sendEmailOptions)
+      const email = await sendEmail<Email, EmailTemplate>(payload, sendEmailOptions)
 
       return {
         output: {

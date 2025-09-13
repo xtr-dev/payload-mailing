@@ -1,6 +1,6 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
-import {Email} from "./payload-types.js"
+import {Email, EmailTemplate} from "./payload-types.js"
 import {BaseEmail} from "./types/index.js"
 
 // Options for sending emails
@@ -36,14 +36,14 @@ export interface SendEmailOptions<T extends BaseEmail = BaseEmail> {
  * })
  * ```
  */
-export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | number>(
+export const sendEmail = async <TEmail extends Email = Email, TEmailTemplate extends EmailTemplate = EmailTemplate>(
   payload: Payload,
-  options: SendEmailOptions<T>
-): Promise<T & {id: ID}> => {
+  options: SendEmailOptions<BaseEmail<TEmail, TEmailTemplate>>
+): Promise<TEmail> => {
   const mailing = getMailing(payload)
   const collectionSlug = options.collectionSlug || mailing.collections.emails || 'emails'
 
-  let emailData: Partial<T> = { ...options.data } as Partial<T>
+  let emailData: Partial<TEmail> = { ...options.data } as Partial<TEmail>
 
   // If using a template, render it first
   if (options.template) {
@@ -59,7 +59,7 @@ export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | n
       subject,
       html,
       text,
-    } as Partial<T>
+    } as Partial<TEmail>
   }
 
   // Validate required fields
@@ -97,7 +97,7 @@ export const sendEmail = async <T extends BaseEmail = BaseEmail, ID = string | n
     data: emailData
   })
 
-  return email as T & {id: ID}
+  return email as TEmail
 }
 
 export default sendEmail
