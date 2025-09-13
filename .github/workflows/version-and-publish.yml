@@ -133,18 +133,23 @@ jobs:
       - name: Update merge commit with changelog
         if: steps.version-type.outputs.type != 'none'
         run: |
-          # Get the merge commit (HEAD)
-          MERGE_COMMIT=$(git rev-parse HEAD)
+          # Extract version type for commit title
+          VERSION_TYPE="${{ steps.version-type.outputs.type }}"
 
-          # Get original commit message
-          ORIGINAL_MSG=$(git log -1 --format=%B)
+          # Create clean commit message with just the changelog
+          if [ "$VERSION_TYPE" = "major" ]; then
+            COMMIT_TITLE="🚀 Major Release"
+          elif [ "$VERSION_TYPE" = "minor" ]; then
+            COMMIT_TITLE="✨ Minor Release"
+          else
+            COMMIT_TITLE="🐛 Patch Release"
+          fi
 
-          # Create new commit message with changelog
-          NEW_MSG="$ORIGINAL_MSG
+          NEW_MSG="$COMMIT_TITLE
 
           ${{ steps.changelog.outputs.changelog }}"
 
-          # Amend the merge commit with the new message
+          # Amend the merge commit with the clean message
           git commit --amend -m "$NEW_MSG"
 
       - name: Version bump
