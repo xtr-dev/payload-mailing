@@ -1,6 +1,6 @@
 {
   "name": "@xtr-dev/payload-mailing",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Template-based email system with scheduling and job processing for PayloadCMS",
   "type": "module",
   "main": "dist/index.js",

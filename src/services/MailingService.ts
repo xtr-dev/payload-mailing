@@ -18,7 +18,7 @@ export class MailingService implements IMailingService {
   private transporter!: Transporter | any
   private templatesCollection: string
   private emailsCollection: string
-  private liquid: Liquid | null = null
+  private liquid: Liquid | null | false = null
 
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
@@ -84,15 +84,15 @@ export class MailingService implements IMailingService {
   }
 
   private async initializeLiquidJS(): Promise<void> {
-    if (this.liquid) return // Already initialized
+    if (this.liquid !== null) return // Already initialized or failed
 
     try {
-      const liquidModule = await Function('return import("liquidjs")')() as any
+      const liquidModule = await import('liquidjs') as any
       const { Liquid: LiquidEngine } = liquidModule
       this.liquid = new LiquidEngine()
 
       // Register custom filters (equivalent to Handlebars helpers)
-      if (this.liquid) {
+      if (this.liquid && typeof this.liquid !== 'boolean') {
         this.liquid.registerFilter('formatDate', (date: any, format?: string) => {
           if (!date) return ''
           const d = new Date(date)
@@ -124,7 +124,7 @@ export class MailingService implements IMailingService {
       }
     } catch (error) {
       console.warn('LiquidJS not available. Falling back to simple variable replacement. Install liquidjs or use a different templateEngine.')
-      this.liquid = null
+      this.liquid = false // Mark as failed to avoid retries
     }
   }
 
@@ -404,7 +404,7 @@ export class MailingService implements IMailingService {
     if (engine === 'liquidjs') {
       try {
         await this.initializeLiquidJS()
-        if (this.liquid) {
+        if (this.liquid && typeof this.liquid !== 'boolean') {
           return await this.liquid.parseAndRender(template, variables)
         }
       } catch (error) {
@@ -430,8 +430,7 @@ export class MailingService implements IMailingService {
 
   private async renderWithMustache(template: string, variables: Record<string, any>): Promise<string | null> {
     try {
-      // Dynamic import with proper typing
-      const mustacheModule = await Function('return import("mustache")')() as any
+      const mustacheModule = await import('mustache') as any
       const Mustache = mustacheModule.default || mustacheModule
       return Mustache.render(template, variables)
     } catch (error) {
