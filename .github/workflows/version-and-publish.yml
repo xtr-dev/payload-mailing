@@ -85,58 +85,129 @@ jobs:
           curl -fsSL https://claude.ai/cli/install.sh | bash
           echo "$HOME/.claude/bin" >> $GITHUB_PATH
 
-      - name: Generate changelog with Claude
+      - name: Generate changelog with Claude (with fallback)
         if: steps.version-type.outputs.type != 'none'
         id: changelog
         run: |
           # Get commits since last tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --oneline --no-merges --since="1 week ago")
+            COMMITS=$(git log --oneline --no-merges --since="1 week ago" || echo "No recent commits")
           else
-            COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD)
+            COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD || echo "No new commits")
           fi
 
-          # Generate changelog using Claude
-          CHANGELOG=$(claude-code << EOF
-          Please analyze the following git commits and generate a concise changelog in this exact format:
+          # Create fallback changelog from commits
+          create_fallback_changelog() {
+            echo "## Changes"
+            echo ""
+            if [ "$COMMITS" != "No recent commits" ] && [ "$COMMITS" != "No new commits" ]; then
+              echo "### 📋 Updates"
+              echo "$COMMITS" | sed 's/^[a-f0-9]* /- /' | head -10
+            else
+              echo "### 📋 Updates"
+              echo "- Version bump and maintenance updates"
+            fi
+          }
 
-          ## Changes
+          # Generate changelog using Claude (fail if it fails)
+          if ! command -v claude-code >/dev/null 2>&1; then
+            echo "❌ ERROR: Claude CLI not found. Please ensure Claude Code is properly installed."
+            exit 1
+          fi
 
-          ### 🚀 Features
-          - Brief description of new features
+          echo "🤖 Generating changelog with Claude..."
+          CHANGELOG=$(timeout 60s claude-code << 'CLAUDE_EOF'
+Please analyze the following git commits and generate a concise changelog in this exact format:
 
-          ### 🐛 Bug Fixes
-          - Brief description of bug fixes
+## Changes
 
-          ### 🔧 Improvements
-          - Brief description of improvements/refactoring
+### 🚀 Features
+- Brief description of new features
 
-          ### 📚 Documentation
-          - Brief description of documentation changes
+### 🐛 Bug Fixes
+- Brief description of bug fixes
 
-          ### ⚡ Performance
-          - Brief description of performance improvements
+### 🔧 Improvements
+- Brief description of improvements/refactoring
 
-          Only include sections that have actual changes. Keep each bullet point concise and user-focused.
+### 📚 Documentation
+- Brief description of documentation changes
 
-          Git commits to analyze:
-          $COMMITS
-          EOF
+### ⚡ Performance
+- Brief description of performance improvements
+
+Only include sections that have actual changes. Keep each bullet point concise and user-focused.
+
+Git commits to analyze:
+$COMMITS
+CLAUDE_EOF
           )
+
+          # Check if changelog generation succeeded
+          if [ $? -ne 0 ] || [ -z "$CHANGELOG" ]; then
+            echo "❌ ERROR: Failed to generate changelog with Claude. Workflow cannot continue."
+            echo "Debug info - Commits to analyze:"
+            echo "$COMMITS"
+            exit 1
+          fi
+
+          echo "✅ Successfully generated changelog with Claude"
 
           # Save changelog to output
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create single squashed commit with changelog
+      - name: Create version bump script
         if: steps.version-type.outputs.type != 'none'
+        run: |
+          # Create Node.js script to safely bump version
+          cat > bump-version.js << 'VERSION_SCRIPT_EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const versionType = process.argv[2];
+          const packagePath = path.join(process.cwd(), 'package.json');
+
+          try {
+            const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+            const currentVersion = packageJson.version;
+            const [major, minor, patch] = currentVersion.split('.').map(Number);
+
+            let newVersion;
+            switch (versionType) {
+              case 'major':
+                newVersion = `${major + 1}.0.0`;
+                break;
+              case 'minor':
+                newVersion = `${major}.${minor + 1}.0`;
+                break;
+              case 'patch':
+                newVersion = `${major}.${minor}.${patch + 1}`;
+                break;
+              default:
+                throw new Error(`Invalid version type: ${versionType}`);
+            }
+
+            packageJson.version = newVersion;
+            fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
+
+            console.log(`${currentVersion}:${newVersion}`);
+          } catch (error) {
+            console.error('Error bumping version:', error.message);
+            process.exit(1);
+          }
+          VERSION_SCRIPT_EOF
+
+      - name: Create single atomic commit with all changes
+        if: steps.version-type.outputs.type != 'none'
+        id: version-bump
         run: |
           # Extract version type for commit title
           VERSION_TYPE="${{ steps.version-type.outputs.type }}"
 
-          # Create clean commit message with just the changelog
+          # Create clean commit message title
           if [ "$VERSION_TYPE" = "major" ]; then
             COMMIT_TITLE="🚀 Major Release"
           elif [ "$VERSION_TYPE" = "minor" ]; then
@@ -145,63 +216,83 @@ jobs:
             COMMIT_TITLE="🐛 Patch Release"
           fi
 
-          NEW_MSG="$COMMIT_TITLE
+          # Get the safe base commit (last release tag or fallback)
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            BASE_COMMIT=$(git rev-list -n 1 $LAST_TAG)
+          else
+            # Fallback: get commit from 1 week ago or first commit
+            BASE_COMMIT=$(git rev-list --since="1 week ago" --reverse HEAD | head -1 || git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "Base commit for squash: $BASE_COMMIT"
+
+          # Safely reset to base (soft reset preserves working directory)
+          git reset --soft $BASE_COMMIT
+
+          # Bump version using our safe Node.js script
+          VERSION_OUTPUT=$(node bump-version.js $VERSION_TYPE)
+          CURRENT_VERSION=$(echo $VERSION_OUTPUT | cut -d: -f1)
+          NEW_VERSION=$(echo $VERSION_OUTPUT | cut -d: -f2)
+
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Synchronize pnpm lockfile if it exists
+          if [ -f pnpm-lock.yaml ]; then
+            echo "Synchronizing pnpm lockfile..."
+            pnpm install --frozen-lockfile --ignore-scripts || echo "Lockfile sync completed with warnings"
+          fi
+
+          # Create single atomic commit with everything
+          git add -A
+          COMMIT_MSG="$COMMIT_TITLE
 
           ${{ steps.changelog.outputs.changelog }}"
 
-          # Get the previous commit (before the merge/PR commits)
-          # This assumes we want to squash everything since the last release
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$LAST_TAG" ]; then
-            BASE_COMMIT=$LAST_TAG
-          else
-            # If no tags, use the commit before this PR
-            BASE_COMMIT=$(git log --oneline --skip=10 -1 --format="%H" 2>/dev/null || git log --max-parents=0 --format="%H")
-          fi
-
-          # Reset to the base and create a single squashed commit
-          git reset --soft $BASE_COMMIT
-          git commit -m "$NEW_MSG"
-
-      - name: Version bump and finalize commit
-        if: steps.version-type.outputs.type != 'none'
-        id: version-bump
-        run: |
-          # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-          # Bump version (npm is used for version command as pnpm doesn't have equivalent)
-          npm version ${{ steps.version-type.outputs.type }} --no-git-tag-version
-
-          # Get new version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-          # Stage version changes
-          git add package.json
-          # Add lockfile if it exists (npm version might create package-lock.json)
-          if [ -f package-lock.json ]; then
-            git add package-lock.json
-          fi
-          if [ -f pnpm-lock.yaml ]; then
-            git add pnpm-lock.yaml
-          fi
-
-          # Amend the squashed commit to include version changes
-          git commit --amend --no-edit
+          git commit -m "$COMMIT_MSG" || {
+            echo "Commit failed, checking git status:"
+            git status
+            git diff --cached
+            exit 1
+          }
 
           # Create git tag
           git tag -a "v$NEW_VERSION" -m "Version $NEW_VERSION
 
           ${{ steps.changelog.outputs.changelog }}"
 
-          echo "Created single squashed commit with version bump from $CURRENT_VERSION to $NEW_VERSION"
+          echo "Created single atomic commit with version $CURRENT_VERSION → $NEW_VERSION"
 
-      - name: Push version changes
+          # Clean up temporary files
+          rm -f bump-version.js
+
+      - name: Push version changes safely
         if: steps.version-type.outputs.type != 'none'
         run: |
-          git push --force-with-lease origin main
+          # Check if we need to force push (if git history was rewritten)
+          CURRENT_REMOTE_HEAD=$(git ls-remote origin main | cut -f1)
+          LOCAL_REMOTE_HEAD=$(git rev-parse origin/main)
+
+          if [ "$CURRENT_REMOTE_HEAD" != "$LOCAL_REMOTE_HEAD" ]; then
+            echo "⚠️  Remote main has been updated by another process"
+            echo "Current remote HEAD: $CURRENT_REMOTE_HEAD"
+            echo "Local remote HEAD: $LOCAL_REMOTE_HEAD"
+            echo "❌ ABORTING: Cannot safely force push. Another workflow may be running."
+            exit 1
+          fi
+
+          # Safe force push with lease (only if remote hasn't changed)
+          echo "🚀 Pushing squashed commit to main..."
+          git push --force-with-lease origin main || {
+            echo "❌ ERROR: Force push failed. This likely means:"
+            echo "1. Another workflow pushed to main after this one started"
+            echo "2. Branch protection rules are preventing the push"
+            echo "3. Insufficient permissions"
+            exit 1
+          }
+
+          echo "🏷️  Pushing tags..."
           git push origin --tags
 
       - name: Publish to NPM
