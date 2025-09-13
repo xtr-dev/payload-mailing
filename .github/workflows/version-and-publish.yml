@@ -62,32 +62,6 @@ jobs:
           echo "📦 Package: $PACKAGE_NAME"
           echo "📌 Current Version: $CURRENT_VERSION"
 
-          # Validate version folder branches exist
-          echo "🔍 Validating version folder branches..."
-          MISSING_BRANCHES=""
-
-          for branch in "major" "minor" "patch"; do
-            if ! git ls-remote --heads origin "$branch" | grep -q "refs/heads/$branch$"; then
-              MISSING_BRANCHES="$MISSING_BRANCHES $branch"
-            fi
-          done
-
-          if [ -n "$MISSING_BRANCHES" ]; then
-            echo "❌ ERROR: Missing required version folder branches:$MISSING_BRANCHES"
-            echo "Please create these branches first:"
-            for branch in $MISSING_BRANCHES; do
-              echo "  git checkout -b $branch && git push origin $branch"
-            done
-            echo ""
-            echo "Then create feature branches under them like:"
-            echo "  git checkout -b major/breaking-change"
-            echo "  git checkout -b minor/new-feature"
-            echo "  git checkout -b patch/bug-fix"
-            exit 1
-          fi
-
-          echo "✅ All version folder branches exist"
-
           # Validate Node.js version matches package.json engines
           NODE_VERSION=$(node --version)
           echo "🔍 Validating Node.js version: $NODE_VERSION"
@@ -130,13 +104,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install Claude Code CLI
-        if: steps.version-type.outputs.type != 'none'
-        run: |
-          curl -fsSL https://claude.ai/cli/install.sh | bash
-          echo "$HOME/.claude/bin" >> $GITHUB_PATH
-
-      - name: Generate changelog with Claude (with fallback)
+      - name: Generate changelog with Claude
         if: steps.version-type.outputs.type != 'none'
         id: changelog
         run: |
@@ -147,7 +115,6 @@ jobs:
           else
             COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD || echo "No new commits")
           fi
-
 
           # Generate changelog using Claude (fail if it fails)
           if ! command -v claude-code >/dev/null 2>&1; then
