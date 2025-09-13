@@ -1,9 +1,9 @@
 import { Payload } from 'payload'
-import Handlebars from 'handlebars'
+import { Liquid } from 'liquidjs'
 import nodemailer, { Transporter } from 'nodemailer'
-import { 
-  MailingPluginConfig, 
-  SendEmailOptions, 
+import {
+  MailingPluginConfig,
+  SendEmailOptions,
   MailingService as IMailingService,
   EmailTemplate,
   QueuedEmail,
@@ -18,19 +18,19 @@ export class MailingService implements IMailingService {
   private transporter!: Transporter | any
   private templatesCollection: string
   private emailsCollection: string
+  private liquid: Liquid | null | false = null
 
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
     this.config = config
-    
+
     const templatesConfig = config.collections?.templates
     this.templatesCollection = typeof templatesConfig === 'string' ? templatesConfig : 'email-templates'
-    
+
     const emailsConfig = config.collections?.emails
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
-    
+
     this.initializeTransporter()
-    this.registerHandlebarsHelpers()
   }
 
   private initializeTransporter(): void {
@@ -62,39 +62,49 @@ export class MailingService implements IMailingService {
     return fromEmail || ''
   }
 
-  private registerHandlebarsHelpers(): void {
-    Handlebars.registerHelper('formatDate', (date: Date, format?: string) => {
-      if (!date) return ''
-      const d = new Date(date)
-      if (format === 'short') {
-        return d.toLocaleDateString()
-      }
-      if (format === 'long') {
-        return d.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+  private async ensureLiquidJSInitialized(): Promise<void> {
+    if (this.liquid !== null) return // Already initialized or failed
+
+    try {
+      const liquidModule = await import('liquidjs')
+      const { Liquid: LiquidEngine } = liquidModule
+      this.liquid = new LiquidEngine()
+
+      // Register custom filters (equivalent to Handlebars helpers)
+      if (this.liquid && typeof this.liquid !== 'boolean') {
+        this.liquid.registerFilter('formatDate', (date: any, format?: string) => {
+          if (!date) return ''
+          const d = new Date(date)
+          if (format === 'short') {
+            return d.toLocaleDateString()
+          }
+          if (format === 'long') {
+            return d.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })
+          }
+          return d.toLocaleString()
+        })
+
+        this.liquid.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
+          if (typeof amount !== 'number') return amount
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currency
+          }).format(amount)
+        })
+
+        this.liquid.registerFilter('capitalize', (str: any) => {
+          if (typeof str !== 'string') return str
+          return str.charAt(0).toUpperCase() + str.slice(1)
         })
       }
-      return d.toLocaleString()
-    })
-
-    Handlebars.registerHelper('formatCurrency', (amount: number, currency = 'USD') => {
-      if (typeof amount !== 'number') return amount
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency
-      }).format(amount)
-    })
-
-    Handlebars.registerHelper('ifEquals', function(this: any, arg1: any, arg2: any, options: any) {
-      return (arg1 === arg2) ? options.fn(this) : options.inverse(this)
-    })
-
-    Handlebars.registerHelper('capitalize', (str: string) => {
-      if (typeof str !== 'string') return str
-      return str.charAt(0).toUpperCase() + str.slice(1)
-    })
+    } catch (error) {
+      console.warn('LiquidJS not available. Falling back to simple variable replacement. Install liquidjs or use a different templateEngine.')
+      this.liquid = false // Mark as failed to avoid retries
+    }
   }
 
   async sendEmail(options: SendEmailOptions): Promise<string> {
@@ -104,7 +114,7 @@ export class MailingService implements IMailingService {
     })
 
     await this.processEmailItem(emailId)
-    
+
     return emailId
   }
 
@@ -116,14 +126,14 @@ export class MailingService implements IMailingService {
 
     if (options.templateSlug) {
       const template = await this.getTemplateBySlug(options.templateSlug)
-      
+
       if (template) {
         templateId = template.id
         const variables = options.variables || {}
         const renderedContent = await this.renderEmailTemplate(template, variables)
         html = renderedContent.html
         text = renderedContent.text
-        subject = this.renderHandlebarsTemplate(template.subject, variables)
+        subject = await this.renderTemplate(template.subject, variables)
       } else {
         throw new Error(`Email template not found: ${options.templateSlug}`)
       }
@@ -164,7 +174,7 @@ export class MailingService implements IMailingService {
 
   async processEmails(): Promise<void> {
     const currentTime = new Date().toISOString()
-    
+
     const { docs: pendingEmails } = await this.payload.find({
       collection: this.emailsCollection as any,
       where: {
@@ -348,7 +358,7 @@ export class MailingService implements IMailingService {
         },
         limit: 1,
       })
-      
+
       return docs.length > 0 ? docs[0] as EmailTemplate : null
     } catch (error) {
       console.error(`Template with slug '${templateSlug}' not found:`, error)
@@ -356,14 +366,62 @@ export class MailingService implements IMailingService {
     }
   }
 
-  private renderHandlebarsTemplate(template: string, variables: Record<string, any>): string {
-    try {
-      const compiled = Handlebars.compile(template)
-      return compiled(variables)
-    } catch (error) {
-      console.error('Handlebars template rendering error:', error)
-      return template
+  private async renderTemplate(template: string, variables: Record<string, any>): Promise<string> {
+    // Use custom template renderer if provided
+    if (this.config.templateRenderer) {
+      try {
+        return await this.config.templateRenderer(template, variables)
+      } catch (error) {
+        console.error('Custom template renderer error:', error)
+        return template
+      }
     }
+
+    const engine = this.config.templateEngine || 'liquidjs'
+
+    // Use LiquidJS if configured
+    if (engine === 'liquidjs') {
+      try {
+        await this.ensureLiquidJSInitialized()
+        if (this.liquid && typeof this.liquid !== 'boolean') {
+          return await this.liquid.parseAndRender(template, variables)
+        }
+      } catch (error) {
+        console.error('LiquidJS template rendering error:', error)
+      }
+    }
+
+    // Use Mustache if configured
+    if (engine === 'mustache') {
+      try {
+        const mustacheResult = await this.renderWithMustache(template, variables)
+        if (mustacheResult !== null) {
+          return mustacheResult
+        }
+      } catch (error) {
+        console.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.')
+      }
+    }
+
+    // Fallback to simple variable replacement
+    return this.simpleVariableReplacement(template, variables)
+  }
+
+  private async renderWithMustache(template: string, variables: Record<string, any>): Promise<string | null> {
+    try {
+      const mustacheModule = await import('mustache')
+      const Mustache = mustacheModule.default || mustacheModule
+      return Mustache.render(template, variables)
+    } catch (error) {
+      return null
+    }
+  }
+
+  private simpleVariableReplacement(template: string, variables: Record<string, any>): string {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      const value = variables[key]
+      return value !== undefined ? String(value) : match
+    })
   }
 
   private async renderEmailTemplate(template: EmailTemplate, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
@@ -375,9 +433,9 @@ export class MailingService implements IMailingService {
     let html = serializeRichTextToHTML(template.content)
     let text = serializeRichTextToText(template.content)
 
-    // Apply Handlebars variables to the rendered content
-    html = this.renderHandlebarsTemplate(html, variables)
-    text = this.renderHandlebarsTemplate(text, variables)
+    // Apply template variables to the rendered content
+    html = await this.renderTemplate(html, variables)
+    text = await this.renderTemplate(text, variables)
 
     return { html, text }
   }

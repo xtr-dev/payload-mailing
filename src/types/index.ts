@@ -16,6 +16,10 @@ export interface EmailObject {
 
 export type EmailWrapperHook = (email: EmailObject) => EmailObject | Promise<EmailObject>
 
+export type TemplateRendererHook = (template: string, variables: Record<string, any>) => string | Promise<string>
+
+export type TemplateEngine = 'liquidjs' | 'mustache' | 'simple'
+
 export interface MailingPluginConfig {
   collections?: {
     templates?: string | Partial<CollectionConfig>
@@ -28,6 +32,8 @@ export interface MailingPluginConfig {
   retryAttempts?: number
   retryDelay?: number
   emailWrapper?: EmailWrapperHook
+  templateRenderer?: TemplateRendererHook
+  templateEngine?: TemplateEngine
   richTextEditor?: RichTextField['editor']
   onReady?: (payload: any) => Promise<void>
   initOrder?: 'before' | 'after'

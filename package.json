@@ -1,6 +1,6 @@
 {
   "name": "@xtr-dev/payload-mailing",
-  "version": "0.0.8",
+  "version": "0.0.12",
   "description": "Template-based email system with scheduling and job processing for PayloadCMS",
   "type": "module",
   "main": "dist/index.js",
@@ -47,8 +47,11 @@
     "payload": "^3.37.0"
   },
   "dependencies": {
-    "handlebars": "^4.7.8",
     "nodemailer": "^6.9.8"
+  },
+  "optionalDependencies": {
+    "liquidjs": "^10.19.0",
+    "mustache": "^4.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
