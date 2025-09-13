@@ -2,7 +2,7 @@
 
 📧 **Template-based email system with scheduling and job processing for PayloadCMS**
 
-✨ **Simplified API**: Starting from v0.1.0, this plugin uses a simplified API that leverages PayloadCMS collections directly for better type safety and flexibility.
+⚠️ **Pre-release Warning**: This package is currently in active development (v0.0.x). Breaking changes may occur before v1.0.0. Not recommended for production use.
 
 ## Features
 
