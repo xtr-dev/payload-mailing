@@ -38,13 +38,15 @@ const customEmail = await sendEmail<MyEmail>(payload, {
 })
 ```
 
-## ID Type Compatibility
+## Compatibility
 
-The plugin works with both:
+The plugin works with:
 - **String IDs**: `id: string`
 - **Number IDs**: `id: number`
+- **Nullable fields**: Fields can be `null`, `undefined`, or have values
+- **Generated types**: Works with `payload generate:types` output
 
-Your Payload configuration determines which type is used. The plugin automatically adapts to your setup.
+Your Payload configuration determines which types are used. The plugin automatically adapts to your setup.
 
 ## Type Definitions
 
@@ -55,33 +57,33 @@ interface BaseEmailDocument {
   id: string | number
   template?: any
   to: string[]
-  cc?: string[]
-  bcc?: string[]
-  from?: string
-  replyTo?: string
+  cc?: string[] | null
+  bcc?: string[] | null
+  from?: string | null
+  replyTo?: string | null
   subject: string
   html: string
-  text?: string
-  variables?: Record<string, any>
-  scheduledAt?: string
-  sentAt?: string
-  status?: 'pending' | 'processing' | 'sent' | 'failed'
-  attempts?: number
-  lastAttemptAt?: string
-  error?: string
-  priority?: number
-  createdAt?: string
-  updatedAt?: string
+  text?: string | null
+  variables?: Record<string, any> | null
+  scheduledAt?: string | null
+  sentAt?: string | null
+  status?: 'pending' | 'processing' | 'sent' | 'failed' | null
+  attempts?: number | null
+  lastAttemptAt?: string | null
+  error?: string | null
+  priority?: number | null
+  createdAt?: string | null
+  updatedAt?: string | null
 }
 
 interface BaseEmailTemplateDocument {
   id: string | number
   name: string
   slug: string
-  subject?: string
+  subject?: string | null
   content?: any
-  createdAt?: string
-  updatedAt?: string
+  createdAt?: string | null
+  updatedAt?: string | null
 }
 ```
 

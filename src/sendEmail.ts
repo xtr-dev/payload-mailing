@@ -83,10 +83,10 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
-  if (emailData.cc) {
+  if (emailData.cc && emailData.cc !== null) {
     emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }
-  if (emailData.bcc) {
+  if (emailData.bcc && emailData.bcc !== null) {
     emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
   }
 
