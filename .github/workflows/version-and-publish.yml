@@ -1,0 +1,191 @@
+name: Version and Publish
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  version-and-publish:
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (contains(github.event.pull_request.head.ref, 'version/major') || contains(github.event.pull_request.head.ref, 'version/minor') || contains(github.event.pull_request.head.ref, 'version/patch')))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run build
+        run: npm run build
+
+      - name: Determine version bump type
+        id: version-type
+        run: |
+          if [[ "${{ github.event.pull_request.head.ref }}" =~ version/major ]]; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.pull_request.head.ref }}" =~ version/minor ]]; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.pull_request.head.ref }}" =~ version/patch ]]; then
+            echo "type=patch" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            # Default to patch for direct pushes to main
+            echo "type=patch" >> $GITHUB_OUTPUT
+          else
+            echo "type=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure git
+        if: steps.version-type.outputs.type != 'none'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Claude Code CLI
+        if: steps.version-type.outputs.type != 'none'
+        run: |
+          curl -fsSL https://claude.ai/cli/install.sh | bash
+          echo "$HOME/.claude/bin" >> $GITHUB_PATH
+
+      - name: Generate changelog with Claude
+        if: steps.version-type.outputs.type != 'none'
+        id: changelog
+        run: |
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --oneline --no-merges --since="1 week ago")
+          else
+            COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD)
+          fi
+
+          # Generate changelog using Claude
+          CHANGELOG=$(claude-code << EOF
+          Please analyze the following git commits and generate a concise changelog in this exact format:
+
+          ## Changes
+
+          ### 🚀 Features
+          - Brief description of new features
+
+          ### 🐛 Bug Fixes
+          - Brief description of bug fixes
+
+          ### 🔧 Improvements
+          - Brief description of improvements/refactoring
+
+          ### 📚 Documentation
+          - Brief description of documentation changes
+
+          ### ⚡ Performance
+          - Brief description of performance improvements
+
+          Only include sections that have actual changes. Keep each bullet point concise and user-focused.
+
+          Git commits to analyze:
+          $COMMITS
+          EOF
+          )
+
+          # Save changelog to output
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Version bump
+        if: steps.version-type.outputs.type != 'none'
+        id: version-bump
+        run: |
+          # Get current version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+          # Bump version
+          npm version ${{ steps.version-type.outputs.type }} --no-git-tag-version
+
+          # Get new version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Create commit with changelog
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to v$NEW_VERSION
+
+          ${{ steps.changelog.outputs.changelog }}"
+
+          # Create git tag
+          git tag -a "v$NEW_VERSION" -m "Version $NEW_VERSION
+
+          ${{ steps.changelog.outputs.changelog }}"
+
+          echo "Version bumped from $CURRENT_VERSION to $NEW_VERSION"
+
+      - name: Push version changes
+        if: steps.version-type.outputs.type != 'none'
+        run: |
+          git push origin main
+          git push origin --tags
+
+      - name: Publish to NPM
+        if: steps.version-type.outputs.type != 'none'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.version-type.outputs.type != 'none'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version-bump.outputs.new-version }}
+          release_name: Release v${{ steps.version-bump.outputs.new-version }}
+          body: |
+            # Release v${{ steps.version-bump.outputs.new-version }}
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+
+            **Version Info**: ${{ steps.version-type.outputs.type }} release (v${{ steps.version-bump.outputs.current-version }} → v${{ steps.version-bump.outputs.new-version }})
+
+            ### Installation
+
+            ```bash
+            npm install @xtr-dev/payload-mailing@${{ steps.version-bump.outputs.new-version }}
+            ```
+
+            ### Documentation
+
+            See the [README](https://github.com/xtr-dev/payload-mailing#readme) for usage instructions and full documentation.
+          draft: false
+          prerelease: false
+
+  notify-success:
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (contains(github.event.pull_request.head.ref, 'version/major') || contains(github.event.pull_request.head.ref, 'version/minor') || contains(github.event.pull_request.head.ref, 'version/patch')))
+    needs: version-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        run: |
+          echo "🎉 Successfully published version ${{ needs.version-and-publish.outputs.new-version }} to NPM!"
+          echo "📦 Package: https://www.npmjs.com/package/@xtr-dev/payload-mailing"
+          echo "🏷️  GitHub Release: https://github.com/xtr-dev/payload-mailing/releases/tag/v${{ needs.version-and-publish.outputs.new-version }}"
