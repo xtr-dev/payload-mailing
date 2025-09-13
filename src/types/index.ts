@@ -75,23 +75,23 @@ export interface MailingTransportConfig {
 
 export interface QueuedEmail {
   id: string
-  template?: string
+  template?: string | null
   to: string[]
-  cc?: string[]
-  bcc?: string[]
-  from?: string
-  replyTo?: string
+  cc?: string[] | null
+  bcc?: string[] | null
+  from?: string | null
+  replyTo?: string | null
   subject: string
   html: string
-  text?: string
-  variables?: Record<string, any>
-  scheduledAt?: string
-  sentAt?: string
+  text?: string | null
+  variables?: Record<string, any> | null
+  scheduledAt?: string | null
+  sentAt?: string | null
   status: 'pending' | 'processing' | 'sent' | 'failed'
   attempts: number
-  lastAttemptAt?: string
-  error?: string
-  priority?: number
+  lastAttemptAt?: string | null
+  error?: string | null
+  priority?: number | null
   createdAt: string
   updatedAt: string
 }
