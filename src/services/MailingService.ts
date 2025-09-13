@@ -1,9 +1,9 @@
 import { Payload } from 'payload'
 import { Liquid } from 'liquidjs'
 import nodemailer, { Transporter } from 'nodemailer'
-import { 
-  MailingPluginConfig, 
-  SendEmailOptions, 
+import {
+  MailingPluginConfig,
+  SendEmailOptions,
   MailingService as IMailingService,
   EmailTemplate,
   QueuedEmail,
@@ -23,15 +23,14 @@ export class MailingService implements IMailingService {
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
     this.config = config
-    
+
     const templatesConfig = config.collections?.templates
     this.templatesCollection = typeof templatesConfig === 'string' ? templatesConfig : 'email-templates'
-    
+
     const emailsConfig = config.collections?.emails
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
-    
+
     this.initializeTransporter()
-    this.initializeTemplateEngine()
   }
 
   private initializeTransporter(): void {
@@ -63,31 +62,11 @@ export class MailingService implements IMailingService {
     return fromEmail || ''
   }
 
-  private initializeTemplateEngine(): void {
-    // Skip initialization if custom template renderer is provided
-    if (this.config.templateRenderer) {
-      return
-    }
-
-    // Use specified template engine or default to 'liquidjs'
-    const engine = this.config.templateEngine || 'liquidjs'
-
-    if (engine === 'liquidjs') {
-      // LiquidJS will be initialized lazily on first use
-      this.liquid = null
-    } else if (engine === 'mustache') {
-      // Mustache will be loaded dynamically on first use
-      this.liquid = null
-    } else if (engine === 'simple') {
-      this.liquid = null
-    }
-  }
-
-  private async initializeLiquidJS(): Promise<void> {
+  private async ensureLiquidJSInitialized(): Promise<void> {
     if (this.liquid !== null) return // Already initialized or failed
 
     try {
-      const liquidModule = await import('liquidjs') as any
+      const liquidModule = await import('liquidjs')
       const { Liquid: LiquidEngine } = liquidModule
       this.liquid = new LiquidEngine()
 
@@ -135,7 +114,7 @@ export class MailingService implements IMailingService {
     })
 
     await this.processEmailItem(emailId)
-    
+
     return emailId
   }
 
@@ -147,7 +126,7 @@ export class MailingService implements IMailingService {
 
     if (options.templateSlug) {
       const template = await this.getTemplateBySlug(options.templateSlug)
-      
+
       if (template) {
         templateId = template.id
         const variables = options.variables || {}
@@ -195,7 +174,7 @@ export class MailingService implements IMailingService {
 
   async processEmails(): Promise<void> {
     const currentTime = new Date().toISOString()
-    
+
     const { docs: pendingEmails } = await this.payload.find({
       collection: this.emailsCollection as any,
       where: {
@@ -379,7 +358,7 @@ export class MailingService implements IMailingService {
         },
         limit: 1,
       })
-      
+
       return docs.length > 0 ? docs[0] as EmailTemplate : null
     } catch (error) {
       console.error(`Template with slug '${templateSlug}' not found:`, error)
@@ -403,7 +382,7 @@ export class MailingService implements IMailingService {
     // Use LiquidJS if configured
     if (engine === 'liquidjs') {
       try {
-        await this.initializeLiquidJS()
+        await this.ensureLiquidJSInitialized()
         if (this.liquid && typeof this.liquid !== 'boolean') {
           return await this.liquid.parseAndRender(template, variables)
         }
@@ -430,7 +409,7 @@ export class MailingService implements IMailingService {
 
   private async renderWithMustache(template: string, variables: Record<string, any>): Promise<string | null> {
     try {
-      const mustacheModule = await import('mustache') as any
+      const mustacheModule = await import('mustache')
       const Mustache = mustacheModule.default || mustacheModule
       return Mustache.render(template, variables)
     } catch (error) {
