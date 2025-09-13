@@ -15,7 +15,7 @@ export interface SendEmailTaskInput {
   to: string | string[]
   cc?: string | string[]
   bcc?: string | string[]
-  scheduledAt?: string // ISO date string
+  scheduledAt?: string | Date // ISO date string or Date object
   priority?: number
 
   // Allow any additional fields that users might have in their email collection
