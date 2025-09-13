@@ -79,7 +79,7 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
     throw new Error('Field "to" is required for sending emails')
   }
 
-  if (!emailData.subject || emailData.subject === null || !emailData.html || emailData.html === null) {
+  if (!emailData.subject || !emailData.html) {
     throw new Error('Fields "subject" and "html" are required when not using a template')
   }
 
@@ -87,10 +87,10 @@ export const sendEmail = async <T extends BaseEmailData = BaseEmailData>(
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
-  if (emailData.cc && emailData.cc !== null) {
+  if (emailData.cc) {
     emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }
-  if (emailData.bcc && emailData.bcc !== null) {
+  if (emailData.bcc) {
     emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
   }
 
