@@ -51,7 +51,15 @@ export class MailingService implements IMailingService {
   private getDefaultFrom(): string {
     const fromEmail = this.config.defaultFrom
     const fromName = this.config.defaultFromName
-    return fromName && fromEmail ? `"${fromName}" <${fromEmail}>` : fromEmail || ''
+
+    // Check if fromName exists, is not empty after trimming, and fromEmail exists
+    if (fromName && fromName.trim() && fromEmail) {
+      // Escape quotes in the display name to prevent malformed headers
+      const escapedName = fromName.replace(/"/g, '\\"')
+      return `"${escapedName}" <${fromEmail}>`
+    }
+
+    return fromEmail || ''
   }
 
   private registerHandlebarsHelpers(): void {
