@@ -11,7 +11,7 @@ on:
 
 jobs:
   version-and-publish:
-    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (contains(github.event.pull_request.head.ref, 'version/major') || contains(github.event.pull_request.head.ref, 'version/minor') || contains(github.event.pull_request.head.ref, 'version/patch')))
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (startsWith(github.event.pull_request.head.ref, 'major/') || startsWith(github.event.pull_request.head.ref, 'minor/') || startsWith(github.event.pull_request.head.ref, 'patch/')))
     runs-on: ubuntu-latest
     outputs:
       new-version: ${{ steps.version-bump.outputs.new-version }}
@@ -62,26 +62,31 @@ jobs:
           echo "📦 Package: $PACKAGE_NAME"
           echo "📌 Current Version: $CURRENT_VERSION"
 
-          # Validate version branches exist
-          echo "🔍 Validating version branches..."
+          # Validate version folder branches exist
+          echo "🔍 Validating version folder branches..."
           MISSING_BRANCHES=""
 
-          for branch in "version/major" "version/minor" "version/patch"; do
-            if ! git ls-remote --heads origin "$branch" | grep -q "$branch"; then
+          for branch in "major" "minor" "patch"; do
+            if ! git ls-remote --heads origin "$branch" | grep -q "refs/heads/$branch$"; then
               MISSING_BRANCHES="$MISSING_BRANCHES $branch"
             fi
           done
 
           if [ -n "$MISSING_BRANCHES" ]; then
-            echo "❌ ERROR: Missing required version branches:$MISSING_BRANCHES"
+            echo "❌ ERROR: Missing required version folder branches:$MISSING_BRANCHES"
             echo "Please create these branches first:"
             for branch in $MISSING_BRANCHES; do
               echo "  git checkout -b $branch && git push origin $branch"
             done
+            echo ""
+            echo "Then create feature branches under them like:"
+            echo "  git checkout -b major/breaking-change"
+            echo "  git checkout -b minor/new-feature"
+            echo "  git checkout -b patch/bug-fix"
             exit 1
           fi
 
-          echo "✅ All version branches exist"
+          echo "✅ All version folder branches exist"
 
           # Validate Node.js version matches package.json engines
           NODE_VERSION=$(node --version)
@@ -106,11 +111,11 @@ jobs:
       - name: Determine version bump type
         id: version-type
         run: |
-          if [[ "${{ github.event.pull_request.head.ref }}" =~ version/major ]]; then
+          if [[ "${{ github.event.pull_request.head.ref }}" =~ ^major/ ]]; then
             echo "type=major" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.pull_request.head.ref }}" =~ version/minor ]]; then
+          elif [[ "${{ github.event.pull_request.head.ref }}" =~ ^minor/ ]]; then
             echo "type=minor" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.pull_request.head.ref }}" =~ version/patch ]]; then
+          elif [[ "${{ github.event.pull_request.head.ref }}" =~ ^patch/ ]]; then
             echo "type=patch" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             # Default to patch for direct pushes to main
@@ -361,7 +366,7 @@ CLAUDE_EOF
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   notify-success:
-    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (contains(github.event.pull_request.head.ref, 'version/major') || contains(github.event.pull_request.head.ref, 'version/minor') || contains(github.event.pull_request.head.ref, 'version/patch')))
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true && (startsWith(github.event.pull_request.head.ref, 'major/') || startsWith(github.event.pull_request.head.ref, 'minor/') || startsWith(github.event.pull_request.head.ref, 'patch/')))
     needs: version-and-publish
     runs-on: ubuntu-latest
     steps:
