@@ -102,7 +102,7 @@ export const seed = async (payload: Payload) => {
                         format: 0,
                         mode: 'normal',
                         style: '',
-                        text: 'Use the emailWrapper hook to add custom layouts',
+                        text: 'Create beautiful emails with rich text formatting',
                         type: 'text',
                         version: 1,
                       },

@@ -8,7 +8,7 @@ import {
   EmailTemplate,
   QueuedEmail,
   MailingTransportConfig,
-  EmailObject
+  BaseEmail
 } from '../types/index.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
@@ -238,10 +238,10 @@ export class MailingService implements IMailingService {
       const email = await this.payload.findByID({
         collection: this.emailsCollection as any,
         id: emailId,
-      }) as QueuedEmail
+      }) as BaseEmail
 
-      let emailObject: EmailObject = {
-        from: email.from || this.getDefaultFrom(),
+      const mailOptions = {
+        from: email.from,
         to: email.to,
         cc: email.cc || undefined,
         bcc: email.bcc || undefined,
@@ -249,23 +249,6 @@ export class MailingService implements IMailingService {
         subject: email.subject,
         html: email.html,
         text: email.text || undefined,
-        variables: email.variables,
-      }
-
-      // Apply emailWrapper hook if configured
-      if (this.config.emailWrapper) {
-        emailObject = await this.config.emailWrapper(emailObject)
-      }
-
-      const mailOptions = {
-        from: emailObject.from,
-        to: emailObject.to,
-        cc: emailObject.cc || undefined,
-        bcc: emailObject.bcc || undefined,
-        replyTo: emailObject.replyTo || undefined,
-        subject: emailObject.subject,
-        html: emailObject.html,
-        text: emailObject.text || undefined,
       }
 
       await this.transporter.sendMail(mailOptions)

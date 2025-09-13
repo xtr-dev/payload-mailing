@@ -1,20 +1,9 @@
 import { Payload } from 'payload'
-import type { CollectionConfig, RichTextField, TypedCollection } from 'payload'
+import type { CollectionConfig, RichTextField } from 'payload'
 import { Transporter } from 'nodemailer'
+import {Email} from "../payload-types.js"
 
-export interface EmailObject {
-  to: string | string[]
-  cc?: string | string[]
-  bcc?: string | string[]
-  from?: string
-  replyTo?: string
-  subject: string
-  html: string
-  text?: string
-  variables?: Record<string, any>
-}
-
-export type EmailWrapperHook = (email: EmailObject) => EmailObject | Promise<EmailObject>
+export type BaseEmail<TEmail = Email, TEmailTemplate = EmailTemplate> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'>}
 
 export type TemplateRendererHook = (template: string, variables: Record<string, any>) => string | Promise<string>
 
@@ -31,7 +20,6 @@ export interface MailingPluginConfig {
   queue?: string
   retryAttempts?: number
   retryDelay?: number
-  emailWrapper?: EmailWrapperHook
   templateRenderer?: TemplateRendererHook
   templateEngine?: TemplateEngine
   richTextEditor?: RichTextField['editor']
