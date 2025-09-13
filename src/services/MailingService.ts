@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import Handlebars from 'handlebars'
+import { Liquid } from 'liquidjs'
 import nodemailer, { Transporter } from 'nodemailer'
 import { 
   MailingPluginConfig, 
@@ -18,6 +18,7 @@ export class MailingService implements IMailingService {
   private transporter!: Transporter | any
   private templatesCollection: string
   private emailsCollection: string
+  private liquid: Liquid | null = null
 
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
@@ -30,7 +31,7 @@ export class MailingService implements IMailingService {
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
     
     this.initializeTransporter()
-    this.registerHandlebarsHelpers()
+    this.initializeTemplateEngine()
   }
 
   private initializeTransporter(): void {
@@ -62,39 +63,65 @@ export class MailingService implements IMailingService {
     return fromEmail || ''
   }
 
-  private registerHandlebarsHelpers(): void {
-    Handlebars.registerHelper('formatDate', (date: Date, format?: string) => {
-      if (!date) return ''
-      const d = new Date(date)
-      if (format === 'short') {
-        return d.toLocaleDateString()
-      }
-      if (format === 'long') {
-        return d.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+  private initializeTemplateEngine(): void {
+    // Skip initialization if custom template renderer is provided
+    if (this.config.templateRenderer) {
+      return
+    }
+
+    // Use specified template engine or default to 'liquidjs'
+    const engine = this.config.templateEngine || 'liquidjs'
+
+    if (engine === 'liquidjs') {
+      this.initializeLiquidJS()
+    } else if (engine === 'mustache') {
+      // Mustache doesn't need initialization, we'll use it directly in renderTemplate
+      this.liquid = null
+    } else if (engine === 'simple') {
+      this.liquid = null
+    }
+  }
+
+  private initializeLiquidJS(): void {
+    try {
+      const { Liquid: LiquidEngine } = require('liquidjs')
+      this.liquid = new LiquidEngine()
+
+      // Register custom filters (equivalent to Handlebars helpers)
+      if (this.liquid) {
+        this.liquid.registerFilter('formatDate', (date: any, format?: string) => {
+          if (!date) return ''
+          const d = new Date(date)
+          if (format === 'short') {
+            return d.toLocaleDateString()
+          }
+          if (format === 'long') {
+            return d.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })
+          }
+          return d.toLocaleString()
+        })
+
+        this.liquid.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
+          if (typeof amount !== 'number') return amount
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currency
+          }).format(amount)
+        })
+
+        this.liquid.registerFilter('capitalize', (str: any) => {
+          if (typeof str !== 'string') return str
+          return str.charAt(0).toUpperCase() + str.slice(1)
         })
       }
-      return d.toLocaleString()
-    })
-
-    Handlebars.registerHelper('formatCurrency', (amount: number, currency = 'USD') => {
-      if (typeof amount !== 'number') return amount
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency
-      }).format(amount)
-    })
-
-    Handlebars.registerHelper('ifEquals', function(this: any, arg1: any, arg2: any, options: any) {
-      return (arg1 === arg2) ? options.fn(this) : options.inverse(this)
-    })
-
-    Handlebars.registerHelper('capitalize', (str: string) => {
-      if (typeof str !== 'string') return str
-      return str.charAt(0).toUpperCase() + str.slice(1)
-    })
+    } catch (error) {
+      console.warn('LiquidJS not available. Falling back to simple variable replacement. Install liquidjs or use a different templateEngine.')
+      this.liquid = null
+    }
   }
 
   async sendEmail(options: SendEmailOptions): Promise<string> {
@@ -123,7 +150,7 @@ export class MailingService implements IMailingService {
         const renderedContent = await this.renderEmailTemplate(template, variables)
         html = renderedContent.html
         text = renderedContent.text
-        subject = this.renderHandlebarsTemplate(template.subject, variables)
+        subject = await this.renderTemplate(template.subject, variables)
       } else {
         throw new Error(`Email template not found: ${options.templateSlug}`)
       }
@@ -356,14 +383,49 @@ export class MailingService implements IMailingService {
     }
   }
 
-  private renderHandlebarsTemplate(template: string, variables: Record<string, any>): string {
-    try {
-      const compiled = Handlebars.compile(template)
-      return compiled(variables)
-    } catch (error) {
-      console.error('Handlebars template rendering error:', error)
-      return template
+  private async renderTemplate(template: string, variables: Record<string, any>): Promise<string> {
+    // Use custom template renderer if provided
+    if (this.config.templateRenderer) {
+      try {
+        return await this.config.templateRenderer(template, variables)
+      } catch (error) {
+        console.error('Custom template renderer error:', error)
+        return template
+      }
     }
+
+    const engine = this.config.templateEngine || 'liquidjs'
+
+    // Use LiquidJS if available and configured
+    if (engine === 'liquidjs' && this.liquid) {
+      try {
+        return await this.liquid.parseAndRender(template, variables)
+      } catch (error) {
+        console.error('LiquidJS template rendering error:', error)
+        return template
+      }
+    }
+
+    // Use Mustache if configured
+    if (engine === 'mustache') {
+      try {
+        const Mustache = require('mustache')
+        return Mustache.render(template, variables)
+      } catch (error) {
+        console.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.')
+        return this.simpleVariableReplacement(template, variables)
+      }
+    }
+
+    // Fallback to simple variable replacement
+    return this.simpleVariableReplacement(template, variables)
+  }
+
+  private simpleVariableReplacement(template: string, variables: Record<string, any>): string {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      const value = variables[key]
+      return value !== undefined ? String(value) : match
+    })
   }
 
   private async renderEmailTemplate(template: EmailTemplate, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
@@ -375,9 +437,9 @@ export class MailingService implements IMailingService {
     let html = serializeRichTextToHTML(template.content)
     let text = serializeRichTextToText(template.content)
 
-    // Apply Handlebars variables to the rendered content
-    html = this.renderHandlebarsTemplate(html, variables)
-    text = this.renderHandlebarsTemplate(text, variables)
+    // Apply template variables to the rendered content
+    html = await this.renderTemplate(html, variables)
+    text = await this.renderTemplate(text, variables)
 
     return { html, text }
   }
