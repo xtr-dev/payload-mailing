@@ -143,18 +143,6 @@ jobs:
             COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD || echo "No new commits")
           fi
 
-          # Create fallback changelog from commits
-          create_fallback_changelog() {
-            echo "## Changes"
-            echo ""
-            if [ "$COMMITS" != "No recent commits" ] && [ "$COMMITS" != "No new commits" ]; then
-              echo "### 📋 Updates"
-              echo "$COMMITS" | sed 's/^[a-f0-9]* /- /' | head -10
-            else
-              echo "### 📋 Updates"
-              echo "- Version bump and maintenance updates"
-            fi
-          }
 
           # Generate changelog using Claude (fail if it fails)
           if ! command -v claude-code >/dev/null 2>&1; then
@@ -163,7 +151,7 @@ jobs:
           fi
 
           echo "🤖 Generating changelog with Claude..."
-          CHANGELOG=$(timeout 60s claude-code << 'CLAUDE_EOF'
+          CHANGELOG=$(timeout 240s claude-code << 'CLAUDE_EOF'
 Please analyze the following git commits and generate a concise changelog in this exact format:
 
 ## Changes
