@@ -1,37 +1,50 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { sendEmail, scheduleEmail } from '@xtr-dev/payload-mailing'
+import { sendEmail } from '@xtr-dev/payload-mailing'
 
 export async function POST(request: Request) {
   try {
     const payload = await getPayload({ config })
     const body = await request.json()
-    const { type = 'send', templateSlug, to, variables, scheduledAt } = body
+    const { type = 'send', templateSlug, to, variables, scheduledAt, subject, html, text } = body
 
-    let result
-    if (type === 'send') {
-      // Send immediately
-      result = await sendEmail(payload, {
-        templateSlug,
+    // Use the new sendEmail API
+    const emailOptions: any = {
+      data: {
         to,
-        variables,
-      })
-    } else if (type === 'schedule') {
-      // Schedule for later
-      result = await scheduleEmail(payload, {
-        templateSlug,
-        to,
-        variables,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 60000), // Default to 1 minute
-      })
-    } else {
-      return Response.json({ error: 'Invalid type. Use "send" or "schedule"' }, { status: 400 })
+      }
     }
+
+    // Add template if provided
+    if (templateSlug) {
+      emailOptions.template = {
+        slug: templateSlug,
+        variables: variables || {}
+      }
+    } else if (subject && html) {
+      // Direct email without template
+      emailOptions.data.subject = subject
+      emailOptions.data.html = html
+      if (text) {
+        emailOptions.data.text = text
+      }
+    } else {
+      return Response.json({
+        error: 'Either templateSlug or subject+html must be provided'
+      }, { status: 400 })
+    }
+
+    // Add scheduling if needed
+    if (type === 'schedule' || scheduledAt) {
+      emailOptions.data.scheduledAt = scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 60000)
+    }
+
+    const result = await sendEmail(payload, emailOptions)
 
     return Response.json({
       success: true,
-      emailId: result,
-      message: type === 'send' ? 'Email sent successfully' : 'Email scheduled successfully',
+      emailId: result.id,
+      message: scheduledAt ? 'Email scheduled successfully' : 'Email queued successfully',
     })
   } catch (error) {
     console.error('Test email error:', error)

@@ -1,4 +1,4 @@
-import { sendEmail, type BaseEmailData } from '../utils/helpers.js'
+import { sendEmail, type BaseEmailData } from '../sendEmail.js'
 
 export interface SendEmailTaskInput {
   // Template mode fields

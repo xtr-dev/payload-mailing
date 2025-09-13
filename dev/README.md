@@ -184,25 +184,43 @@ The plugin automatically processes the outbox every 5 minutes and retries failed
 ## Plugin API Usage
 
 ```javascript
-import { sendEmail, scheduleEmail } from '@xtr-dev/payload-mailing'
+import { sendEmail } from '@xtr-dev/payload-mailing'
 
-// Send immediate email
-const emailId = await sendEmail(payload, {
-  templateId: 'welcome-template-id',
-  to: 'user@example.com',
-  variables: {
-    firstName: 'John',
-    siteName: 'My App'
+// Send immediate email with template
+const email = await sendEmail(payload, {
+  template: {
+    slug: 'welcome-email',
+    variables: {
+      firstName: 'John',
+      siteName: 'My App'
+    }
+  },
+  data: {
+    to: 'user@example.com',
   }
 })
 
-// Schedule email
-const scheduledId = await scheduleEmail(payload, {
-  templateId: 'reminder-template-id', 
-  to: 'user@example.com',
-  scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-  variables: {
-    eventName: 'Product Launch'
+// Schedule email for later
+const scheduledEmail = await sendEmail(payload, {
+  template: {
+    slug: 'reminder',
+    variables: {
+      eventName: 'Product Launch'
+    }
+  },
+  data: {
+    to: 'user@example.com',
+    scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  }
+})
+
+// Send direct HTML email (no template)
+const directEmail = await sendEmail(payload, {
+  data: {
+    to: 'user@example.com',
+    subject: 'Direct Email',
+    html: '<h1>Hello World</h1>',
+    text: 'Hello World'
   }
 })
 ```

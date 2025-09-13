@@ -59,6 +59,7 @@ export default buildConfig({
 ### 2. Send emails with type-safe helper
 
 ```typescript
+// sendEmail is a primary export for easy access
 import { sendEmail } from '@xtr-dev/payload-mailing'
 import { Email } from './payload-types' // Your generated types
 

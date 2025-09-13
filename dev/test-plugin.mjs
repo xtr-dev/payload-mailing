@@ -1,10 +1,10 @@
 // Simple test to verify plugin can be imported and initialized
-import { mailingPlugin, sendEmail, scheduleEmail } from '@xtr-dev/payload-mailing'
+import { mailingPlugin, sendEmail, renderTemplate } from '@xtr-dev/payload-mailing'
 
 console.log('✅ Plugin imports successfully')
 console.log('✅ mailingPlugin:', typeof mailingPlugin)
-console.log('✅ sendEmail:', typeof sendEmail) 
-console.log('✅ scheduleEmail:', typeof scheduleEmail)
+console.log('✅ sendEmail:', typeof sendEmail)
+console.log('✅ renderTemplate:', typeof renderTemplate)
 
 // Test plugin configuration
 try {
