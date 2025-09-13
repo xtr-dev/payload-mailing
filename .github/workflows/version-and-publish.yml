@@ -97,6 +97,12 @@ jobs:
           echo "source-version=$SOURCE_VERSION" >> $GITHUB_OUTPUT
           echo "target-version=$TARGET_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Install Claude Code CLI
+        run: |
+          echo "🤖 Installing Claude Code CLI..."
+          curl -fsSL https://claude.ai/cli/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Generate changelog with Claude
         id: changelog
         run: |
@@ -110,7 +116,7 @@ jobs:
 
           # Generate changelog using Claude (fail if it fails)
           if ! command -v claude-code >/dev/null 2>&1; then
-            echo "❌ ERROR: Claude CLI not found. Please ensure Claude Code is properly installed."
+            echo "❌ ERROR: Claude CLI installation failed."
             exit 1
           fi
 
