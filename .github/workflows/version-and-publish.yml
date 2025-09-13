@@ -97,86 +97,87 @@ jobs:
           echo "source-version=$SOURCE_VERSION" >> $GITHUB_OUTPUT
           echo "target-version=$TARGET_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Install Claude Code CLI
-        run: |
-          echo "🤖 Installing Claude Code CLI..."
-          npm install -g @anthropic-ai/claude-code
-
-      - name: Generate changelog with Claude
+      - name: Generate changelog from commits
         id: changelog
         run: |
           # Get commits since last tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
             COMMITS=$(git log --oneline --no-merges --since="1 week ago" || echo "No recent commits")
+            echo "📝 Generating changelog from commits since 1 week ago (no previous tags found)"
           else
             COMMITS=$(git log --oneline --no-merges ${LAST_TAG}..HEAD || echo "No new commits")
+            echo "📝 Generating changelog from commits since tag: $LAST_TAG"
           fi
 
-          # Generate changelog using Claude (fail if it fails)
-          if ! command -v claude >/dev/null 2>&1; then
-            echo "❌ ERROR: Claude CLI installation failed."
-            exit 1
-          fi
+          echo "Commits to process:"
+          echo "$COMMITS"
 
-          echo "🤖 Generating changelog with Claude..."
+          # Categorize commits based on conventional commit patterns and keywords
+          FEATURES=""
+          BUGFIXES=""
+          IMPROVEMENTS=""
+          DOCS=""
 
-          # Debug Claude CLI installation
-          echo "🔍 Debugging Claude CLI..."
-          which claude || echo "Claude not in PATH"
-          claude --version || echo "Claude version check failed"
+          while IFS= read -r commit; do
+            if [[ -z "$commit" ]]; then continue; fi
 
-          # Try Claude CLI first, fallback to manual changelog if it fails
-          PROMPT="Please analyze the following git commits and generate a concise changelog in this exact format:
+            # Extract commit message (remove hash)
+            MSG=$(echo "$commit" | sed 's/^[a-f0-9]* //')
 
-          ## Changes
+            # Categorize based on patterns
+            if echo "$MSG" | grep -qiE "^(feat|feature|add|new):|🚀|✨"; then
+              FEATURES="${FEATURES}- $MSG"$'\n'
+            elif echo "$MSG" | grep -qiE "^(fix|bug):|🐛|❌|🔧.*fix"; then
+              BUGFIXES="${BUGFIXES}- $MSG"$'\n'
+            elif echo "$MSG" | grep -qiE "^(docs|doc):|📚|📝"; then
+              DOCS="${DOCS}- $MSG"$'\n'
+            else
+              IMPROVEMENTS="${IMPROVEMENTS}- $MSG"$'\n'
+            fi
+          done <<< "$COMMITS"
+
+          # Build changelog
+          CHANGELOG="## Changes"
+
+          if [[ -n "$FEATURES" ]]; then
+            CHANGELOG="$CHANGELOG
 
           ### 🚀 Features
-          - Brief description of new features
+          $FEATURES"
+          fi
+
+          if [[ -n "$BUGFIXES" ]]; then
+            CHANGELOG="$CHANGELOG
 
           ### 🐛 Bug Fixes
-          - Brief description of bug fixes
+          $BUGFIXES"
+          fi
+
+          if [[ -n "$IMPROVEMENTS" ]]; then
+            CHANGELOG="$CHANGELOG
 
           ### 🔧 Improvements
-          - Brief description of improvements/refactoring
+          $IMPROVEMENTS"
+          fi
+
+          if [[ -n "$DOCS" ]]; then
+            CHANGELOG="$CHANGELOG
 
           ### 📚 Documentation
-          - Brief description of documentation changes
+          $DOCS"
+          fi
 
-          ### ⚡ Performance
-          - Brief description of performance improvements
-
-          Only include sections that have actual changes. Keep each bullet point concise and user-focused.
-
-          Git commits to analyze:
-          $COMMITS"
-
-          # Try Claude CLI with authentication bypass for CI
-          if claude -p --dangerously-skip-permissions "$PROMPT" > /tmp/changelog.txt 2>/tmp/claude_error.txt; then
-            CHANGELOG=$(cat /tmp/changelog.txt)
-            echo "✅ Successfully generated changelog with Claude CLI"
-          else
-            echo "⚠️ Claude CLI failed, using fallback changelog generation"
-            cat /tmp/claude_error.txt || echo "No error details available"
-
-            # Fallback: Generate changelog from commit messages
+          # If no commits found, create a simple message
+          if [[ -z "$FEATURES$BUGFIXES$IMPROVEMENTS$DOCS" ]]; then
             CHANGELOG="## Changes
 
           ### 🔧 Improvements
-          $(echo "$COMMITS" | sed 's/^[a-f0-9]* /- /' | head -10)
-
-          *Note: This changelog was generated automatically from commit messages. For detailed AI-generated changelogs, Claude CLI authentication would be needed.*"
+          - Version update and maintenance changes"
           fi
 
-          # Check if changelog generation succeeded
-          if [ -z "$CHANGELOG" ]; then
-            echo "❌ ERROR: Failed to generate any changelog. Workflow cannot continue."
-            echo "Debug info - Commits to analyze:"
-            echo "$COMMITS"
-            exit 1
-          fi
-
-          echo "✅ Changelog generation completed"
+          echo "Generated changelog:"
+          echo "$CHANGELOG"
 
           # Save changelog to output
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
