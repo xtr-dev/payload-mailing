@@ -15,7 +15,7 @@ import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richT
 export class MailingService implements IMailingService {
   private payload: Payload
   private config: MailingPluginConfig
-  private transporter!: Transporter
+  private transporter!: Transporter | any
   private templatesCollection: string
   private emailsCollection: string
 
@@ -41,8 +41,8 @@ export class MailingService implements IMailingService {
         this.transporter = nodemailer.createTransport(this.config.transport as MailingTransportConfig)
       }
     } else if (this.payload.email && 'sendMail' in this.payload.email) {
-      // Use Payload's configured mailer
-      this.transporter = this.payload.email
+      // Use Payload's configured mailer (cast to any to handle different adapter types)
+      this.transporter = this.payload.email as any
     } else {
       throw new Error('Email transport configuration is required either in plugin config or Payload config')
     }
