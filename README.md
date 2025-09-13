@@ -7,11 +7,17 @@
 ## Features
 
 ✅ **Template System**: Create reusable email templates with LiquidJS, Mustache, or simple variables
+
 ✅ **Type Safety**: Full TypeScript support using your generated Payload types
+
 ✅ **Flexible Template Engines**: LiquidJS, Mustache, or bring your own template renderer
+
 ✅ **Email Scheduling**: Schedule emails for future delivery using Payload collections
+
 ✅ **Job Integration**: Automatic processing via PayloadCMS jobs queue
+
 ✅ **Retry Failed Sends**: Automatic retry mechanism for failed emails
+
 ✅ **Payload Native**: Uses Payload collections directly - no custom APIs to learn
 
 ## Installation
