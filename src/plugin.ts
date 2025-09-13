@@ -52,7 +52,10 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
     },
     // Update relationship fields to point to correct templates collection
     fields: (emailsOverrides.fields || Emails.fields).map((field: any) => {
-      if (field.name === 'template' && field.type === 'relationship') {
+      if (field &&
+          typeof field === 'object' &&
+          field.name === 'template' &&
+          field.type === 'relationship') {
         return {
           ...field,
           relationTo: templatesSlug,
@@ -95,12 +98,10 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
               }
             } catch (error) {
               console.error('❌ Error processing email queue:', error)
-              return {
-                output: {
-                  success: false,
-                  error: error instanceof Error ? error.message : 'Unknown error'
-                }
-              }
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+              // Properly fail the job by throwing the error
+              throw new Error(`Email queue processing failed: ${errorMessage}`)
             }
           },
           interfaceName: 'ProcessEmailQueueJob',

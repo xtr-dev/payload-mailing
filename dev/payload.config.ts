@@ -146,6 +146,123 @@ const buildConfigWithMemoryDB = async () => {
         retryDelay: 60000, // 1 minute for dev
         queue: 'email-queue',
 
+        // Example: Collection overrides for customization
+        // Uncomment and modify as needed for your use case
+        /*
+        collections: {
+          templates: {
+            // Custom access controls - restrict who can manage templates
+            access: {
+              read: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin' || user.permissions?.includes('mailing:read')
+              },
+              create: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin' || user.permissions?.includes('mailing:create')
+              },
+              update: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin' || user.permissions?.includes('mailing:update')
+              },
+              delete: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin'
+              },
+            },
+            // Custom admin UI settings
+            admin: {
+              group: 'Marketing',
+              description: 'Email templates with enhanced security and categorization'
+            },
+            // Add custom fields to templates
+            fields: [
+              // Default plugin fields are automatically included
+              {
+                name: 'category',
+                type: 'select',
+                options: [
+                  { label: 'Marketing', value: 'marketing' },
+                  { label: 'Transactional', value: 'transactional' },
+                  { label: 'System Notifications', value: 'system' }
+                ],
+                defaultValue: 'transactional',
+                admin: {
+                  position: 'sidebar',
+                  description: 'Template category for organization'
+                }
+              },
+              {
+                name: 'tags',
+                type: 'text',
+                hasMany: true,
+                admin: {
+                  position: 'sidebar',
+                  description: 'Tags for easy template filtering'
+                }
+              },
+              {
+                name: 'isActive',
+                type: 'checkbox',
+                defaultValue: true,
+                admin: {
+                  position: 'sidebar',
+                  description: 'Only active templates can be used'
+                }
+              }
+            ],
+            // Custom validation hooks
+            hooks: {
+              beforeChange: [
+                ({ data, req }) => {
+                  // Example: Only admins can create system templates
+                  if (data.category === 'system' && req.user?.role !== 'admin') {
+                    throw new Error('Only administrators can create system notification templates')
+                  }
+
+                  // Example: Auto-generate slug if not provided
+                  if (!data.slug && data.name) {
+                    data.slug = data.name.toLowerCase()
+                      .replace(/[^a-z0-9]/g, '-')
+                      .replace(/-+/g, '-')
+                      .replace(/^-|-$/g, '')
+                  }
+
+                  return data
+                }
+              ]
+            }
+          },
+          emails: {
+            // Restrict access to emails collection
+            access: {
+              read: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin' || user.permissions?.includes('mailing:read')
+              },
+              create: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin' || user.permissions?.includes('mailing:create')
+              },
+              update: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin' || user.permissions?.includes('mailing:update')
+              },
+              delete: ({ req: { user } }) => {
+                if (!user) return false
+                return user.role === 'admin'
+              },
+            },
+            // Custom admin configuration for emails
+            admin: {
+              group: 'Marketing',
+              description: 'Email delivery tracking and management',
+              defaultColumns: ['subject', 'to', 'status', 'priority', 'scheduledAt'],
+            }
+          }
+        },
+        */
+
         // Optional: Custom rich text editor configuration
         // Comment out to use default lexical editor
         richTextEditor: lexicalEditor({

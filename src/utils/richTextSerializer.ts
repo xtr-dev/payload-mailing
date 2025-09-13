@@ -1,6 +1,20 @@
-// Using any type for now since Lexical types have import issues
-// import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
-type SerializedEditorState = any
+// Proper type definitions for Lexical serialization
+interface SerializedEditorState {
+  root: {
+    children: SerializedLexicalNode[]
+  }
+}
+
+interface SerializedLexicalNode {
+  type: string
+  children?: SerializedLexicalNode[]
+  text?: string
+  format?: number
+  tag?: string
+  listType?: 'number' | 'bullet'
+  url?: string
+  newTab?: boolean
+}
 
 /**
  * Converts Lexical richtext content to HTML
@@ -24,11 +38,11 @@ export function serializeRichTextToText(richTextData: SerializedEditorState): st
   return serializeNodesToText(richTextData.root.children)
 }
 
-function serializeNodesToHTML(nodes: any[]): string {
+function serializeNodesToHTML(nodes: SerializedLexicalNode[]): string {
   return nodes.map(node => serializeNodeToHTML(node)).join('')
 }
 
-function serializeNodeToHTML(node: any): string {
+function serializeNodeToHTML(node: SerializedLexicalNode): string {
   if (!node) return ''
 
   switch (node.type) {
@@ -43,16 +57,25 @@ function serializeNodeToHTML(node: any): string {
 
     case 'text':
       let text = node.text || ''
-      
-      // Apply text formatting
+
+      // Apply text formatting using proper nesting order
       if (node.format) {
-        if (node.format & 1) text = `<strong>${text}</strong>` // Bold
-        if (node.format & 2) text = `<em>${text}</em>` // Italic
-        if (node.format & 4) text = `<s>${text}</s>` // Strikethrough  
-        if (node.format & 8) text = `<u>${text}</u>` // Underline
-        if (node.format & 16) text = `<code>${text}</code>` // Code
+        const formatFlags = {
+          bold: (node.format & 1) !== 0,
+          italic: (node.format & 2) !== 0,
+          strikethrough: (node.format & 4) !== 0,
+          underline: (node.format & 8) !== 0,
+          code: (node.format & 16) !== 0,
+        }
+
+        // Apply formatting in proper nesting order: code > bold > italic > underline > strikethrough
+        if (formatFlags.code) text = `<code>${text}</code>`
+        if (formatFlags.bold) text = `<strong>${text}</strong>`
+        if (formatFlags.italic) text = `<em>${text}</em>`
+        if (formatFlags.underline) text = `<u>${text}</u>`
+        if (formatFlags.strikethrough) text = `<s>${text}</s>`
       }
-      
+
       return text
 
     case 'linebreak':
@@ -89,11 +112,11 @@ function serializeNodeToHTML(node: any): string {
   }
 }
 
-function serializeNodesToText(nodes: any[]): string {
+function serializeNodesToText(nodes: SerializedLexicalNode[]): string {
   return nodes.map(node => serializeNodeToText(node)).join('')
 }
 
-function serializeNodeToText(node: any): string {
+function serializeNodeToText(node: SerializedLexicalNode): string {
   if (!node) return ''
 
   switch (node.type) {

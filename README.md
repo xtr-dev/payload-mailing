@@ -359,14 +359,127 @@ EMAIL_PASS=your-app-password
 EMAIL_FROM=noreply@yoursite.com
 ```
 
+## Security and Access Control
+
+### Collection Access Restrictions
+
+By default, both email templates and emails collections allow full access (`read/create/update/delete: () => true`). For production use, you should configure proper access restrictions using collection overrides:
+
+```typescript
+mailingPlugin({
+  // ... other config
+  collections: {
+    templates: {
+      access: {
+        read: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin' || user.permissions?.includes('mailing:read')
+        },
+        create: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin' || user.permissions?.includes('mailing:create')
+        },
+        update: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin' || user.permissions?.includes('mailing:update')
+        },
+        delete: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin'
+        },
+      }
+    },
+    emails: {
+      access: {
+        read: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin' || user.permissions?.includes('mailing:read')
+        },
+        create: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin' || user.permissions?.includes('mailing:create')
+        },
+        update: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin' || user.permissions?.includes('mailing:update')
+        },
+        delete: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin'
+        },
+      }
+    }
+  }
+})
+```
+
+### Collection Overrides
+
+You can override any collection configuration using the `collections.templates` or `collections.emails` options. This includes:
+
+- **Access controls** - Restrict who can read/create/update/delete
+- **Admin UI settings** - Customize admin interface appearance
+- **Field modifications** - Add custom fields or modify existing ones
+- **Hooks** - Add custom validation or processing logic
+
+Example with additional custom fields:
+
+```typescript
+mailingPlugin({
+  // ... other config
+  collections: {
+    templates: {
+      admin: {
+        group: 'Custom Marketing',
+        description: 'Custom email templates with enhanced features'
+      },
+      fields: [
+        // Plugin's default fields are preserved
+        {
+          name: 'category',
+          type: 'select',
+          options: [
+            { label: 'Marketing', value: 'marketing' },
+            { label: 'Transactional', value: 'transactional' },
+            { label: 'System', value: 'system' }
+          ],
+          admin: {
+            position: 'sidebar'
+          }
+        },
+        {
+          name: 'tags',
+          type: 'text',
+          hasMany: true,
+          admin: {
+            description: 'Tags for organizing templates'
+          }
+        }
+      ],
+      hooks: {
+        beforeChange: [
+          ({ data, req }) => {
+            // Custom validation logic
+            if (data.category === 'system' && req.user?.role !== 'admin') {
+              throw new Error('Only admins can create system templates')
+            }
+            return data
+          }
+        ]
+      }
+    }
+  }
+})
+```
+
 ## TypeScript Support
 
 The plugin includes full TypeScript definitions. Import types as needed:
 
 ```typescript
-import { 
-  MailingPluginConfig, 
-  SendEmailOptions, 
+import {
+  MailingPluginConfig,
+  SendEmailOptions,
   EmailTemplate,
   QueuedEmail,
   EmailObject,
