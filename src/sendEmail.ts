@@ -66,8 +66,17 @@ export const sendEmail = async <T extends Email = Email>(
     throw new Error('Field "to" is required for sending emails')
   }
 
-  if (!emailData.subject || !emailData.html) {
-    throw new Error('Fields "subject" and "html" are required when not using a template')
+  // Validate required fields based on whether template was used
+  if (options.template) {
+    // When using template, subject and html should have been set by renderTemplate
+    if (!emailData.subject || !emailData.html) {
+      throw new Error(`Template rendering failed: template "${options.template.slug}" did not provide required subject and html content`)
+    }
+  } else {
+    // When not using template, user must provide subject and html directly
+    if (!emailData.subject || !emailData.html) {
+      throw new Error('Fields "subject" and "html" are required when sending direct emails without a template')
+    }
   }
 
   // Process email addresses using shared validation (handle null values)
@@ -81,13 +90,13 @@ export const sendEmail = async <T extends Email = Email>(
     emailData.bcc = parseAndValidateEmails(emailData.bcc as string | string[])
   }
 
-  // Create the email in the collection
+  // Create the email in the collection with proper typing
   const email = await payload.create({
-    collection: collectionSlug as any,
-    data: emailData as any
+    collection: collectionSlug,
+    data: emailData
   })
 
-  return email as unknown as T
+  return email as T
 }
 
 export default sendEmail

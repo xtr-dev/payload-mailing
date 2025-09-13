@@ -15,9 +15,20 @@ export const parseAndValidateEmails = (emails: string | string[] | null | undefi
     emailList = emails.split(',').map(email => email.trim()).filter(Boolean)
   }
 
-  // Basic email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  const invalidEmails = emailList.filter(email => !emailRegex.test(email))
+  // RFC 5322 compliant email validation
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+  const invalidEmails = emailList.filter(email => {
+    // Check basic format
+    if (!emailRegex.test(email)) return true
+    // Check for common invalid patterns
+    if (email.includes('..') || email.startsWith('.') || email.endsWith('.')) return true
+    if (email.includes('@.') || email.includes('.@')) return true
+    // Check domain has at least one dot
+    const parts = email.split('@')
+    if (parts.length !== 2 || !parts[1].includes('.')) return true
+    return false
+  })
+
   if (invalidEmails.length > 0) {
     throw new Error(`Invalid email addresses: ${invalidEmails.join(', ')}`)
   }
