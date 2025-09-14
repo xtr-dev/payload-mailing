@@ -64,6 +64,10 @@ function transformTaskInputToSendEmailOptions(taskInput: SendEmailTaskInput) {
   return sendEmailOptions
 }
 
+/**
+ * Job definition for sending emails
+ * Can be used through Payload's job queue system to send emails programmatically
+ */
 export const sendEmailJob = {
   slug: 'send-email',
   label: 'Send Email',
