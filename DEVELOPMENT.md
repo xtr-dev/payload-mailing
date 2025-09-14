@@ -126,8 +126,9 @@ When you start the dev server, look for these messages:
 🎯 Test interface will be available at: /mailing-test
 
 ✅ Example email templates created successfully
-PayloadCMS Mailing Plugin initialized successfully
 ```
+
+**Note**: The plugin initializes silently on success (no "initialized successfully" message). If you see no errors, the plugin loaded correctly.
 
 ## Troubleshooting
 
