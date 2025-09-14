@@ -1,6 +1,6 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { sendEmail, processEmailById } from '@xtr-dev/payload-mailing'
+import { sendEmail } from '@xtr-dev/payload-mailing'
 
 export async function POST(request: Request) {
   try {
@@ -55,35 +55,21 @@ export async function POST(request: Request) {
       emailOptions.data.scheduledAt = scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 60000)
     }
 
-    const result = await sendEmail(payload, emailOptions)
+    // Set processImmediately for "send now" type
+    const processImmediately = (type === 'send' && !scheduledAt)
+    emailOptions.processImmediately = processImmediately
 
-    // If it's "send now" (not scheduled), process the email immediately
-    if (type === 'send' && !scheduledAt) {
-      try {
-        await processEmailById(payload, String(result.id))
-        return Response.json({
-          success: true,
-          emailId: result.id,
-          message: 'Email sent successfully',
-          status: 'sent'
-        })
-      } catch (processError) {
-        // If immediate processing fails, return that it's queued
-        console.warn('Failed to process email immediately, left in queue:', processError)
-        return Response.json({
-          success: true,
-          emailId: result.id,
-          message: 'Email queued successfully (immediate processing failed)',
-          status: 'queued'
-        })
-      }
-    }
+    const result = await sendEmail(payload, emailOptions)
 
     return Response.json({
       success: true,
       emailId: result.id,
-      message: scheduledAt ? 'Email scheduled successfully' : 'Email queued successfully',
-      status: scheduledAt ? 'scheduled' : 'queued'
+      message: processImmediately ? 'Email sent successfully' :
+               scheduledAt ? 'Email scheduled successfully' :
+               'Email queued successfully',
+      status: processImmediately ? 'sent' :
+              scheduledAt ? 'scheduled' :
+              'queued'
     })
   } catch (error) {
     console.error('Test email error:', error)

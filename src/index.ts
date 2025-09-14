@@ -11,9 +11,9 @@ export { MailingService } from './services/MailingService.js'
 export { default as EmailTemplates, createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 export { default as Emails } from './collections/Emails.js'
 
-// Jobs (includes the send email task)
-export { mailingJobs, sendEmailJob } from './jobs/index.js'
-export type { SendEmailTaskInput } from './jobs/sendEmailTask.js'
+// Jobs (includes the individual email processing job)
+export { mailingJobs } from './jobs/index.js'
+export type { ProcessEmailJobInput } from './jobs/processEmailJob.js'
 
 // Main email sending function
 export { sendEmail, type SendEmailOptions } from './sendEmail.js'

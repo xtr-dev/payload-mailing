@@ -1,6 +1,7 @@
 import { Payload } from 'payload'
 import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
 import { BaseEmailDocument } from './types/index.js'
+import { processJobById } from './utils/emailProcessor.js'
 
 // Options for sending emails
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
@@ -13,6 +14,8 @@ export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocumen
   data?: Partial<T>
   // Common options
   collectionSlug?: string // defaults to 'emails'
+  processImmediately?: boolean // if true, creates job and processes it immediately
+  queue?: string // queue name for the job, defaults to mailing config queue
 }
 
 /**
@@ -39,8 +42,8 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   payload: Payload,
   options: SendEmailOptions<TEmail>
 ): Promise<TEmail> => {
-  const mailing = getMailing(payload)
-  const collectionSlug = options.collectionSlug || mailing.collections.emails || 'emails'
+  const mailingConfig = getMailing(payload)
+  const collectionSlug = options.collectionSlug || mailingConfig.collections.emails || 'emails'
 
   let emailData: Partial<TEmail> = { ...options.data } as Partial<TEmail>
 
@@ -137,6 +140,42 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   // Validate that the created email has the expected structure
   if (!email || typeof email !== 'object' || !email.id) {
     throw new Error('Failed to create email: invalid response from database')
+  }
+
+  // Create an individual job for this email
+  const queueName = options.queue || mailingConfig.queue || 'default'
+
+  let jobId: string | undefined
+
+  if (payload.jobs) {
+    try {
+      const job = await payload.jobs.queue({
+        queue: queueName,
+        task: 'process-email',
+        input: {
+          emailId: String(email.id)
+        },
+        // If scheduled, set the waitUntil date
+        waitUntil: emailData.scheduledAt ? new Date(emailData.scheduledAt) : undefined
+      })
+
+      jobId = String(job.id)
+    } catch (error) {
+      console.warn(`Failed to create job for email ${email.id}:`, error)
+      // Don't fail the entire sendEmail operation if job creation fails
+    }
+  } else {
+    console.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
+  }
+
+  // If processImmediately is true and we have a job, process it now
+  if (options.processImmediately && jobId) {
+    try {
+      await processJobById(payload, jobId)
+    } catch (error) {
+      console.warn(`Failed to process email ${email.id} immediately:`, error)
+      // Don't fail the entire sendEmail operation if immediate processing fails
+    }
   }
 
   return email as TEmail

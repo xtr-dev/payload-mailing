@@ -30,6 +30,31 @@ export async function processEmailById(payload: Payload, emailId: string): Promi
 }
 
 /**
+ * Processes a job immediately by finding and executing it
+ * @param payload Payload instance
+ * @param jobId The ID of the job to run immediately
+ * @returns Promise that resolves when job is processed
+ */
+export async function processJobById(payload: Payload, jobId: string): Promise<void> {
+  if (!payload.jobs) {
+    throw new Error('PayloadCMS jobs not configured - cannot process job immediately')
+  }
+
+  try {
+    // Run a specific job by its ID (using where clause to find the job)
+    await payload.jobs.run({
+      where: {
+        id: {
+          equals: jobId
+        }
+      }
+    })
+  } catch (error) {
+    throw new Error(`Failed to process job ${jobId}: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/**
  * Processes all pending and failed emails using the mailing service
  * @param payload Payload instance
  * @returns Promise that resolves when all emails are processed
