@@ -165,6 +165,72 @@ Upgrade to premium for more features.
 Account created: {{formatDate user.createdAt "long"}}
 ```
 
+## Configuration
+
+### Plugin Options
+
+```typescript
+mailingPlugin({
+  // Template engine
+  templateEngine: 'liquidjs',  // 'liquidjs' | 'mustache' | 'simple'
+
+  // Custom template renderer
+  templateRenderer: async (template: string, variables: Record<string, any>) => {
+    return yourCustomEngine.render(template, variables)
+  },
+
+  // Email settings
+  defaultFrom: 'noreply@yoursite.com',
+  defaultFromName: 'Your Site',
+  retryAttempts: 3,              // Number of retry attempts
+  retryDelay: 300000,            // 5 minutes between retries
+
+  // Collection customization
+  collections: {
+    templates: 'email-templates', // Custom collection name
+    emails: 'emails'             // Custom collection name
+  },
+
+  // Hooks
+  beforeSend: async (options, email) => {
+    // Modify email before sending
+    options.headers = { 'X-Campaign-ID': email.campaignId }
+    return options
+  },
+
+  onReady: async (payload) => {
+    // Plugin initialization complete
+    console.log('Mailing plugin ready!')
+  }
+})
+```
+
+### Collection Overrides
+
+Customize collections with access controls and custom fields:
+
+```typescript
+mailingPlugin({
+  collections: {
+    emails: {
+      access: {
+        read: ({ req: { user } }) => user?.role === 'admin',
+        create: ({ req: { user } }) => !!user,
+        update: ({ req: { user } }) => user?.role === 'admin',
+        delete: ({ req: { user } }) => user?.role === 'admin'
+      },
+      fields: [
+        {
+          name: 'campaignId',
+          type: 'text',
+          admin: { position: 'sidebar' }
+        }
+      ]
+    }
+  }
+})
+```
+
 ## Requirements
 
 - PayloadCMS ^3.45.0
@@ -213,6 +279,87 @@ EMAIL_PORT=587
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your-app-password
 EMAIL_FROM=noreply@yoursite.com
+```
+
+## API Reference
+
+### `sendEmail<T>(payload, options)`
+
+Send emails with full type safety using your generated Payload types.
+
+```typescript
+import { sendEmail } from '@xtr-dev/payload-mailing'
+import type { Email } from './payload-types'
+
+const email = await sendEmail<Email>(payload, {
+  template?: {
+    slug: string                    // Template slug
+    variables: Record<string, any>  // Template variables
+  },
+  data: {
+    to: string | string[]          // Recipients
+    cc?: string | string[]         // CC recipients
+    bcc?: string | string[]        // BCC recipients
+    subject?: string               // Email subject (overrides template)
+    html?: string                  // HTML content (overrides template)
+    text?: string                  // Text content (overrides template)
+    scheduledAt?: Date             // Schedule for later
+    priority?: number              // Priority (1-5, 1 = highest)
+    // ... your custom fields from Email collection
+  },
+  collectionSlug?: string          // Custom collection name (default: 'emails')
+})
+```
+
+### `renderTemplate(payload, slug, variables)`
+
+Render a template without sending an email.
+
+```typescript
+import { renderTemplate } from '@xtr-dev/payload-mailing'
+
+const result = await renderTemplate(
+  payload: Payload,
+  slug: string,
+  variables: Record<string, any>
+): Promise<{
+  html: string    // Rendered HTML content
+  text: string    // Rendered text content
+  subject: string // Rendered subject line
+}>
+```
+
+### Helper Functions
+
+```typescript
+import { processEmails, retryFailedEmails, getMailing } from '@xtr-dev/payload-mailing'
+
+// Process pending emails manually
+await processEmails(payload: Payload): Promise<void>
+
+// Retry failed emails manually
+await retryFailedEmails(payload: Payload): Promise<void>
+
+// Get mailing service instance
+const mailing = getMailing(payload: Payload): MailingService
+```
+
+### Job Task Types
+
+```typescript
+import type { SendTemplateEmailInput } from '@xtr-dev/payload-mailing'
+
+interface SendTemplateEmailInput {
+  templateSlug: string              // Template to use
+  to: string[]                      // Recipients
+  cc?: string[]                     // CC recipients
+  bcc?: string[]                    // BCC recipients
+  variables: Record<string, any>    // Template variables
+  scheduledAt?: string              // ISO date string for scheduling
+  priority?: number                 // Priority (1-5)
+  processImmediately?: boolean      // Send immediately (default: false)
+  [key: string]: any               // Your custom email collection fields
+}
 ```
 
 ## License
