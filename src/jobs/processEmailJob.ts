@@ -9,6 +9,10 @@ export interface ProcessEmailJobInput {
    * The ID of the email to process
    */
   emailId: string | number
+  /**
+   * Optional unique constraint helper to prevent duplicate jobs
+   */
+  uniqueKey?: string
 }
 
 /**

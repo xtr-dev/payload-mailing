@@ -226,20 +226,14 @@ const Emails: CollectionConfig = {
     ]
   },
   timestamps: true,
-  // indexes: [
-  //   {
-  //     fields: {
-  //       status: 1,
-  //       scheduledAt: 1,
-  //     },
-  //   },
-  //   {
-  //     fields: {
-  //       priority: -1,
-  //       createdAt: 1,
-  //     },
-  //   },
-  // ],
+  indexes: [
+    {
+      fields: ['status', 'scheduledAt'],
+    },
+    {
+      fields: ['priority', 'createdAt'],
+    },
+  ],
 }
 
 export default Emails
