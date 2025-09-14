@@ -45,6 +45,7 @@ export class MailingService implements IMailingService {
       // Use Payload's configured mailer (cast to any to handle different adapter types)
       this.transporter = this.payload.email as any
     } else {
+      console.log('[DEBUG] email: ', this.payload.email);
       throw new Error('Email transport configuration is required either in plugin config or Payload config')
     }
 
