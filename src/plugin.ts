@@ -9,12 +9,6 @@ import { mailingJobs, scheduleEmailsJob } from './jobs/index.js'
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
   const queueName = pluginConfig.queue || 'default'
 
-  // Validate queueName
-  if (!queueName || typeof queueName !== 'string') {
-    throw new Error('Invalid queue configuration: queue must be a non-empty string')
-  }
-
-
   // Handle templates collection configuration
   const templatesConfig = pluginConfig.collections?.templates
   const templatesSlug = typeof templatesConfig === 'string' ? templatesConfig : 'email-templates'
