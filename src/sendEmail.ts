@@ -145,36 +145,44 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   // Create an individual job for this email
   const queueName = options.queue || mailingConfig.queue || 'default'
 
-  let jobId: string | undefined
-
-  if (payload.jobs) {
-    try {
-      const job = await payload.jobs.queue({
-        queue: queueName,
-        task: 'process-email',
-        input: {
-          emailId: String(email.id)
-        },
-        // If scheduled, set the waitUntil date
-        waitUntil: emailData.scheduledAt ? new Date(emailData.scheduledAt) : undefined
-      })
-
-      jobId = String(job.id)
-    } catch (error) {
-      console.warn(`Failed to create job for email ${email.id}:`, error)
-      // Don't fail the entire sendEmail operation if job creation fails
+  if (!payload.jobs) {
+    if (options.processImmediately) {
+      throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
+    } else {
+      console.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
+      return email as TEmail
     }
-  } else {
-    console.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
   }
 
-  // If processImmediately is true and we have a job, process it now
-  if (options.processImmediately && jobId) {
+  let jobId: string
+  try {
+    const job = await payload.jobs.queue({
+      queue: queueName,
+      task: 'process-email',
+      input: {
+        emailId: String(email.id)
+      },
+      // If scheduled, set the waitUntil date
+      waitUntil: emailData.scheduledAt ? new Date(emailData.scheduledAt) : undefined
+    })
+
+    jobId = String(job.id)
+  } catch (error) {
+    if (options.processImmediately) {
+      // If immediate processing was requested, job creation failure is critical
+      throw new Error(`Failed to create job for immediate processing of email ${email.id}: ${error instanceof Error ? error.message : String(error)}`)
+    } else {
+      // For regular queued emails, job creation failure is still critical
+      throw new Error(`Failed to create processing job for email ${email.id}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // If processImmediately is true, process the job now
+  if (options.processImmediately) {
     try {
       await processJobById(payload, jobId)
     } catch (error) {
-      console.warn(`Failed to process email ${email.id} immediately:`, error)
-      // Don't fail the entire sendEmail operation if immediate processing fails
+      throw new Error(`Failed to process email ${email.id} immediately: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

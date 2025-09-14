@@ -64,13 +64,7 @@ export const processEmailJob = {
         }
       }
     } catch (error) {
-      // Re-throw Error instances to preserve stack trace and error context
-      if (error instanceof Error) {
-        throw error
-      } else {
-        // Only wrap non-Error values
-        throw new Error(`Failed to process email ${emailId}: ${String(error)}`)
-      }
+      throw new Error(`Failed to process email ${emailId}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 }
