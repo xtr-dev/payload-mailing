@@ -33,6 +33,8 @@ export default function MailingTestPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [toEmail, setToEmail] = useState<string>('test@example.com')
   const [variables, setVariables] = useState<Record<string, any>>({})
+  const [jsonVariables, setJsonVariables] = useState<string>('{}')
+  const [jsonError, setJsonError] = useState<string>('')
   const [emailType, setEmailType] = useState<'send' | 'schedule'>('send')
   const [scheduleDate, setScheduleDate] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
@@ -58,12 +60,34 @@ export default function MailingTestPage() {
     const template = templates.find(t => t.slug === templateSlug)
     if (template?.previewData) {
       setVariables(template.previewData)
+      setJsonVariables(JSON.stringify(template.previewData, null, 2))
+    } else {
+      setVariables({})
+      setJsonVariables('{}')
+    }
+    setJsonError('')
+  }
+
+  const handleJsonVariablesChange = (jsonString: string) => {
+    setJsonVariables(jsonString)
+    setJsonError('')
+
+    try {
+      const parsed = JSON.parse(jsonString)
+      setVariables(parsed)
+    } catch (error) {
+      setJsonError(error instanceof Error ? error.message : 'Invalid JSON')
     }
   }
 
   const sendTestEmail = async () => {
     if (!selectedTemplate || !toEmail) {
       setMessage('Please select a template and enter an email address')
+      return
+    }
+
+    if (jsonError) {
+      setMessage('Please fix the JSON syntax error before sending')
       return
     }
 
@@ -88,7 +112,8 @@ export default function MailingTestPage() {
       const result = await response.json()
       
       if (result.success) {
-        setMessage(`✅ ${result.message} (ID: ${result.emailId})`)
+        const statusIcon = result.status === 'sent' ? '📧' : '📫'
+        setMessage(`✅ ${statusIcon} ${result.message} (ID: ${result.emailId})`)
         fetchData() // Refresh email queue
       } else {
         setMessage(`❌ Error: ${result.error}`)
@@ -204,28 +229,43 @@ export default function MailingTestPage() {
             </div>
           )}
 
-          {selectedTemplateData?.variables && (
+          {selectedTemplate && (
             <div style={{ marginBottom: '15px' }}>
-              <h3>Template Variables:</h3>
-              {selectedTemplateData.variables.map(variable => (
-                <div key={variable.name} style={{ marginBottom: '10px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px' }}>
-                    {variable.name} {variable.required && <span style={{ color: 'red' }}>*</span>}
-                    {variable.description && <small style={{ color: '#666' }}> - {variable.description}</small>}
-                  </label>
-                  <input
-                    type={variable.type === 'number' ? 'number' : variable.type === 'date' ? 'datetime-local' : 'text'}
-                    value={variables[variable.name] || ''}
-                    onChange={(e) => setVariables({
-                      ...variables,
-                      [variable.name]: variable.type === 'number' ? Number(e.target.value) : 
-                                     variable.type === 'boolean' ? e.target.checked : 
-                                     e.target.value
-                    })}
-                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                  />
+              <label style={{ display: 'block', marginBottom: '5px' }}>
+                <strong>Template Variables (JSON):</strong>
+                {selectedTemplateData?.variables && (
+                  <small style={{ color: '#666', marginLeft: '8px' }}>
+                    Available variables: {selectedTemplateData.variables.map(v => v.name).join(', ')}
+                  </small>
+                )}
+              </label>
+              <textarea
+                value={jsonVariables}
+                onChange={(e) => handleJsonVariablesChange(e.target.value)}
+                placeholder='{\n  "firstName": "John",\n  "siteName": "MyApp",\n  "createdAt": "2023-01-01T00:00:00Z"\n}'
+                style={{
+                  width: '100%',
+                  height: '150px',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: jsonError ? '2px solid #dc3545' : '1px solid #ddd',
+                  fontFamily: 'monaco, "Courier New", monospace',
+                  fontSize: '13px',
+                  resize: 'vertical'
+                }}
+              />
+              {jsonError && (
+                <div style={{
+                  color: '#dc3545',
+                  fontSize: '12px',
+                  marginTop: '5px',
+                  padding: '5px',
+                  backgroundColor: '#f8d7da',
+                  borderRadius: '4px'
+                }}>
+                  Invalid JSON: {jsonError}
                 </div>
-              ))}
+              )}
             </div>
           )}
 

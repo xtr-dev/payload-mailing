@@ -19,17 +19,8 @@ export const processEmailsTaskHandler = async (
   const { req } = context
   const payload = (req as any).payload
 
-  try {
-    console.log('🔄 Processing email queue (pending + failed emails)...')
-
-    // Use the shared email processing logic
-    await processAllEmails(payload)
-
-    console.log('✅ Email queue processing completed successfully')
-  } catch (error) {
-    console.error('❌ Email queue processing failed:', error)
-    throw error
-  }
+  // Use the shared email processing logic
+  await processAllEmails(payload)
 }
 
 /**

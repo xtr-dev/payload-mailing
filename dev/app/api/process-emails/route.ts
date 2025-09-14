@@ -4,24 +4,25 @@ import config from '@payload-config'
 export async function POST(request: Request) {
   try {
     const payload = await getPayload({ config })
-    
-    // Queue the combined email queue processing job
-    const job = await payload.jobs.queue({
-      task: 'process-email-queue',
-      input: {},
+
+    // Run jobs in the default queue (the plugin already schedules email processing on init)
+    const results = await payload.jobs.run({
+      queue: 'default',
     })
-    
+
+    const processedCount = Array.isArray(results) ? results.length : (results ? 1 : 0)
+
     return Response.json({
       success: true,
-      message: 'Email queue processing job queued successfully (will process both pending and failed emails)',
-      jobId: job.id,
+      message: `Email queue processing completed. Processed ${processedCount} jobs.`,
+      processedJobs: processedCount,
     })
   } catch (error) {
     console.error('Process emails error:', error)
     return Response.json(
-      { 
+      {
         error: 'Failed to process emails',
-        details: error instanceof Error ? error.message : 'Unknown error' 
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     )

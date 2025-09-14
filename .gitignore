@@ -4,4 +4,6 @@ node_modules/
 payload-docs
 dist/
 /dev/payload.db
+/dev/dev.db
+dev.db
 tsconfig.tsbuildinfo
