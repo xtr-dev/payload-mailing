@@ -144,6 +144,10 @@ export interface Email {
    */
   from?: string | null;
   /**
+   * Sender display name (optional, e.g., "John Doe" for "John Doe <john@example.com>")
+   */
+  fromName?: string | null;
+  /**
    * Reply-to email address
    */
   replyTo?: string | null;
@@ -336,6 +340,7 @@ export interface EmailsSelect<T extends boolean = true> {
   cc?: T;
   bcc?: T;
   from?: T;
+  fromName?: T;
   replyTo?: T;
   subject?: T;
   html?: T;

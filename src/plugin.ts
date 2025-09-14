@@ -74,10 +74,15 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
     }),
   } satisfies CollectionConfig
 
+  // Filter out any existing collections with the same slugs to prevent duplicates
+  const existingCollections = (config.collections || []).filter(
+    (collection) => collection.slug !== templatesSlug && collection.slug !== emailsSlug
+  )
+
   return {
     ...config,
     collections: [
-      ...(config.collections || []),
+      ...existingCollections,
       templatesCollection,
       emailsCollection,
     ],
