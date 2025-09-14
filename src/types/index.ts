@@ -76,7 +76,6 @@ export interface MailingPluginConfig {
   templateEngine?: TemplateEngine
   richTextEditor?: RichTextField['editor']
   beforeSend?: BeforeSendHook
-  onReady?: (payload: any) => Promise<void>
   initOrder?: 'before' | 'after'
 }
 
