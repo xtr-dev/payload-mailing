@@ -47,9 +47,9 @@ export async function ensureEmailJob(
   const mailingContext = (payload as any).mailing
   const queueName = options?.queueName || mailingContext?.config?.queue || 'default'
 
-  // Implement atomic check-and-create with retry logic to prevent race conditions
-  const maxAttempts = 5
-  const baseDelay = 100 // Start with 100ms
+  // Implement atomic check-and-create with minimal retry for efficiency
+  const maxAttempts = 3 // Reduced from 5 for better performance
+  const baseDelay = 50 // Reduced from 100ms for faster response
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // Check for existing jobs with precise matching
@@ -64,14 +64,12 @@ export async function ensureEmailJob(
     }
 
     try {
-      // Attempt to create job with specific input that ensures uniqueness
+      // Attempt to create job - rely on database constraints for duplicate prevention
       const job = await payload.jobs.queue({
         queue: queueName,
         task: 'process-email',
         input: {
-          emailId: normalizedEmailId,
-          // Add a unique constraint helper to prevent duplicates at queue level
-          uniqueKey: `email-${normalizedEmailId}-${Date.now()}-${Math.random()}`
+          emailId: normalizedEmailId
         },
         waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
       })
@@ -85,7 +83,7 @@ export async function ensureEmailJob(
     } catch (error) {
       // On any creation error, wait briefly and check again for concurrent creation
       if (attempt < maxAttempts - 1) {
-        const delay = baseDelay * Math.pow(2, attempt) // Exponential backoff
+        const delay = Math.min(baseDelay * Math.pow(1.5, attempt), 200) // Gentler exponential backoff, capped at 200ms
         await new Promise(resolve => setTimeout(resolve, delay))
 
         // Check if another process succeeded while we were failing

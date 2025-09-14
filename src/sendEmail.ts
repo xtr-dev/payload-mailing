@@ -149,16 +149,26 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
     }
 
-    // Poll for the job with exponential backoff
+    // Poll for the job with optimized backoff and timeout protection
     // This handles the async nature of hooks and ensures we wait for job creation
-    const maxAttempts = 10
-    const initialDelay = 50 // Start with 50ms
+    const maxAttempts = 5 // Reduced from 10 to minimize delay
+    const initialDelay = 25 // Reduced from 50ms for faster response
+    const maxTotalTime = 3000 // 3 second total timeout
+    const startTime = Date.now()
     let jobId: string | undefined
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Calculate delay with exponential backoff (50ms, 100ms, 200ms, 400ms...)
-      // Cap at 2 seconds per attempt
-      const delay = Math.min(initialDelay * Math.pow(2, attempt), 2000)
+      // Check total timeout before continuing
+      if (Date.now() - startTime > maxTotalTime) {
+        throw new Error(
+          `Job polling timed out after ${maxTotalTime}ms for email ${email.id}. ` +
+          `The auto-scheduling may have failed or is taking longer than expected.`
+        )
+      }
+
+      // Calculate delay with exponential backoff (25ms, 50ms, 100ms, 200ms, 400ms)
+      // Cap at 400ms per attempt for better responsiveness
+      const delay = Math.min(initialDelay * Math.pow(2, attempt), 400)
 
       if (attempt > 0) {
         await new Promise(resolve => setTimeout(resolve, delay))
@@ -178,15 +188,15 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
         break
       }
 
-      // Log on later attempts to help with debugging
-      if (attempt >= 3) {
+      // Log on later attempts to help with debugging (reduced threshold)
+      if (attempt >= 2) {
         console.log(`Waiting for job creation for email ${email.id}, attempt ${attempt + 1}/${maxAttempts}`)
       }
     }
 
     if (!jobId) {
       throw new Error(
-        `No processing job found for email ${email.id} after ${maxAttempts} attempts. ` +
+        `No processing job found for email ${email.id} after ${maxAttempts} attempts (${Date.now() - startTime}ms). ` +
         `The auto-scheduling may have failed or is taking longer than expected.`
       )
     }
