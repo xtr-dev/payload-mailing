@@ -148,21 +148,66 @@ Use `{{}}` to insert data in templates:
 - `{{formatDate createdAt "short"}}` - Built-in date formatting
 - `{{formatCurrency amount "USD"}}` - Currency formatting
 
-Example template:
+### Template Structure
+
+Templates include both subject and body content:
+
 ```liquid
-Subject: Welcome {{user.name}}!
+<!-- Subject Template -->
+Welcome {{user.name}} to {{siteName}}!
+
+<!-- Body Template -->
+# Hello {{user.name}}! 👋
 
 {% if user.isPremium %}
-Welcome Premium Member {{user.name}}!
+**Welcome Premium Member!**
 
-Your premium features are ready.
+Your premium features are now active:
+- Priority support
+- Advanced analytics
+- Custom integrations
 {% else %}
-Welcome {{user.name}}!
+Welcome to {{siteName}}!
 
-Upgrade to premium for more features.
+**Ready to get started?**
+- Complete your profile
+- Explore our features
+- [Upgrade to Premium]({{upgradeUrl}})
 {% endif %}
 
-Account created: {{formatDate user.createdAt "long"}}
+---
+**Account Details:**
+- Created: {{formatDate user.createdAt "long"}}
+- Email: {{user.email}}
+- Plan: {{user.plan | capitalize}}
+
+Need help? Reply to this email or visit our [help center]({{helpUrl}}).
+
+Best regards,
+The {{siteName}} Team
+```
+
+### Example Usage
+
+```typescript
+// Create template in admin panel, then use:
+const { html, text, subject } = await renderTemplate(payload, 'welcome-email', {
+  user: {
+    name: 'John Doe',
+    email: 'john@example.com',
+    isPremium: false,
+    plan: 'free',
+    createdAt: new Date()
+  },
+  siteName: 'MyApp',
+  upgradeUrl: 'https://myapp.com/upgrade',
+  helpUrl: 'https://myapp.com/help'
+})
+
+// Results in:
+// subject: "Welcome John Doe to MyApp!"
+// html: "<h1>Hello John Doe! 👋</h1><p>Welcome to MyApp!</p>..."
+// text: "Hello John Doe! Welcome to MyApp! Ready to get started?..."
 ```
 
 ## Configuration
@@ -233,43 +278,152 @@ mailingPlugin({
 
 ## Requirements
 
-- PayloadCMS ^3.45.0
+- PayloadCMS ^3.0.0
 - Node.js ^18.20.2 || >=20.9.0
 - pnpm ^9 || ^10
 
 ## Job Processing
 
-Queue emails using PayloadCMS jobs:
+### When to Use Jobs vs Direct Sending
+
+**Use Jobs for:**
+- Bulk email campaigns (performance)
+- Scheduled emails (future delivery)
+- Background processing (non-blocking)
+- Retry handling (automatic retries)
+- High-volume sending (queue management)
+
+**Use Direct Sending for:**
+- Immediate transactional emails
+- Single recipient emails
+- Simple use cases
+- When you need immediate feedback
+
+### Setup
 
 ```typescript
 import { sendTemplateEmailTask } from '@xtr-dev/payload-mailing'
 
-// Add to your Payload config
 export default buildConfig({
   jobs: {
     tasks: [sendTemplateEmailTask]
   }
 })
+```
 
-// Queue a template email
+### Queue Template Emails
+
+```typescript
+// Basic template email
 await payload.jobs.queue({
   task: 'send-template-email',
   input: {
     templateSlug: 'welcome-email',
     to: ['user@example.com'],
-    variables: { firstName: 'John' },
-    scheduledAt: new Date('2024-01-15T10:00:00Z').toISOString()
+    variables: { firstName: 'John' }
+  }
+})
+
+// Scheduled email
+await payload.jobs.queue({
+  task: 'send-template-email',
+  input: {
+    templateSlug: 'reminder-email',
+    to: ['user@example.com'],
+    variables: { eventName: 'Product Launch' },
+    scheduledAt: new Date('2024-01-15T10:00:00Z').toISOString(),
+    priority: 1
+  }
+})
+
+// Immediate processing (bypasses queue)
+await payload.jobs.queue({
+  task: 'send-template-email',
+  input: {
+    processImmediately: true,
+    templateSlug: 'urgent-notification',
+    to: ['admin@example.com'],
+    variables: { alertMessage: 'System critical error' }
   }
 })
 ```
 
-## Email Status
+### Bulk Operations
+
+```typescript
+// Send to multiple recipients efficiently
+const recipients = ['user1@example.com', 'user2@example.com', 'user3@example.com']
+
+for (const email of recipients) {
+  await payload.jobs.queue({
+    task: 'send-template-email',
+    input: {
+      templateSlug: 'newsletter',
+      to: [email],
+      variables: { unsubscribeUrl: `https://example.com/unsubscribe/${email}` },
+      priority: 3 // Lower priority for bulk emails
+    }
+  })
+}
+```
+
+## Email Status & Monitoring
+
+### Status Types
 
 Emails are tracked with these statuses:
 - `pending` - Waiting to be sent
 - `processing` - Currently being sent
 - `sent` - Successfully delivered
 - `failed` - Failed to send (will retry automatically)
+
+### Query Email Status
+
+```typescript
+// Check specific email status
+const email = await payload.findByID({
+  collection: 'emails',
+  id: 'email-id'
+})
+console.log(`Email status: ${email.status}`)
+
+// Find emails by status
+const pendingEmails = await payload.find({
+  collection: 'emails',
+  where: {
+    status: { equals: 'pending' }
+  },
+  sort: 'createdAt'
+})
+
+// Find failed emails for retry
+const failedEmails = await payload.find({
+  collection: 'emails',
+  where: {
+    status: { equals: 'failed' },
+    attemptCount: { less_than: 3 }
+  }
+})
+
+// Monitor scheduled emails
+const scheduledEmails = await payload.find({
+  collection: 'emails',
+  where: {
+    scheduledAt: { greater_than: new Date() },
+    status: { equals: 'pending' }
+  }
+})
+```
+
+### Admin Panel Monitoring
+
+Navigate to **Mailing > Emails** in your Payload admin to:
+- View email delivery status and timestamps
+- See error messages for failed deliveries
+- Track retry attempts and next retry times
+- Monitor scheduled email queue
+- Filter by status, recipient, or date range
+- Export email reports for analysis
 
 ## Environment Variables
 
@@ -362,10 +516,142 @@ interface SendTemplateEmailInput {
 }
 ```
 
+## Troubleshooting
+
+### Common Issues
+
+#### Templates not rendering
+```typescript
+// Check template exists
+const template = await payload.findByID({
+  collection: 'email-templates',
+  id: 'your-template-slug'
+})
+
+// Verify template engine configuration
+mailingPlugin({
+  templateEngine: 'liquidjs', // Ensure correct engine
+})
+```
+
+#### Emails stuck in pending status
+```typescript
+// Manually process email queue
+import { processEmails } from '@xtr-dev/payload-mailing'
+await processEmails(payload)
+
+// Check for processing errors
+const pendingEmails = await payload.find({
+  collection: 'emails',
+  where: { status: { equals: 'pending' } }
+})
+```
+
+#### SMTP connection errors
+```bash
+# Verify environment variables
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password  # Use app password, not regular password
+
+# Test connection
+curl -v telnet://smtp.gmail.com:587
+```
+
+#### Template variables not working
+```typescript
+// Ensure variables match template syntax
+const variables = {
+  user: { name: 'John' },  // For {{user.name}}
+  welcomeUrl: 'https://...' // For {{welcomeUrl}}
+}
+
+// Check for typos in template
+{% if user.isPremium %}  <!-- Correct -->
+{% if user.isPremimum %} <!-- Typo - won't work -->
+```
+
+### Error Handling
+
+```typescript
+try {
+  const email = await sendEmail(payload, {
+    template: { slug: 'welcome', variables: { name: 'John' } },
+    data: { to: 'user@example.com' }
+  })
+} catch (error) {
+  if (error.message.includes('Template not found')) {
+    // Handle missing template
+    console.error('Template does not exist:', error.templateSlug)
+  } else if (error.message.includes('SMTP')) {
+    // Handle email delivery issues
+    console.error('Email delivery failed:', error.details)
+  } else {
+    // Handle other errors
+    console.error('Unexpected error:', error)
+  }
+}
+```
+
+### Debug Mode
+
+Enable detailed logging:
+
+```bash
+# Set environment variable
+PAYLOAD_AUTOMATION_LOG_LEVEL=debug npm run dev
+
+# Or in your code
+mailingPlugin({
+  onReady: async (payload) => {
+    console.log('Mailing plugin initialized')
+  },
+  beforeSend: async (options, email) => {
+    console.log('Sending email:', { to: options.to, subject: options.subject })
+    return options
+  }
+})
+```
+
 ## License
 
 MIT
 
 ## Contributing
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/xtr-dev/payload-mailing.git
+cd payload-mailing
+
+# Install dependencies
+pnpm install
+
+# Build the package
+pnpm build
+
+# Run tests
+pnpm test
+
+# Link for local development
+pnpm link --global
+```
+
+### Testing
+
+```bash
+# Run unit tests
+pnpm test
+
+# Run integration tests
+pnpm test:integration
+
+# Test with different PayloadCMS versions
+pnpm test:payload-3.0
+pnpm test:payload-latest
+```
 
 Issues and pull requests welcome at [GitHub repository](https://github.com/xtr-dev/payload-mailing)
