@@ -242,9 +242,11 @@ export const sendEmailJob = {
       }
 
     } catch (error) {
+      // Re-throw Error instances to preserve stack trace and error context
       if (error instanceof Error) {
-        throw new Error(`Failed to process email: ${error.message}`, { cause: error })
+        throw error
       } else {
+        // Only wrap non-Error values
         throw new Error(`Failed to process email: ${String(error)}`)
       }
     }

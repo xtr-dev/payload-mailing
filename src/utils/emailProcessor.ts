@@ -10,8 +10,19 @@ export async function processEmailById(payload: Payload, emailId: string): Promi
   // Get mailing context from payload
   const mailingContext = (payload as any).mailing
 
-  if (!mailingContext || !mailingContext.service) {
-    throw new Error('Mailing plugin not properly initialized')
+  if (!mailingContext) {
+    throw new Error(
+      'Mailing plugin not found on payload instance. ' +
+      'Ensure the mailingPlugin is properly configured in your Payload config plugins array.'
+    )
+  }
+
+  if (!mailingContext.service) {
+    throw new Error(
+      'Mailing service not available. ' +
+      'The plugin may not have completed initialization. ' +
+      'Check that email configuration is properly set up in your Payload config.'
+    )
   }
 
   // Process the specific email
@@ -27,8 +38,19 @@ export async function processAllEmails(payload: Payload): Promise<void> {
   // Get mailing context from payload
   const mailingContext = (payload as any).mailing
 
-  if (!mailingContext || !mailingContext.service) {
-    throw new Error('Mailing plugin not properly initialized')
+  if (!mailingContext) {
+    throw new Error(
+      'Mailing plugin not found on payload instance. ' +
+      'Ensure the mailingPlugin is properly configured in your Payload config plugins array.'
+    )
+  }
+
+  if (!mailingContext.service) {
+    throw new Error(
+      'Mailing service not available. ' +
+      'The plugin may not have completed initialization. ' +
+      'Check that email configuration is properly set up in your Payload config.'
+    )
   }
 
   // Process pending emails first
