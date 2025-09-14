@@ -270,7 +270,7 @@ export class MailingService implements IMailingService {
         fromField = this.getDefaultFrom()
       }
 
-      const mailOptions = {
+      let mailOptions: any = {
         from: fromField,
         to: email.to,
         cc: email.cc || undefined,
@@ -279,6 +279,16 @@ export class MailingService implements IMailingService {
         subject: email.subject,
         html: email.html,
         text: email.text || undefined,
+      }
+
+      // Call beforeSend hook if configured
+      if (this.config.beforeSend) {
+        try {
+          mailOptions = await this.config.beforeSend(mailOptions, email)
+        } catch (error) {
+          console.error('Error in beforeSend hook:', error)
+          throw new Error(`beforeSend hook failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
       }
 
       await this.transporter.sendMail(mailOptions)
