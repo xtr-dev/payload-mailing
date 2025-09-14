@@ -466,65 +466,31 @@ The task can also be triggered from the Payload admin panel with a user-friendly
 
 ### Workflow Integration
 
-The plugin also provides a workflow for sending emails with advanced features:
+For advanced features, use the workflow instead:
 
 ```typescript
 import { sendEmailWorkflow } from '@xtr-dev/payload-mailing'
 
 export default buildConfig({
-  // ... your config
   jobs: {
-    workflows: [
-      sendEmailWorkflow,
-      // ... your other workflows
-    ]
+    workflows: [sendEmailWorkflow]
   }
 })
 ```
 
-### Workflow Features
-
-- **Immediate Processing**: Option to send emails immediately instead of queuing
-- **Admin UI**: Rich form interface with conditional fields
-- **Status Tracking**: Track workflow execution progress
-- **Template or Direct**: Support for both template-based and direct HTML emails
-
-### Using the Workflow
+**Key advantage**: Optional `processImmediately` option to send emails instantly instead of queuing.
 
 ```typescript
-// Queue a workflow with immediate processing
 await payload.workflows.queue({
   workflow: 'send-email',
   input: {
-    processImmediately: true, // Send immediately
+    processImmediately: true, // Send immediately (default: false)
     templateSlug: 'welcome-email',
     to: ['user@example.com'],
-    variables: { name: 'John Doe' }
-  }
-})
-
-// Queue normally (processed by background job)
-await payload.workflows.queue({
-  workflow: 'send-email',
-  input: {
-    processImmediately: false, // Default: false
-    subject: 'Direct Email',
-    html: '<h1>Hello World!</h1>',
-    to: ['user@example.com']
+    variables: { name: 'John' }
   }
 })
 ```
-
-### Workflow vs Task Comparison
-
-| Feature | Task | Workflow |
-|---------|------|----------|
-| Admin UI | Basic form | Rich form with conditions |
-| Immediate Processing | ❌ | ✅ (optional) |
-| Status Tracking | Basic | Detailed with progress |
-| Template Support | ✅ | ✅ |
-| Direct HTML Support | ✅ | ✅ |
-| Background Processing | ✅ | ✅ |
 
 ## Job Processing
 
