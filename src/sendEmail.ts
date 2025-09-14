@@ -149,10 +149,6 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
     }
 
-    // Wait a bit for hooks to complete and populate the job relationship
-    // This is necessary because hooks might run asynchronously
-    await new Promise(resolve => setTimeout(resolve, 100))
-
     // Refetch the email to get the populated jobs relationship
     const emailWithJobs = await payload.findByID({
       collection: collectionSlug,

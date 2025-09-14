@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from '../utils/jobScheduler.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
@@ -201,19 +202,7 @@ const Emails: CollectionConfig = {
           // For updates where we need to check existing jobs, we need the document ID
           if (originalDoc?.id) {
             try {
-              // Check if a processing job already exists for this email
-              const existingJobs = await req.payload.find({
-                collection: 'payload-jobs',
-                where: {
-                  'input.emailId': {
-                    equals: String(originalDoc.id),
-                  },
-                  task: {
-                    equals: 'process-email',
-                  },
-                },
-                limit: 10,
-              })
+              const existingJobs = await findExistingJobs(req.payload, originalDoc.id)
 
               if (existingJobs.totalDocs > 0) {
                 // Add existing jobs to the relationship
@@ -245,48 +234,17 @@ const Emails: CollectionConfig = {
         }
 
         try {
-          // Check if a processing job already exists for this email
-          const existingJobs = await req.payload.find({
-            collection: 'payload-jobs',
-            where: {
-              'input.emailId': {
-                equals: String(doc.id),
-              },
-              task: {
-                equals: 'process-email',
-              },
-            },
-            limit: 1,
+          // Ensure a job exists for this email (will check for existing ones first)
+          const result = await ensureEmailJob(req.payload, doc.id, {
+            scheduledAt: doc.scheduledAt,
           })
 
-          // If no job exists, create one and add it to the relationship
-          if (existingJobs.totalDocs === 0) {
-            const mailingContext = (req.payload as any).mailing
-            const queueName = mailingContext?.config?.queue || 'default'
-
-            const job = await req.payload.jobs.queue({
-              queue: queueName,
-              task: 'process-email',
-              input: {
-                emailId: String(doc.id)
-              },
-              // If scheduled, set the waitUntil date
-              waitUntil: doc.scheduledAt ? new Date(doc.scheduledAt) : undefined
-            })
-
-            // Update the email document to include the job in the relationship
-            await req.payload.update({
-              collection: 'emails',
-              id: doc.id,
-              data: {
-                jobs: [...(doc.jobs || []), job.id]
-              }
-            })
-
-            console.log(`Auto-scheduled processing job ${job.id} for email ${doc.id}`)
+          // If a new job was created or we found existing jobs, update the relationship
+          if (result.jobIds.length > 0) {
+            await updateEmailJobRelationship(req.payload, doc.id, result.jobIds, 'emails')
           }
         } catch (error) {
-          console.error(`Failed to auto-schedule job for email ${doc.id}:`, error)
+          console.error(`Failed to ensure job for email ${doc.id}:`, error)
           // Don't throw - we don't want to fail the email creation/update
         }
       }
