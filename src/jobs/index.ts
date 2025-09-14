@@ -1,4 +1,4 @@
-import { processEmailsJob } from './processEmailsJob.js'
+import { processEmailsJob } from './processEmailsTask.js'
 import { sendEmailJob } from './sendEmailTask.js'
 
 /**
@@ -10,5 +10,5 @@ export const mailingJobs = [
 ]
 
 // Re-export everything from individual job files
-export * from './processEmailsJob.js'
+export * from './processEmailsTask.js'
 export * from './sendEmailTask.js'

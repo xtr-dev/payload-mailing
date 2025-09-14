@@ -280,11 +280,7 @@ export const sendEmailWorkflow = {
       }
 
       if (error instanceof Error) {
-        // Preserve original error and stack trace
-        const wrappedError = new Error(`Failed to process email: ${error.message}`)
-        wrappedError.stack = error.stack
-        wrappedError.cause = error
-        throw wrappedError
+        throw new Error(`Failed to process email: ${error.message}`, { cause: error })
       } else {
         throw new Error(`Failed to process email: ${String(error)}`)
       }

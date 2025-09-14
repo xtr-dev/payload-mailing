@@ -2,18 +2,18 @@ import type { PayloadRequest, Payload } from 'payload'
 import type { MailingService } from '../services/MailingService.js'
 
 /**
- * Data passed to the process emails job
+ * Data passed to the process emails task
  */
-export interface ProcessEmailsJobData {
+export interface ProcessEmailsTaskData {
   // Currently no data needed - always processes both pending and failed emails
 }
 
 /**
  * Handler function for processing emails
- * Used internally by the job definition
+ * Used internally by the task definition
  */
-export const processEmailsJobHandler = async (
-  job: { data: ProcessEmailsJobData },
+export const processEmailsTaskHandler = async (
+  job: { data: ProcessEmailsTaskData },
   context: { req: PayloadRequest; mailingService: MailingService }
 ) => {
   const { mailingService } = context
@@ -35,10 +35,10 @@ export const processEmailsJobHandler = async (
 }
 
 /**
- * Job definition for processing emails
+ * Task definition for processing emails
  * This is what gets registered with Payload's job system
  */
-export const processEmailsJob = {
+export const processEmailsTask = {
   slug: 'process-emails',
   handler: async ({ job, req }: { job: any; req: any }) => {
     // Get mailing context from payload
@@ -50,8 +50,8 @@ export const processEmailsJob = {
     }
 
     // Use the existing mailing service from context
-    await processEmailsJobHandler(
-      job as { data: ProcessEmailsJobData },
+    await processEmailsTaskHandler(
+      job as { data: ProcessEmailsTaskData },
       { req, mailingService: mailingContext.service }
     )
 
@@ -62,8 +62,11 @@ export const processEmailsJob = {
       }
     }
   },
-  interfaceName: 'ProcessEmailsJob',
+  interfaceName: 'ProcessEmailsTask',
 }
+
+// For backward compatibility, export as processEmailsJob
+export const processEmailsJob = processEmailsTask
 
 /**
  * Helper function to schedule an email processing job
@@ -82,7 +85,7 @@ export const scheduleEmailsJob = async (
   try {
     await payload.jobs.queue({
       queue: queueName,
-      workflow: 'process-emails',
+      task: 'process-emails',
       input: {},
       waitUntil: delay ? new Date(Date.now() + delay) : undefined,
     } as any)
