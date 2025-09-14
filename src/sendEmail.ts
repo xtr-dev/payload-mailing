@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import { getMailing, renderTemplate, parseAndValidateEmails } from './utils/helpers.js'
+import { getMailing, renderTemplate, parseAndValidateEmails, sanitizeFromName } from './utils/helpers.js'
 import { BaseEmailDocument } from './types/index.js'
 import { processJobById } from './utils/emailProcessor.js'
 
@@ -104,15 +104,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   }
 
   // Sanitize fromName to prevent header injection
-  if (emailData.fromName) {
-    emailData.fromName = emailData.fromName
-      .trim()
-      // Remove/replace newlines and carriage returns to prevent header injection
-      .replace(/[\r\n]/g, ' ')
-      // Remove control characters (except space and printable characters)
-      .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
-      // Note: We don't escape quotes here as that's handled in MailingService
-  }
+  emailData.fromName = sanitizeFromName(emailData.fromName as string)
 
   // Normalize Date objects to ISO strings for consistent database storage
   if (emailData.scheduledAt instanceof Date) {
@@ -132,6 +124,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   }
 
   // Create the email in the collection with proper typing
+  // The hooks will automatically create and populate the job relationship
   const email = await payload.create({
     collection: collectionSlug,
     data: emailData
@@ -142,54 +135,78 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     throw new Error('Failed to create email: invalid response from database')
   }
 
-  // Create an individual job for this email
-  const queueName = options.queue || mailingConfig.queue || 'default'
-
-  if (!payload.jobs) {
-    if (options.processImmediately) {
-      throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
-    } else {
-      console.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
-      return email as TEmail
-    }
-  }
-
-  let jobId: string
-  try {
-    const job = await payload.jobs.queue({
-      queue: queueName,
-      task: 'process-email',
-      input: {
-        emailId: String(email.id)
-      },
-      // If scheduled, set the waitUntil date
-      waitUntil: emailData.scheduledAt ? new Date(emailData.scheduledAt) : undefined
-    })
-
-    jobId = String(job.id)
-  } catch (error) {
-    // Clean up the orphaned email since job creation failed
-    try {
-      await payload.delete({
-        collection: collectionSlug,
-        id: email.id
-      })
-    } catch (deleteError) {
-      console.error(`Failed to clean up orphaned email ${email.id} after job creation failure:`, deleteError)
-    }
-
-    // Throw the original job creation error
-    const errorMsg = `Failed to create processing job for email ${email.id}: ${String(error)}`
-    throw new Error(errorMsg)
-  }
-
-  // If processImmediately is true, process the job now
+  // If processImmediately is true, get the job from the relationship and process it now
   if (options.processImmediately) {
+    if (!payload.jobs) {
+      throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
+    }
+
+    // Poll for the job with optimized backoff and timeout protection
+    // This handles the async nature of hooks and ensures we wait for job creation
+    const maxAttempts = 5 // Reduced from 10 to minimize delay
+    const initialDelay = 25 // Reduced from 50ms for faster response
+    const maxTotalTime = 3000 // 3 second total timeout
+    const startTime = Date.now()
+    let jobId: string | undefined
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Check total timeout before continuing
+      if (Date.now() - startTime > maxTotalTime) {
+        throw new Error(
+          `Job polling timed out after ${maxTotalTime}ms for email ${email.id}. ` +
+          `The auto-scheduling may have failed or is taking longer than expected.`
+        )
+      }
+
+      // Calculate delay with exponential backoff (25ms, 50ms, 100ms, 200ms, 400ms)
+      // Cap at 400ms per attempt for better responsiveness
+      const delay = Math.min(initialDelay * Math.pow(2, attempt), 400)
+
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+
+      // Refetch the email to check for jobs
+      const emailWithJobs = await payload.findByID({
+        collection: collectionSlug,
+        id: email.id,
+      })
+
+      if (emailWithJobs.jobs && emailWithJobs.jobs.length > 0) {
+        // Job found! Get the first job ID (should only be one for a new email)
+        jobId = Array.isArray(emailWithJobs.jobs)
+          ? String(emailWithJobs.jobs[0])
+          : String(emailWithJobs.jobs)
+        break
+      }
+
+      // Log on later attempts to help with debugging (reduced threshold)
+      if (attempt >= 2) {
+        console.log(`Waiting for job creation for email ${email.id}, attempt ${attempt + 1}/${maxAttempts}`)
+      }
+    }
+
+    if (!jobId) {
+      // Distinguish between different failure scenarios for better error handling
+      const timeoutMsg = Date.now() - startTime >= maxTotalTime
+      const errorType = timeoutMsg ? 'POLLING_TIMEOUT' : 'JOB_NOT_FOUND'
+
+      const baseMessage = timeoutMsg
+        ? `Job polling timed out after ${maxTotalTime}ms for email ${email.id}`
+        : `No processing job found for email ${email.id} after ${maxAttempts} attempts (${Date.now() - startTime}ms)`
+
+      throw new Error(
+        `${errorType}: ${baseMessage}. ` +
+        `This indicates the email was created but job auto-scheduling failed. ` +
+        `The email exists in the database but immediate processing cannot proceed. ` +
+        `You may need to: 1) Check job queue configuration, 2) Verify database hooks are working, ` +
+        `3) Process the email later using processEmailById('${email.id}').`
+      )
+    }
+
     try {
       await processJobById(payload, jobId)
     } catch (error) {
-      // For immediate processing failures, we could consider cleanup, but the job exists and could be retried later
-      // So we'll leave the email and job in place for potential retry
       throw new Error(`Failed to process email ${email.id} immediately: ${String(error)}`)
     }
   }

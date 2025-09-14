@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from '../utils/jobScheduler.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
@@ -183,21 +184,56 @@ const Emails: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    // Simple approach: Only use afterChange hook for job management
+    // This avoids complex interaction between hooks and ensures document ID is always available
+    afterChange: [
+      async ({ doc, previousDoc, req, operation }) => {
+        // Skip if:
+        // 1. Email is not pending status
+        // 2. Jobs are not configured
+        // 3. Email already has jobs (unless status just changed to pending)
+
+        const shouldSkip =
+          doc.status !== 'pending' ||
+          !req.payload.jobs ||
+          (doc.jobs?.length > 0 && previousDoc?.status === 'pending')
+
+        if (shouldSkip) {
+          return
+        }
+
+        try {
+          // Ensure a job exists for this email
+          // This function handles:
+          // - Checking for existing jobs (duplicate prevention)
+          // - Creating new job if needed
+          // - Returning all job IDs
+          const result = await ensureEmailJob(req.payload, doc.id, {
+            scheduledAt: doc.scheduledAt,
+          })
+
+          // Update the email's job relationship if we have jobs
+          // This handles both new jobs and existing jobs that weren't in the relationship
+          if (result.jobIds.length > 0) {
+            await updateEmailJobRelationship(req.payload, doc.id, result.jobIds, 'emails')
+          }
+        } catch (error) {
+          // Log error but don't throw - we don't want to fail the email operation
+          console.error(`Failed to ensure job for email ${doc.id}:`, error)
+        }
+      }
+    ]
+  },
   timestamps: true,
-  // indexes: [
-  //   {
-  //     fields: {
-  //       status: 1,
-  //       scheduledAt: 1,
-  //     },
-  //   },
-  //   {
-  //     fields: {
-  //       priority: -1,
-  //       createdAt: 1,
-  //     },
-  //   },
-  // ],
+  indexes: [
+    {
+      fields: ['status', 'scheduledAt'],
+    },
+    {
+      fields: ['priority', 'createdAt'],
+    },
+  ],
 }
 
 export default Emails

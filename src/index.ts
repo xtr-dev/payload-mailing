@@ -26,7 +26,12 @@ export {
   processEmails,
   retryFailedEmails,
   parseAndValidateEmails,
+  sanitizeDisplayName,
+  sanitizeFromName,
 } from './utils/helpers.js'
 
 // Email processing utilities
-export { processEmailById, processAllEmails } from './utils/emailProcessor.js'
+export { processEmailById, processJobById, processAllEmails } from './utils/emailProcessor.js'
+
+// Job scheduling utilities
+export { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from './utils/jobScheduler.js'

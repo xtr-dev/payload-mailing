@@ -7,6 +7,7 @@ import {
   BaseEmail, BaseEmailTemplate, BaseEmailDocument, BaseEmailTemplateDocument
 } from '../types/index.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
+import { sanitizeDisplayName } from '../utils/helpers.js'
 
 export class MailingService implements IMailingService {
   public payload: Payload
@@ -44,17 +45,10 @@ export class MailingService implements IMailingService {
 
   /**
    * Sanitizes a display name for use in email headers to prevent header injection
-   * and ensure proper formatting
+   * Uses the centralized sanitization utility with quote escaping for headers
    */
   private sanitizeDisplayName(name: string): string {
-    return name
-      .trim()
-      // Remove/replace newlines and carriage returns to prevent header injection
-      .replace(/[\r\n]/g, ' ')
-      // Remove control characters (except space and printable characters)
-      .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
-      // Escape quotes to prevent malformed headers
-      .replace(/"/g, '\\"')
+    return sanitizeDisplayName(name, true) // escapeQuotes = true for email headers
   }
 
   /**
