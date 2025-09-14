@@ -1,6 +1,5 @@
 import { Payload } from 'payload'
 import type { CollectionConfig, RichTextField } from 'payload'
-import { Transporter } from 'nodemailer'
 
 // JSON value type that matches Payload's JSON field type
 export type JSONValue = string | number | boolean | { [k: string]: unknown } | unknown[] | null | undefined
@@ -70,7 +69,6 @@ export interface MailingPluginConfig {
   }
   defaultFrom?: string
   defaultFromName?: string
-  transport?: Transporter | MailingTransportConfig
   queue?: string
   retryAttempts?: number
   retryDelay?: number
@@ -81,17 +79,6 @@ export interface MailingPluginConfig {
   onReady?: (payload: any) => Promise<void>
   initOrder?: 'before' | 'after'
 }
-
-export interface MailingTransportConfig {
-  host: string
-  port: number
-  secure?: boolean
-  auth?: {
-    user: string
-    pass: string
-  }
-}
-
 
 export interface QueuedEmail {
   id: string

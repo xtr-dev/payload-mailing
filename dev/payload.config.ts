@@ -135,15 +135,6 @@ const buildConfigWithMemoryDB = async () => {
       mailingPlugin({
         defaultFrom: 'noreply@test.com',
         initOrder: 'after',
-        transport: {
-          host: 'localhost',
-          port: 1025, // MailHog port for dev
-          secure: false,
-          auth: {
-            user: 'test',
-            pass: 'test',
-          },
-        },
         retryAttempts: 3,
         retryDelay: 60000, // 1 minute for dev
         queue: 'email-queue',

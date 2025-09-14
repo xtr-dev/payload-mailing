@@ -1,11 +1,9 @@
 import { Payload } from 'payload'
 import { Liquid } from 'liquidjs'
-import nodemailer, { Transporter } from 'nodemailer'
 import {
   MailingPluginConfig,
   TemplateVariables,
   MailingService as IMailingService,
-  MailingTransportConfig,
   BaseEmail, BaseEmailTemplate, BaseEmailDocument, BaseEmailTemplateDocument
 } from '../types/index.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
@@ -13,11 +11,10 @@ import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richT
 export class MailingService implements IMailingService {
   public payload: Payload
   private config: MailingPluginConfig
-  private transporter!: Transporter | any
+  private emailAdapter: any
   private templatesCollection: string
   private emailsCollection: string
   private liquid: Liquid | null | false = null
-  private transporterInitialized = false
 
   constructor(payload: Payload, config: MailingPluginConfig) {
     this.payload = payload
@@ -29,34 +26,19 @@ export class MailingService implements IMailingService {
     const emailsConfig = config.collections?.emails
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
 
-    this.initializeTransporter()
-  }
-
-  private initializeTransporter(): void {
-    if (this.transporterInitialized) return
-
-    if (this.config.transport) {
-      if ('sendMail' in this.config.transport) {
-        this.transporter = this.config.transport
-      } else {
-        this.transporter = nodemailer.createTransport(this.config.transport as MailingTransportConfig)
-      }
-    } else if (this.payload.email && 'sendMail' in this.payload.email) {
-      // Use Payload's configured mailer (cast to any to handle different adapter types)
-      this.transporter = this.payload.email as any
-    } else {
-      throw new Error('Email transport configuration is required either in plugin config or Payload config')
+    // Use Payload's configured email adapter
+    if (!this.payload.email) {
+      throw new Error('Payload email configuration is required. Please configure email in your Payload config.')
     }
-
-    this.transporterInitialized = true
+    this.emailAdapter = this.payload.email
   }
 
   private ensureInitialized(): void {
     if (!this.payload || !this.payload.db) {
       throw new Error('MailingService payload not properly initialized')
     }
-    if (!this.transporterInitialized) {
-      this.initializeTransporter()
+    if (!this.emailAdapter) {
+      throw new Error('Email adapter not configured. Please ensure Payload has email configured.')
     }
   }
 
@@ -302,7 +284,8 @@ export class MailingService implements IMailingService {
         }
       }
 
-      await this.transporter.sendMail(mailOptions)
+      // Send email using Payload's email adapter
+      await this.emailAdapter.sendEmail(mailOptions)
 
       await this.payload.update({
         collection: this.emailsCollection as any,
