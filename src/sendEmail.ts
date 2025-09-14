@@ -149,20 +149,47 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
     }
 
-    // Refetch the email to get the populated jobs relationship
-    const emailWithJobs = await payload.findByID({
-      collection: collectionSlug,
-      id: email.id,
-    })
+    // Poll for the job with exponential backoff
+    // This handles the async nature of hooks and ensures we wait for job creation
+    const maxAttempts = 10
+    const initialDelay = 50 // Start with 50ms
+    let jobId: string | undefined
 
-    if (!emailWithJobs.jobs || emailWithJobs.jobs.length === 0) {
-      throw new Error(`No processing job found for email ${email.id}. The auto-scheduling may have failed.`)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Calculate delay with exponential backoff (50ms, 100ms, 200ms, 400ms...)
+      // Cap at 2 seconds per attempt
+      const delay = Math.min(initialDelay * Math.pow(2, attempt), 2000)
+
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+
+      // Refetch the email to check for jobs
+      const emailWithJobs = await payload.findByID({
+        collection: collectionSlug,
+        id: email.id,
+      })
+
+      if (emailWithJobs.jobs && emailWithJobs.jobs.length > 0) {
+        // Job found! Get the first job ID (should only be one for a new email)
+        jobId = Array.isArray(emailWithJobs.jobs)
+          ? String(emailWithJobs.jobs[0])
+          : String(emailWithJobs.jobs)
+        break
+      }
+
+      // Log on later attempts to help with debugging
+      if (attempt >= 3) {
+        console.log(`Waiting for job creation for email ${email.id}, attempt ${attempt + 1}/${maxAttempts}`)
+      }
     }
 
-    // Get the first job ID (should only be one for a new email)
-    const jobId = Array.isArray(emailWithJobs.jobs)
-      ? String(emailWithJobs.jobs[0])
-      : String(emailWithJobs.jobs)
+    if (!jobId) {
+      throw new Error(
+        `No processing job found for email ${email.id} after ${maxAttempts} attempts. ` +
+        `The auto-scheduling may have failed or is taking longer than expected.`
+      )
+    }
 
     try {
       await processJobById(payload, jobId)
