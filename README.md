@@ -28,26 +28,31 @@ npm install @xtr-dev/payload-mailing
 
 ## Quick Start
 
-### 1. Add the plugin to your Payload config
+### 1. Configure email in your Payload config and add the plugin
 
 ```typescript
 import { buildConfig } from 'payload/config'
 import { mailingPlugin } from '@xtr-dev/payload-mailing'
+import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 
 export default buildConfig({
   // ... your config
+  email: nodemailerAdapter({
+    defaultFromAddress: 'noreply@yoursite.com',
+    defaultFromName: 'Your Site',
+    transport: {
+      host: 'smtp.gmail.com',
+      port: 587,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    },
+  }),
   plugins: [
     mailingPlugin({
       defaultFrom: 'noreply@yoursite.com',
-      transport: {
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      },
+      defaultFromName: 'Your Site Name',
       retryAttempts: 3,
       retryDelay: 300000, // 5 minutes
       queue: 'email-queue', // optional
@@ -117,13 +122,6 @@ mailingPlugin({
   // Custom template renderer (optional)
   templateRenderer: async (template: string, variables: Record<string, any>) => {
     return yourCustomEngine.render(template, variables)
-  },
-
-  // Email transport
-  transport: {
-    host: 'smtp.gmail.com',
-    port: 587,
-    auth: { user: '...', pass: '...' }
   },
 
   // Collection names (optional)
