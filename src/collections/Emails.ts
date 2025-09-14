@@ -184,15 +184,63 @@ const Emails: CollectionConfig = {
     },
   ],
   hooks: {
+    beforeChange: [
+      async ({ data, originalDoc, req, operation }) => {
+        // Only process if this is a pending email and we have jobs configured
+        if (data.status !== 'pending' || !req.payload.jobs) {
+          return data
+        }
+
+        // For updates, check if status changed to pending or if this was already pending
+        if (operation === 'update') {
+          // If it was already pending and still pending, skip (unless jobs field is empty)
+          if (originalDoc?.status === 'pending' && data.jobs && data.jobs.length > 0) {
+            return data
+          }
+
+          // For updates where we need to check existing jobs, we need the document ID
+          if (originalDoc?.id) {
+            try {
+              // Check if a processing job already exists for this email
+              const existingJobs = await req.payload.find({
+                collection: 'payload-jobs',
+                where: {
+                  'input.emailId': {
+                    equals: String(originalDoc.id),
+                  },
+                  task: {
+                    equals: 'process-email',
+                  },
+                },
+                limit: 10,
+              })
+
+              if (existingJobs.totalDocs > 0) {
+                // Add existing jobs to the relationship
+                const existingJobIds = existingJobs.docs.map(job => job.id)
+                data.jobs = [...(data.jobs || []), ...existingJobIds.filter(id => !data.jobs?.includes(id))]
+                return data
+              }
+            } catch (error) {
+              console.error(`Failed to check existing jobs for email ${originalDoc.id}:`, error)
+            }
+          }
+        }
+
+        // For new emails or updates that need a new job, we'll create it after the document exists
+        // We'll handle this in afterChange for new documents since we need the ID
+        return data
+      }
+    ],
     afterChange: [
       async ({ doc, previousDoc, req, operation }) => {
-        // Only process if this is a pending email and we have jobs configured
+        // Only process if this is a pending email, we have jobs configured, and no job exists yet
         if (doc.status !== 'pending' || !req.payload.jobs) {
           return
         }
 
-        // Skip if this is an update and status didn't change to pending
-        if (operation === 'update' && previousDoc?.status === 'pending') {
+        // Skip if this is an update and status didn't change to pending, and jobs already exist
+        if (operation === 'update' && previousDoc?.status === 'pending' && doc.jobs && doc.jobs.length > 0) {
           return
         }
 
@@ -211,12 +259,12 @@ const Emails: CollectionConfig = {
             limit: 1,
           })
 
-          // If no job exists, create one
+          // If no job exists, create one and add it to the relationship
           if (existingJobs.totalDocs === 0) {
             const mailingContext = (req.payload as any).mailing
             const queueName = mailingContext?.config?.queue || 'default'
 
-            await req.payload.jobs.queue({
+            const job = await req.payload.jobs.queue({
               queue: queueName,
               task: 'process-email',
               input: {
@@ -226,7 +274,16 @@ const Emails: CollectionConfig = {
               waitUntil: doc.scheduledAt ? new Date(doc.scheduledAt) : undefined
             })
 
-            console.log(`Auto-scheduled processing job for email ${doc.id}`)
+            // Update the email document to include the job in the relationship
+            await req.payload.update({
+              collection: 'emails',
+              id: doc.id,
+              data: {
+                jobs: [...(doc.jobs || []), job.id]
+              }
+            })
+
+            console.log(`Auto-scheduled processing job ${job.id} for email ${doc.id}`)
           }
         } catch (error) {
           console.error(`Failed to auto-schedule job for email ${doc.id}:`, error)
