@@ -4,7 +4,6 @@ import { MailingService } from './services/MailingService.js'
 import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 import Emails from './collections/Emails.js'
 import { mailingJobs, scheduleEmailsJob } from './jobs/index.js'
-import { mailingWorkflows } from './workflows/index.js'
 
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
@@ -86,10 +85,6 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       tasks: [
         ...(config.jobs?.tasks || []),
         ...mailingJobs,
-      ],
-      workflows: [
-        ...(config.jobs?.workflows || []),
-        ...mailingWorkflows,
       ],
     },
     onInit: async (payload: any) => {
