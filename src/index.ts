@@ -26,6 +26,8 @@ export {
   processEmails,
   retryFailedEmails,
   parseAndValidateEmails,
+  sanitizeDisplayName,
+  sanitizeFromName,
 } from './utils/helpers.js'
 
 // Email processing utilities

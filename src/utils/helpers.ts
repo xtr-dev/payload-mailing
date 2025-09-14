@@ -36,6 +36,44 @@ export const parseAndValidateEmails = (emails: string | string[] | null | undefi
   return emailList
 }
 
+/**
+ * Sanitize display names to prevent email header injection
+ * Removes newlines, carriage returns, and control characters
+ * @param displayName - The display name to sanitize
+ * @param escapeQuotes - Whether to escape quotes (for email headers)
+ * @returns Sanitized display name
+ */
+export const sanitizeDisplayName = (displayName: string, escapeQuotes = false): string => {
+  if (!displayName) return displayName
+
+  let sanitized = displayName
+    .trim()
+    // Remove/replace newlines and carriage returns to prevent header injection
+    .replace(/[\r\n]/g, ' ')
+    // Remove control characters (except space and printable characters)
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+
+  // Escape quotes if needed (for email headers)
+  if (escapeQuotes) {
+    sanitized = sanitized.replace(/"/g, '\\"')
+  }
+
+  return sanitized
+}
+
+/**
+ * Sanitize and validate fromName for emails
+ * Wrapper around sanitizeDisplayName for consistent fromName handling
+ * @param fromName - The fromName to sanitize
+ * @returns Sanitized fromName or undefined if empty after sanitization
+ */
+export const sanitizeFromName = (fromName: string | null | undefined): string | undefined => {
+  if (!fromName) return undefined
+
+  const sanitized = sanitizeDisplayName(fromName, false)
+  return sanitized.length > 0 ? sanitized : undefined
+}
+
 export const getMailing = (payload: Payload) => {
   const mailing = (payload as any).mailing
   if (!mailing) {
