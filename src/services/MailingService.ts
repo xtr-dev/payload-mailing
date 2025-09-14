@@ -29,10 +29,7 @@ export class MailingService implements IMailingService {
     const emailsConfig = config.collections?.emails
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
 
-    // Only initialize transporter if payload is properly set
-    if (payload && payload.db) {
-      this.initializeTransporter()
-    }
+    this.initializeTransporter()
   }
 
   private initializeTransporter(): void {
