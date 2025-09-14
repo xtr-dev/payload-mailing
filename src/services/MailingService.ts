@@ -225,7 +225,7 @@ export class MailingService implements IMailingService {
     }
   }
 
-  private async processEmailItem(emailId: string): Promise<void> {
+  async processEmailItem(emailId: string): Promise<void> {
     try {
       await this.payload.update({
         collection: this.emailsCollection as any,
