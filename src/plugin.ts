@@ -106,12 +106,9 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
         },
       } as MailingContext
 
-      console.log('PayloadCMS Mailing Plugin initialized successfully')
-
       // Schedule the initial email processing job
       try {
         await scheduleEmailsJob(payload, queueName, 60000) // Schedule in 1 minute
-        console.log(`🔄 Scheduled initial email processing job in queue: ${queueName}`)
       } catch (error) {
         console.error('Failed to schedule email processing job:', error)
       }
