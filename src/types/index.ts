@@ -48,6 +48,21 @@ export type TemplateRendererHook = (template: string, variables: Record<string, 
 
 export type TemplateEngine = 'liquidjs' | 'mustache' | 'simple'
 
+export interface BeforeSendMailOptions {
+  from: string
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
+  replyTo?: string
+  subject: string
+  html: string
+  text?: string
+  attachments?: any[]
+  [key: string]: any
+}
+
+export type BeforeSendHook = (options: BeforeSendMailOptions, email: BaseEmailDocument) => BeforeSendMailOptions | Promise<BeforeSendMailOptions>
+
 export interface MailingPluginConfig {
   collections?: {
     templates?: string | Partial<CollectionConfig>
@@ -62,6 +77,7 @@ export interface MailingPluginConfig {
   templateRenderer?: TemplateRendererHook
   templateEngine?: TemplateEngine
   richTextEditor?: RichTextField['editor']
+  beforeSend?: BeforeSendHook
   onReady?: (payload: any) => Promise<void>
   initOrder?: 'before' | 'after'
 }

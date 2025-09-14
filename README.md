@@ -142,6 +142,18 @@ mailingPlugin({
   richTextEditor: lexicalEditor(),  // optional custom editor
   onReady: async (payload) => {     // optional initialization hook
     console.log('Mailing plugin ready!')
+  },
+
+  // beforeSend hook - modify emails before sending
+  beforeSend: async (options, email) => {
+    // Add attachments, modify headers, etc.
+    options.attachments = [
+      { filename: 'invoice.pdf', content: pdfBuffer }
+    ]
+    options.headers = {
+      'X-Campaign-ID': email.campaignId
+    }
+    return options
   }
 })
 ```
@@ -255,6 +267,56 @@ mailingPlugin({
 })
 ```
 
+### beforeSend Hook
+
+Modify emails before they are sent to add attachments, custom headers, or make other changes:
+
+```typescript
+mailingPlugin({
+  // ... other config
+  beforeSend: async (options, email) => {
+    // Add attachments dynamically
+    if (email.invoiceId) {
+      const invoice = await generateInvoicePDF(email.invoiceId)
+      options.attachments = [
+        {
+          filename: `invoice-${email.invoiceId}.pdf`,
+          content: invoice.buffer,
+          contentType: 'application/pdf'
+        }
+      ]
+    }
+
+    // Add custom headers
+    options.headers = {
+      'X-Campaign-ID': email.campaignId,
+      'X-Customer-ID': email.customerId,
+      'X-Priority': email.priority === 1 ? 'High' : 'Normal'
+    }
+
+    // Modify recipients based on conditions
+    if (process.env.NODE_ENV === 'development') {
+      // Redirect all emails to test address in dev
+      options.to = ['test@example.com']
+      options.subject = `[TEST] ${options.subject}`
+    }
+
+    // Add BCC for compliance
+    if (email.requiresAudit) {
+      options.bcc = ['audit@company.com']
+    }
+
+    return options
+  }
+})
+```
+
+The `beforeSend` hook receives:
+- `options`: The nodemailer mail options that will be sent
+- `email`: The full email document from the database
+
+You must return the modified options object.
+
 ### Initialization Hooks
 
 Control plugin initialization order and add post-initialization logic:
@@ -266,7 +328,7 @@ mailingPlugin({
   onReady: async (payload) => {
     // Called after plugin is fully initialized
     console.log('Mailing plugin ready!')
-    
+
     // Custom initialization logic here
     await setupCustomEmailSettings(payload)
   }

@@ -249,6 +249,10 @@ export interface Email {
    */
   from?: string | null;
   /**
+   * Sender display name (optional, e.g., "John Doe" for "John Doe <john@example.com>")
+   */
+  fromName?: string | null;
+  /**
    * Reply-to email address
    */
   replyTo?: string | null;
@@ -543,6 +547,7 @@ export interface EmailsSelect<T extends boolean = true> {
   cc?: T;
   bcc?: T;
   from?: T;
+  fromName?: T;
   replyTo?: T;
   subject?: T;
   html?: T;
@@ -676,6 +681,18 @@ export interface TaskSendEmail {
      */
     bcc?: string | null;
     /**
+     * Optional sender email address (uses default if not provided)
+     */
+    from?: string | null;
+    /**
+     * Optional sender display name (e.g., "John Doe")
+     */
+    fromName?: string | null;
+    /**
+     * Optional reply-to email address
+     */
+    replyTo?: string | null;
+    /**
      * Optional date/time to schedule email for future delivery
      */
     scheduledAt?: string | null;
@@ -684,7 +701,9 @@ export interface TaskSendEmail {
      */
     priority?: number | null;
   };
-  output?: unknown;
+  output: {
+    id?: string | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
