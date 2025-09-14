@@ -380,7 +380,16 @@ await processEmails(payload)
 await retryFailedEmails(payload)
 ```
 
-## PayloadCMS Task Integration
+## PayloadCMS Integration
+
+The plugin provides both tasks and workflows for email processing:
+
+### Tasks vs Workflows
+
+- **Tasks**: Simple job execution, good for background processing
+- **Workflows**: More advanced with UI, status tracking, and immediate processing options
+
+### Task Integration
 
 The plugin provides a ready-to-use PayloadCMS task for queuing template emails:
 
@@ -454,6 +463,68 @@ The task can also be triggered from the Payload admin panel with a user-friendly
 - ✅ **Flexible**: Supports all your custom email collection fields
 - ✅ **Error Handling**: Comprehensive error reporting
 - ✅ **Queue Management**: Leverage Payload's job queue system
+
+### Workflow Integration
+
+The plugin also provides a workflow for sending emails with advanced features:
+
+```typescript
+import { sendEmailWorkflow } from '@xtr-dev/payload-mailing'
+
+export default buildConfig({
+  // ... your config
+  jobs: {
+    workflows: [
+      sendEmailWorkflow,
+      // ... your other workflows
+    ]
+  }
+})
+```
+
+### Workflow Features
+
+- **Immediate Processing**: Option to send emails immediately instead of queuing
+- **Admin UI**: Rich form interface with conditional fields
+- **Status Tracking**: Track workflow execution progress
+- **Template or Direct**: Support for both template-based and direct HTML emails
+
+### Using the Workflow
+
+```typescript
+// Queue a workflow with immediate processing
+await payload.workflows.queue({
+  workflow: 'send-email',
+  input: {
+    processImmediately: true, // Send immediately
+    templateSlug: 'welcome-email',
+    to: ['user@example.com'],
+    variables: { name: 'John Doe' }
+  }
+})
+
+// Queue normally (processed by background job)
+await payload.workflows.queue({
+  workflow: 'send-email',
+  input: {
+    processImmediately: false, // Default: false
+    subject: 'Direct Email',
+    html: '<h1>Hello World!</h1>',
+    to: ['user@example.com']
+  }
+})
+```
+
+### Workflow vs Task Comparison
+
+| Feature | Task | Workflow |
+|---------|------|----------|
+| Admin UI | Basic form | Rich form with conditions |
+| Immediate Processing | ❌ | ✅ (optional) |
+| Status Tracking | Basic | Detailed with progress |
+| Template Support | ✅ | ✅ |
+| Direct HTML Support | ✅ | ✅ |
+| Background Processing | ✅ | ✅ |
 
 ## Job Processing
 

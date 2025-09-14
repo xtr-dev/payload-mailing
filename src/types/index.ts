@@ -111,6 +111,7 @@ export interface TemplateVariables {
 
 export interface MailingService {
   processEmails(): Promise<void>
+  processEmailItem(emailId: string): Promise<void>
   retryFailedEmails(): Promise<void>
   renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; text: string; subject: string }>
 }
