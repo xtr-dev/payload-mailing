@@ -8,6 +8,22 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { type = 'send', templateSlug, to, variables, scheduledAt, subject, html, text } = body
 
+    // Validate required fields
+    if (!to) {
+      return Response.json(
+        { error: 'Recipient email address (to) is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate email has either template or direct content
+    if (!templateSlug && (!subject || !html)) {
+      return Response.json(
+        { error: 'Either templateSlug or both subject and html must be provided' },
+        { status: 400 }
+      )
+    }
+
     // Use the new sendEmail API
     const emailOptions: any = {
       data: {
@@ -105,8 +121,8 @@ export async function GET() {
         total: totalDocs,
       },
       mailing: {
-        pluginActive: !!(payload as any).mailing,
-        service: !!(payload as any).mailing?.service,
+        pluginActive: 'mailing' in payload && !!payload.mailing,
+        service: 'mailing' in payload && payload.mailing && 'service' in payload.mailing && !!payload.mailing.service,
       },
     })
   } catch (error) {
