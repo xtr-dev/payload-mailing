@@ -187,9 +187,20 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     }
 
     if (!jobId) {
+      // Distinguish between different failure scenarios for better error handling
+      const timeoutMsg = Date.now() - startTime >= maxTotalTime
+      const errorType = timeoutMsg ? 'POLLING_TIMEOUT' : 'JOB_NOT_FOUND'
+
+      const baseMessage = timeoutMsg
+        ? `Job polling timed out after ${maxTotalTime}ms for email ${email.id}`
+        : `No processing job found for email ${email.id} after ${maxAttempts} attempts (${Date.now() - startTime}ms)`
+
       throw new Error(
-        `No processing job found for email ${email.id} after ${maxAttempts} attempts (${Date.now() - startTime}ms). ` +
-        `The auto-scheduling may have failed or is taking longer than expected.`
+        `${errorType}: ${baseMessage}. ` +
+        `This indicates the email was created but job auto-scheduling failed. ` +
+        `The email exists in the database but immediate processing cannot proceed. ` +
+        `You may need to: 1) Check job queue configuration, 2) Verify database hooks are working, ` +
+        `3) Process the email later using processEmailById('${email.id}').`
       )
     }
 

@@ -47,74 +47,60 @@ export async function ensureEmailJob(
   const mailingContext = (payload as any).mailing
   const queueName = options?.queueName || mailingContext?.config?.queue || 'default'
 
-  // Implement atomic check-and-create with minimal retry for efficiency
-  const maxAttempts = 3 // Reduced from 5 for better performance
-  const baseDelay = 50 // Reduced from 100ms for faster response
+  // First, optimistically try to create the job
+  // If it fails due to uniqueness constraint, then check for existing jobs
+  // This approach minimizes the race condition window
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Check for existing jobs with precise matching
+  try {
+    // Attempt to create job - rely on database constraints for duplicate prevention
+    const job = await payload.jobs.queue({
+      queue: queueName,
+      task: 'process-email',
+      input: {
+        emailId: normalizedEmailId
+      },
+      waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
+    })
+
+    console.log(`Auto-scheduled processing job ${job.id} for email ${normalizedEmailId}`)
+
+    return {
+      jobIds: [job.id],
+      created: true
+    }
+  } catch (createError) {
+    // Job creation failed - likely due to duplicate constraint or system issue
+
+    // Check if duplicate jobs exist (handles race condition where another process created job)
     const existingJobs = await findExistingJobs(payload, normalizedEmailId)
 
     if (existingJobs.totalDocs > 0) {
-      // Job already exists - return existing job IDs
+      // Found existing jobs - return them (race condition handled successfully)
+      console.log(`Found existing jobs for email ${normalizedEmailId}: ${existingJobs.docs.map(j => j.id).join(', ')}`)
       return {
         jobIds: existingJobs.docs.map(job => job.id),
         created: false
       }
     }
 
-    try {
-      // Attempt to create job - rely on database constraints for duplicate prevention
-      const job = await payload.jobs.queue({
-        queue: queueName,
-        task: 'process-email',
-        input: {
-          emailId: normalizedEmailId
-        },
-        waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
-      })
+    // No existing jobs found - this is a genuine error
+    // Enhanced error context for better debugging
+    const errorMessage = String(createError)
+    const isLikelyUniqueConstraint = errorMessage.toLowerCase().includes('duplicate') ||
+                                     errorMessage.toLowerCase().includes('unique') ||
+                                     errorMessage.toLowerCase().includes('constraint')
 
-      console.log(`Auto-scheduled processing job ${job.id} for email ${normalizedEmailId}`)
-
-      return {
-        jobIds: [job.id],
-        created: true
-      }
-    } catch (error) {
-      // On any creation error, wait briefly and check again for concurrent creation
-      if (attempt < maxAttempts - 1) {
-        const delay = Math.min(baseDelay * Math.pow(1.5, attempt), 200) // Gentler exponential backoff, capped at 200ms
-        await new Promise(resolve => setTimeout(resolve, delay))
-
-        // Check if another process succeeded while we were failing
-        const recheckJobs = await findExistingJobs(payload, normalizedEmailId)
-        if (recheckJobs.totalDocs > 0) {
-          return {
-            jobIds: recheckJobs.docs.map(job => job.id),
-            created: false
-          }
-        }
-
-        // Continue to next attempt
-        continue
-      }
-
-      // Final attempt failed - perform one last check before throwing
-      const finalCheckJobs = await findExistingJobs(payload, normalizedEmailId)
-      if (finalCheckJobs.totalDocs > 0) {
-        return {
-          jobIds: finalCheckJobs.docs.map(job => job.id),
-          created: false
-        }
-      }
-
-      // No concurrent job found - this is a real error
-      throw new Error(`Failed to create job for email ${normalizedEmailId} after ${maxAttempts} attempts: ${String(error)}`)
+    if (isLikelyUniqueConstraint) {
+      // This should not happen if our check above worked, but provide a clear error
+      throw new Error(
+        `Database uniqueness constraint violation for email ${normalizedEmailId}, but no existing jobs found. ` +
+        `This indicates a potential data consistency issue. Original error: ${errorMessage}`
+      )
     }
-  }
 
-  // This should never be reached, but TypeScript requires it
-  throw new Error(`Unexpected error in ensureEmailJob after ${maxAttempts} attempts`)
+    // Non-constraint related error
+    throw new Error(`Failed to create job for email ${normalizedEmailId}: ${errorMessage}`)
+  }
 }
 
 /**
