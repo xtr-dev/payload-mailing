@@ -3,7 +3,7 @@ import { MailingPluginConfig, MailingContext } from './types/index.js'
 import { MailingService } from './services/MailingService.js'
 import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 import Emails from './collections/Emails.js'
-import { mailingJobs, scheduleEmailsJob } from './jobs/index.js'
+import { mailingJobs } from './jobs/index.js'
 
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
@@ -106,12 +106,6 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
         },
       } as MailingContext
 
-      // Schedule the initial email processing job
-      try {
-        await scheduleEmailsJob(payload, queueName, 60000) // Schedule in 1 minute
-      } catch (error) {
-        console.error('Failed to schedule email processing job:', error)
-      }
 
       // Call onReady callback if provided
       if (pluginConfig.onReady) {
