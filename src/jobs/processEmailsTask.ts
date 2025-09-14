@@ -1,5 +1,5 @@
 import type { PayloadRequest, Payload } from 'payload'
-import type { MailingService } from '../services/MailingService.js'
+import { processAllEmails } from '../utils/emailProcessor.js'
 
 /**
  * Data passed to the process emails task
@@ -14,18 +14,16 @@ export interface ProcessEmailsTaskData {
  */
 export const processEmailsTaskHandler = async (
   job: { data: ProcessEmailsTaskData },
-  context: { req: PayloadRequest; mailingService: MailingService }
+  context: { req: PayloadRequest }
 ) => {
-  const { mailingService } = context
+  const { req } = context
+  const payload = (req as any).payload
 
   try {
     console.log('🔄 Processing email queue (pending + failed emails)...')
 
-    // Process pending emails first
-    await mailingService.processEmails()
-
-    // Then retry failed emails
-    await mailingService.retryFailedEmails()
+    // Use the shared email processing logic
+    await processAllEmails(payload)
 
     console.log('✅ Email queue processing completed successfully')
   } catch (error) {
@@ -49,10 +47,10 @@ export const processEmailsTask = {
       throw new Error('Mailing plugin not properly initialized')
     }
 
-    // Use the existing mailing service from context
+    // Use the task handler
     await processEmailsTaskHandler(
       job as { data: ProcessEmailsTaskData },
-      { req, mailingService: mailingContext.service }
+      { req }
     )
 
     return {

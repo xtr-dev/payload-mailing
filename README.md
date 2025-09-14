@@ -382,16 +382,7 @@ await retryFailedEmails(payload)
 
 ## PayloadCMS Integration
 
-The plugin provides both tasks and workflows for email processing:
-
-### Tasks vs Workflows
-
-- **Tasks**: Simple job execution, good for background processing
-- **Workflows**: More advanced with UI, status tracking, and immediate processing options
-
-### Task Integration
-
-The plugin provides a ready-to-use PayloadCMS task for queuing template emails:
+The plugin provides PayloadCMS tasks for email processing:
 
 ### 1. Add the task to your Payload config
 
@@ -464,25 +455,13 @@ The task can also be triggered from the Payload admin panel with a user-friendly
 - ✅ **Error Handling**: Comprehensive error reporting
 - ✅ **Queue Management**: Leverage Payload's job queue system
 
-### Workflow Integration
+### Immediate Processing
 
-For advanced features, use the workflow instead:
-
-```typescript
-import { sendEmailWorkflow } from '@xtr-dev/payload-mailing'
-
-export default buildConfig({
-  jobs: {
-    workflows: [sendEmailWorkflow]
-  }
-})
-```
-
-**Key advantage**: Optional `processImmediately` option to send emails instantly instead of queuing.
+The send email task now supports immediate processing. Enable the `processImmediately` option to send emails instantly:
 
 ```typescript
-await payload.workflows.queue({
-  workflow: 'send-email',
+await payload.jobs.queue({
+  task: 'send-email',
   input: {
     processImmediately: true, // Send immediately (default: false)
     templateSlug: 'welcome-email',
@@ -491,6 +470,11 @@ await payload.workflows.queue({
   }
 })
 ```
+
+**Benefits**:
+- No separate workflow needed
+- Unified task interface
+- Optional immediate processing when needed
 
 ## Job Processing
 

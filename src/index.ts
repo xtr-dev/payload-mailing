@@ -15,10 +15,6 @@ export { default as Emails } from './collections/Emails.js'
 export { mailingJobs, sendEmailJob } from './jobs/index.js'
 export type { SendEmailTaskInput } from './jobs/sendEmailTask.js'
 
-// Workflows (includes the send email workflow)
-export { mailingWorkflows, sendEmailWorkflow } from './workflows/index.js'
-export type { SendEmailWorkflowInput } from './workflows/sendEmailWorkflow.js'
-
 // Main email sending function
 export { sendEmail, type SendEmailOptions } from './sendEmail.js'
 export { default as sendEmailDefault } from './sendEmail.js'
@@ -31,3 +27,6 @@ export {
   retryFailedEmails,
   parseAndValidateEmails,
 } from './utils/helpers.js'
+
+// Email processing utilities
+export { processEmailById, processAllEmails } from './utils/emailProcessor.js'
