@@ -168,13 +168,19 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     jobId = String(job.id)
   } catch (error) {
-    if (options.processImmediately) {
-      // If immediate processing was requested, job creation failure is critical
-      throw new Error(`Failed to create job for immediate processing of email ${email.id}: ${error instanceof Error ? error.message : String(error)}`)
-    } else {
-      // For regular queued emails, job creation failure is still critical
-      throw new Error(`Failed to create processing job for email ${email.id}: ${error instanceof Error ? error.message : String(error)}`)
+    // Clean up the orphaned email since job creation failed
+    try {
+      await payload.delete({
+        collection: collectionSlug,
+        id: email.id
+      })
+    } catch (deleteError) {
+      console.error(`Failed to clean up orphaned email ${email.id} after job creation failure:`, deleteError)
     }
+
+    // Throw the original job creation error
+    const errorMsg = `Failed to create processing job for email ${email.id}: ${String(error)}`
+    throw new Error(errorMsg)
   }
 
   // If processImmediately is true, process the job now
@@ -182,7 +188,9 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     try {
       await processJobById(payload, jobId)
     } catch (error) {
-      throw new Error(`Failed to process email ${email.id} immediately: ${error instanceof Error ? error.message : String(error)}`)
+      // For immediate processing failures, we could consider cleanup, but the job exists and could be retried later
+      // So we'll leave the email and job in place for potential retry
+      throw new Error(`Failed to process email ${email.id} immediately: ${String(error)}`)
     }
   }
 

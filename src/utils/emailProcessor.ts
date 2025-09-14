@@ -50,7 +50,7 @@ export async function processJobById(payload: Payload, jobId: string): Promise<v
       }
     })
   } catch (error) {
-    throw new Error(`Failed to process job ${jobId}: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(`Failed to process job ${jobId}: ${String(error)}`)
   }
 }
 

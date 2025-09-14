@@ -4,7 +4,7 @@ const Emails: CollectionConfig = {
   slug: 'emails',
   admin: {
     useAsTitle: 'subject',
-    defaultColumns: ['subject', 'to', 'status', 'scheduledAt', 'sentAt'],
+    defaultColumns: ['subject', 'to', 'status', 'jobs', 'scheduledAt', 'sentAt'],
     group: 'Mailing',
     description: 'Email delivery and status tracking',
   },
@@ -162,6 +162,24 @@ const Emails: CollectionConfig = {
       defaultValue: 5,
       admin: {
         description: 'Email priority (1=highest, 10=lowest)',
+      },
+    },
+    {
+      name: 'jobs',
+      type: 'relationship',
+      relationTo: 'payload-jobs',
+      hasMany: true,
+      admin: {
+        description: 'Processing jobs associated with this email',
+        allowCreate: false,
+        readOnly: true,
+      },
+      filterOptions: ({ id }) => {
+        return {
+          'input.emailId': {
+            equals: id,
+          },
+        }
       },
     },
   ],
