@@ -106,8 +106,6 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
         },
       } as MailingContext
 
-
-
       if (pluginConfig.initOrder !== 'after' && config.onInit) {
         await config.onInit(payload)
       }
