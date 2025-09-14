@@ -1,37 +1,32 @@
 # @xtr-dev/payload-mailing
 
-📧 **Template-based email system with scheduling and job processing for PayloadCMS**
+A template-based email system with scheduling and job processing for PayloadCMS 3.x.
 
 ⚠️ **Pre-release Warning**: This package is currently in active development (v0.0.x). Breaking changes may occur before v1.0.0. Not recommended for production use.
 
 ## Features
 
-✅ **Template System**: Create reusable email templates with LiquidJS, Mustache, or simple variables
-
-✅ **Type Safety**: Full TypeScript support using your generated Payload types
-
-✅ **Flexible Template Engines**: LiquidJS, Mustache, or bring your own template renderer
-
-✅ **Email Scheduling**: Schedule emails for future delivery using Payload collections
-
-✅ **Job Integration**: Automatic processing via PayloadCMS jobs queue
-
-✅ **Retry Failed Sends**: Automatic retry mechanism for failed emails
-
-✅ **Payload Native**: Uses Payload collections directly - no custom APIs to learn
+- 📧 Template-based emails with LiquidJS, Mustache, or custom engines
+- ⏰ Email scheduling for future delivery
+- 🔄 Automatic retry mechanism for failed sends
+- 🎯 Full TypeScript support with generated Payload types
+- 📋 Job queue integration via PayloadCMS
+- 🔧 Uses Payload collections directly - no custom APIs
 
 ## Installation
 
 ```bash
 npm install @xtr-dev/payload-mailing
+# or
+pnpm add @xtr-dev/payload-mailing
+# or
+yarn add @xtr-dev/payload-mailing
 ```
 
 ## Quick Start
 
-### 1. Configure email in your Payload config and add the plugin
-
 ```typescript
-import { buildConfig } from 'payload/config'
+import { buildConfig } from 'payload'
 import { mailingPlugin } from '@xtr-dev/payload-mailing'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 
@@ -55,59 +50,164 @@ export default buildConfig({
       defaultFromName: 'Your Site Name',
       retryAttempts: 3,
       retryDelay: 300000, // 5 minutes
-      queue: 'email-queue', // optional
     }),
   ],
 })
 ```
 
-### 2. Send emails with type-safe helper
+## Imports
 
 ```typescript
-// sendEmail is a primary export for easy access
-import { sendEmail } from '@xtr-dev/payload-mailing'
-import { Email } from './payload-types' // Your generated types
+// Main plugin
+import { mailingPlugin } from '@xtr-dev/payload-mailing'
 
-// Option 1: Using templates with full type safety
-const email = await sendEmail<Email>(payload, {
+// Helper functions
+import { sendEmail, renderTemplate, processEmails } from '@xtr-dev/payload-mailing'
+
+// Job tasks
+import { sendTemplateEmailTask } from '@xtr-dev/payload-mailing'
+
+// Types
+import type { MailingPluginConfig, SendEmailOptions } from '@xtr-dev/payload-mailing'
+```
+
+## Usage
+
+```typescript
+import { sendEmail } from '@xtr-dev/payload-mailing'
+
+// Using templates
+const email = await sendEmail(payload, {
   template: {
     slug: 'welcome-email',
-    variables: {
-      firstName: 'John',
-      welcomeUrl: 'https://yoursite.com/welcome'
-    }
+    variables: { firstName: 'John', welcomeUrl: 'https://example.com' }
   },
   data: {
     to: 'user@example.com',
-    // Schedule for later (optional)
-    scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    priority: 1,
-    // Your custom fields are type-safe!
-    customField: 'your-value',
+    scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Schedule for later
+    priority: 1
   }
 })
 
-// Option 2: Direct HTML email (no template)
-const directEmail = await sendEmail<Email>(payload, {
-  data: {
-    to: ['user@example.com', 'another@example.com'],
-    subject: 'Welcome!',
-    html: '<h1>Welcome John!</h1><p>Thanks for joining!</p>',
-    text: 'Welcome John! Thanks for joining!',
-    // All your custom fields work with TypeScript autocomplete!
-    customField: 'value',
-  }
-})
-
-// Option 3: Use payload.create() directly for full control
-const manualEmail = await payload.create({
+// Direct email
+const directEmail = await payload.create({
   collection: 'emails',
   data: {
     to: ['user@example.com'],
-    subject: 'Hello',
-    html: '<p>Hello World</p>',
+    subject: 'Welcome!',
+    html: '<h1>Welcome!</h1>',
+    text: 'Welcome!'
   }
 })
+```
+
+## Template Engines
+
+### LiquidJS (Default)
+Modern template syntax with logic support:
+```liquid
+{% if user.isPremium %}
+  Welcome Premium Member {{user.name}}!
+{% else %}
+  Welcome {{user.name}}!
+{% endif %}
+```
+
+### Mustache
+Logic-less templates:
+```mustache
+{{#user.isPremium}}
+  Welcome Premium Member {{user.name}}!
+{{/user.isPremium}}
+{{^user.isPremium}}
+  Welcome {{user.name}}!
+{{/user.isPremium}}
+```
+
+### Simple Variables
+Basic `{{variable}}` replacement:
+```text
+Welcome {{user.name}}! Your account expires on {{expireDate}}.
+```
+
+### Custom Renderer
+Bring your own template engine:
+```typescript
+mailingPlugin({
+  templateRenderer: async (template, variables) => {
+    return handlebars.compile(template)(variables)
+  }
+})
+```
+
+## Templates
+
+Use `{{}}` to insert data in templates:
+
+- `{{user.name}}` - User data from variables
+- `{{formatDate createdAt "short"}}` - Built-in date formatting
+- `{{formatCurrency amount "USD"}}` - Currency formatting
+
+### Template Structure
+
+Templates include both subject and body content:
+
+```liquid
+<!-- Subject Template -->
+Welcome {{user.name}} to {{siteName}}!
+
+<!-- Body Template -->
+# Hello {{user.name}}! 👋
+
+{% if user.isPremium %}
+**Welcome Premium Member!**
+
+Your premium features are now active:
+- Priority support
+- Advanced analytics
+- Custom integrations
+{% else %}
+Welcome to {{siteName}}!
+
+**Ready to get started?**
+- Complete your profile
+- Explore our features
+- [Upgrade to Premium]({{upgradeUrl}})
+{% endif %}
+
+---
+**Account Details:**
+- Created: {{formatDate user.createdAt "long"}}
+- Email: {{user.email}}
+- Plan: {{user.plan | capitalize}}
+
+Need help? Reply to this email or visit our [help center]({{helpUrl}}).
+
+Best regards,
+The {{siteName}} Team
+```
+
+### Example Usage
+
+```typescript
+// Create template in admin panel, then use:
+const { html, text, subject } = await renderTemplate(payload, 'welcome-email', {
+  user: {
+    name: 'John Doe',
+    email: 'john@example.com',
+    isPremium: false,
+    plan: 'free',
+    createdAt: new Date()
+  },
+  siteName: 'MyApp',
+  upgradeUrl: 'https://myapp.com/upgrade',
+  helpUrl: 'https://myapp.com/help'
+})
+
+// Results in:
+// subject: "Welcome John Doe to MyApp!"
+// html: "<h1>Hello John Doe! 👋</h1><p>Welcome to MyApp!</p>..."
+// text: "Hello John Doe! Welcome to MyApp! Ready to get started?..."
 ```
 
 ## Configuration
@@ -116,314 +216,115 @@ const manualEmail = await payload.create({
 
 ```typescript
 mailingPlugin({
-  // Template engine (optional)
+  // Template engine
   templateEngine: 'liquidjs',  // 'liquidjs' | 'mustache' | 'simple'
 
-  // Custom template renderer (optional)
+  // Custom template renderer
   templateRenderer: async (template: string, variables: Record<string, any>) => {
     return yourCustomEngine.render(template, variables)
   },
 
-  // Collection names (optional)
-  collections: {
-    templates: 'email-templates',  // default
-    emails: 'emails'              // default
-  },
-
-  // Sending options
+  // Email settings
   defaultFrom: 'noreply@yoursite.com',
   defaultFromName: 'Your Site',
-  retryAttempts: 3,              // default
-  retryDelay: 300000,            // 5 minutes (default)
+  retryAttempts: 3,              // Number of retry attempts
+  retryDelay: 300000,            // 5 minutes between retries
 
-  // Advanced options
-  richTextEditor: lexicalEditor(),  // optional custom editor
-  onReady: async (payload) => {     // optional initialization hook
-    console.log('Mailing plugin ready!')
+  // Collection customization
+  collections: {
+    templates: 'email-templates', // Custom collection name
+    emails: 'emails'             // Custom collection name
   },
 
-  // beforeSend hook - modify emails before sending
+  // Hooks
   beforeSend: async (options, email) => {
-    // Add attachments, modify headers, etc.
-    options.attachments = [
-      { filename: 'invoice.pdf', content: pdfBuffer }
-    ]
-    options.headers = {
-      'X-Campaign-ID': email.campaignId
-    }
+    // Modify email before sending
+    options.headers = { 'X-Campaign-ID': email.campaignId }
     return options
+  },
+
+  onReady: async (payload) => {
+    // Plugin initialization complete
+    console.log('Mailing plugin ready!')
   }
 })
 ```
 
-### Template Engine Options
+### Collection Overrides
 
-Choose your preferred template engine:
-
-```typescript
-// LiquidJS (default) - Modern syntax with logic
-mailingPlugin({
-  templateEngine: 'liquidjs'  // {% if user.isPremium %}Premium!{% endif %}
-})
-
-// Mustache - Logic-less templates
-mailingPlugin({
-  templateEngine: 'mustache'  // {{#user.isPremium}}Premium!{{/user.isPremium}}
-})
-
-// Simple variable replacement
-mailingPlugin({
-  templateEngine: 'simple'    // Just {{variable}} replacement
-})
-
-// Custom template renderer
-mailingPlugin({
-  templateRenderer: async (template, variables) => {
-    return handlebars.compile(template)(variables)  // Bring your own!
-  }
-})
-```
-
-### Transport Configuration
-
-You can provide either a Nodemailer transporter instance or configuration:
-
-```typescript
-// Using configuration object
-{
-  transport: {
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  }
-}
-
-// Or using a transporter instance
-import nodemailer from 'nodemailer'
-{
-  transport: nodemailer.createTransporter({
-    // your config
-  })
-}
-```
-
-## Creating Email Templates
-
-1. Go to your Payload admin panel
-2. Navigate to **Mailing > Email Templates**
-3. Create a new template with:
-   - **Name**: Descriptive name for the template
-   - **Slug**: Unique identifier for the template (auto-generated)
-   - **Subject**: Email subject (supports Handlebars)
-   - **Content**: Rich text editor with Handlebars syntax (automatically generates HTML and text versions)
-
-### Template Example
-
-**Subject**: `Welcome to {{siteName}}, {{firstName}}!`
-
-**Content** (using rich text editor with Handlebars):
-```
-# Welcome {{firstName}}! 🎉
-
-Thanks for joining {{siteName}}. We're excited to have you!
-
-**What you can do:**
-• Create beautiful emails with rich text formatting
-  
-• Queue and schedule emails effortlessly
-
-Your account was created on {{formatDate createdAt "long"}}.
-
-Best regards,
-The {{siteName}} Team
-```
-
-## Advanced Features
-
-### Custom Rich Text Editor
-
-Override the rich text editor used for templates:
-
-```typescript
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { FixedToolbarFeature, HeadingFeature } from '@payloadcms/richtext-lexical'
-
-mailingPlugin({
-  // ... other config  
-  richTextEditor: lexicalEditor({
-    features: ({ defaultFeatures }) => [
-      ...defaultFeatures,
-      FixedToolbarFeature(),
-      HeadingFeature({ enabledHeadingSizes: ['h1', 'h2', 'h3'] }),
-      // Add more features as needed
-    ],
-  })
-})
-```
-
-### beforeSend Hook
-
-Modify emails before they are sent to add attachments, custom headers, or make other changes:
+Customize collections with access controls and custom fields:
 
 ```typescript
 mailingPlugin({
-  // ... other config
-  beforeSend: async (options, email) => {
-    // Add attachments dynamically
-    if (email.invoiceId) {
-      const invoice = await generateInvoicePDF(email.invoiceId)
-      options.attachments = [
+  collections: {
+    emails: {
+      access: {
+        read: ({ req: { user } }) => user?.role === 'admin',
+        create: ({ req: { user } }) => !!user,
+        update: ({ req: { user } }) => user?.role === 'admin',
+        delete: ({ req: { user } }) => user?.role === 'admin'
+      },
+      fields: [
         {
-          filename: `invoice-${email.invoiceId}.pdf`,
-          content: invoice.buffer,
-          contentType: 'application/pdf'
+          name: 'campaignId',
+          type: 'text',
+          admin: { position: 'sidebar' }
         }
       ]
     }
-
-    // Add custom headers
-    options.headers = {
-      'X-Campaign-ID': email.campaignId,
-      'X-Customer-ID': email.customerId,
-      'X-Priority': email.priority === 1 ? 'High' : 'Normal'
-    }
-
-    // Modify recipients based on conditions
-    if (process.env.NODE_ENV === 'development') {
-      // Redirect all emails to test address in dev
-      options.to = ['test@example.com']
-      options.subject = `[TEST] ${options.subject}`
-    }
-
-    // Add BCC for compliance
-    if (email.requiresAudit) {
-      options.bcc = ['audit@company.com']
-    }
-
-    return options
   }
 })
 ```
 
-The `beforeSend` hook receives:
-- `options`: The nodemailer mail options that will be sent
-- `email`: The full email document from the database
+## Requirements
 
-You must return the modified options object.
+- PayloadCMS ^3.0.0
+- Node.js ^18.20.2 || >=20.9.0
+- pnpm ^9 || ^10
 
-### Initialization Hooks
+## Job Processing
 
-Control plugin initialization order and add post-initialization logic:
+### When to Use Jobs vs Direct Sending
 
-```typescript
-mailingPlugin({
-  // ... other config
-  initOrder: 'after', // Initialize after main Payload onInit
-  onReady: async (payload) => {
-    // Called after plugin is fully initialized
-    console.log('Mailing plugin ready!')
+**Use Jobs for:**
+- Bulk email campaigns (performance)
+- Scheduled emails (future delivery)
+- Background processing (non-blocking)
+- Retry handling (automatic retries)
+- High-volume sending (queue management)
 
-    // Custom initialization logic here
-    await setupCustomEmailSettings(payload)
-  }
-})
-```
+**Use Direct Sending for:**
+- Immediate transactional emails
+- Single recipient emails
+- Simple use cases
+- When you need immediate feedback
 
-## Template Syntax Reference
-
-Depending on your chosen template engine, you can use different syntax:
-
-### LiquidJS (Default)
-- Variables: `{{ user.name }}`
-- Logic: `{% if user.isPremium %}Premium content{% endif %}`
-- Loops: `{% for item in items %}{{ item.name }}{% endfor %}`
-- Filters: `{{ amount | formatCurrency }}`, `{{ date | formatDate: "short" }}`
-
-### Mustache
-- Variables: `{{ user.name }}`
-- Logic: `{{#user.isPremium}}Premium content{{/user.isPremium}}`
-- Loops: `{{#items}}{{ name }}{{/items}}`
-- No built-in filters (use variables with pre-formatted data)
-
-### Simple
-- Variables only: `{{ user.name }}`, `{{ amount }}`, `{{ date }}`
-
-### Built-in Filters (LiquidJS only)
-- `formatDate` - Format dates: `{{ createdAt | formatDate: "short" }}`
-- `formatCurrency` - Format currency: `{{ amount | formatCurrency: "USD" }}`
-- `capitalize` - Capitalize first letter: `{{ name | capitalize }}`
-
-## Available Helper Functions
+### Setup
 
 ```typescript
-import {
-  renderTemplate,    // Render email templates with variables
-  processEmails,     // Process pending emails manually
-  retryFailedEmails, // Retry failed emails
-  getMailing        // Get mailing service instance
-} from '@xtr-dev/payload-mailing'
-
-// Render a template
-const { html, text, subject } = await renderTemplate(payload, 'welcome', {
-  name: 'John',
-  activationUrl: 'https://example.com/activate'
-})
-
-// Process emails manually
-await processEmails(payload)
-
-// Retry failed emails
-await retryFailedEmails(payload)
-```
-
-## PayloadCMS Integration
-
-The plugin provides PayloadCMS tasks for email processing:
-
-### 1. Add the task to your Payload config
-
-```typescript
-import { buildConfig } from 'payload/config'
 import { sendTemplateEmailTask } from '@xtr-dev/payload-mailing'
 
 export default buildConfig({
-  // ... your config
   jobs: {
-    tasks: [
-      sendTemplateEmailTask,
-      // ... your other tasks
-    ]
+    tasks: [sendTemplateEmailTask]
   }
 })
 ```
 
-### 2. Queue emails from your code
+### Queue Template Emails
 
 ```typescript
-import type { SendTemplateEmailInput } from '@xtr-dev/payload-mailing'
-
-// Queue a template email
-const result = await payload.jobs.queue({
+// Basic template email
+await payload.jobs.queue({
   task: 'send-template-email',
   input: {
     templateSlug: 'welcome-email',
     to: ['user@example.com'],
-    cc: ['manager@example.com'],
-    variables: {
-      firstName: 'John',
-      activationUrl: 'https://example.com/activate/123'
-    },
-    priority: 1,
-    // Add any custom fields from your email collection
-    customField: 'value'
-  } as SendTemplateEmailInput
+    variables: { firstName: 'John' }
+  }
 })
 
-// Queue a scheduled email
+// Scheduled email
 await payload.jobs.queue({
   task: 'send-template-email',
   input: {
@@ -431,91 +332,102 @@ await payload.jobs.queue({
     to: ['user@example.com'],
     variables: { eventName: 'Product Launch' },
     scheduledAt: new Date('2024-01-15T10:00:00Z').toISOString(),
-    priority: 3
+    priority: 1
   }
 })
-```
 
-### 3. Use in admin panel workflows
-
-The task can also be triggered from the Payload admin panel with a user-friendly form interface that includes:
-- Template slug selection
-- Email recipients (to, cc, bcc)
-- Template variables as JSON
-- Optional scheduling
-- Priority setting
-- Any custom fields you've added to your email collection
-
-### Task Benefits
-
-- ✅ **Easy Integration**: Just add to your tasks array
-- ✅ **Type Safety**: Full TypeScript support with `SendTemplateEmailInput`
-- ✅ **Admin UI**: Ready-to-use form interface
-- ✅ **Flexible**: Supports all your custom email collection fields
-- ✅ **Error Handling**: Comprehensive error reporting
-- ✅ **Queue Management**: Leverage Payload's job queue system
-
-### Immediate Processing
-
-The send email task now supports immediate processing. Enable the `processImmediately` option to send emails instantly:
-
-```typescript
+// Immediate processing (bypasses queue)
 await payload.jobs.queue({
-  task: 'send-email',
+  task: 'send-template-email',
   input: {
-    processImmediately: true, // Send immediately (default: false)
-    templateSlug: 'welcome-email',
-    to: ['user@example.com'],
-    variables: { name: 'John' }
+    processImmediately: true,
+    templateSlug: 'urgent-notification',
+    to: ['admin@example.com'],
+    variables: { alertMessage: 'System critical error' }
   }
 })
 ```
 
-**Benefits**:
-- No separate workflow needed
-- Unified task interface
-- Optional immediate processing when needed
-
-## Job Processing
-
-The plugin automatically adds a unified email processing job to PayloadCMS:
-
-- **Job Name**: `process-email-queue`
-- **Function**: Processes both pending emails and retries failed emails
-- **Trigger**: Manual via admin panel or API call
-
-The job is automatically registered when the plugin initializes. To trigger it manually:
+### Bulk Operations
 
 ```typescript
-// Queue the job for processing
-await payload.jobs.queue({
-  task: 'process-email-queue',
-  input: {}
-})
+// Send to multiple recipients efficiently
+const recipients = ['user1@example.com', 'user2@example.com', 'user3@example.com']
+
+for (const email of recipients) {
+  await payload.jobs.queue({
+    task: 'send-template-email',
+    input: {
+      templateSlug: 'newsletter',
+      to: [email],
+      variables: { unsubscribeUrl: `https://example.com/unsubscribe/${email}` },
+      priority: 3 // Lower priority for bulk emails
+    }
+  })
+}
 ```
 
-## Email Status Tracking
+## Email Status & Monitoring
 
-All emails are stored in the emails collection with these statuses:
+### Status Types
 
+Emails are tracked with these statuses:
 - `pending` - Waiting to be sent
 - `processing` - Currently being sent
 - `sent` - Successfully delivered
-- `failed` - Failed to send (will retry if attempts < retryAttempts)
+- `failed` - Failed to send (will retry automatically)
 
-## Monitoring
+### Query Email Status
 
-Check the **Mailing > Emails** collection in your admin panel to:
+```typescript
+// Check specific email status
+const email = await payload.findByID({
+  collection: 'emails',
+  id: 'email-id'
+})
+console.log(`Email status: ${email.status}`)
 
-- View email delivery status
-- See error messages for failed sends
-- Track retry attempts
-- Monitor scheduled emails
+// Find emails by status
+const pendingEmails = await payload.find({
+  collection: 'emails',
+  where: {
+    status: { equals: 'pending' }
+  },
+  sort: 'createdAt'
+})
+
+// Find failed emails for retry
+const failedEmails = await payload.find({
+  collection: 'emails',
+  where: {
+    status: { equals: 'failed' },
+    attemptCount: { less_than: 3 }
+  }
+})
+
+// Monitor scheduled emails
+const scheduledEmails = await payload.find({
+  collection: 'emails',
+  where: {
+    scheduledAt: { greater_than: new Date() },
+    status: { equals: 'pending' }
+  }
+})
+```
+
+### Admin Panel Monitoring
+
+Navigate to **Mailing > Emails** in your Payload admin to:
+- View email delivery status and timestamps
+- See error messages for failed deliveries
+- Track retry attempts and next retry times
+- Monitor scheduled email queue
+- Filter by status, recipient, or date range
+- Export email reports for analysis
 
 ## Environment Variables
 
 ```bash
-# Email configuration
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your-email@gmail.com
@@ -523,267 +435,223 @@ EMAIL_PASS=your-app-password
 EMAIL_FROM=noreply@yoursite.com
 ```
 
-## Security and Access Control
-
-### Collection Access Restrictions
-
-By default, both email templates and emails collections allow full access (`read/create/update/delete: () => true`). For production use, you should configure proper access restrictions using collection overrides:
-
-```typescript
-mailingPlugin({
-  // ... other config
-  collections: {
-    templates: {
-      access: {
-        read: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin' || user.permissions?.includes('mailing:read')
-        },
-        create: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin' || user.permissions?.includes('mailing:create')
-        },
-        update: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin' || user.permissions?.includes('mailing:update')
-        },
-        delete: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin'
-        },
-      }
-    },
-    emails: {
-      access: {
-        read: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin' || user.permissions?.includes('mailing:read')
-        },
-        create: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin' || user.permissions?.includes('mailing:create')
-        },
-        update: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin' || user.permissions?.includes('mailing:update')
-        },
-        delete: ({ req: { user } }) => {
-          if (!user) return false
-          return user.role === 'admin'
-        },
-      }
-    }
-  }
-})
-```
-
-### Collection Overrides
-
-You can override any collection configuration using the `collections.templates` or `collections.emails` options. This includes:
-
-- **Access controls** - Restrict who can read/create/update/delete
-- **Admin UI settings** - Customize admin interface appearance
-- **Field modifications** - Add custom fields or modify existing ones
-- **Hooks** - Add custom validation or processing logic
-
-Example with additional custom fields:
-
-```typescript
-mailingPlugin({
-  // ... other config
-  collections: {
-    templates: {
-      admin: {
-        group: 'Custom Marketing',
-        description: 'Custom email templates with enhanced features'
-      },
-      fields: [
-        // Plugin's default fields are preserved
-        {
-          name: 'category',
-          type: 'select',
-          options: [
-            { label: 'Marketing', value: 'marketing' },
-            { label: 'Transactional', value: 'transactional' },
-            { label: 'System', value: 'system' }
-          ],
-          admin: {
-            position: 'sidebar'
-          }
-        },
-        {
-          name: 'tags',
-          type: 'text',
-          hasMany: true,
-          admin: {
-            description: 'Tags for organizing templates'
-          }
-        }
-      ],
-      hooks: {
-        beforeChange: [
-          ({ data, req }) => {
-            // Custom validation logic
-            if (data.category === 'system' && req.user?.role !== 'admin') {
-              throw new Error('Only admins can create system templates')
-            }
-            return data
-          }
-        ]
-      }
-    }
-  }
-})
-```
-
-## TypeScript Support
-
-The plugin includes full TypeScript definitions. Import types as needed:
-
-```typescript
-import {
-  MailingPluginConfig,
-  SendEmailOptions,
-  EmailTemplate,
-  QueuedEmail,
-  EmailObject,
-  EmailWrapperHook
-} from '@xtr-dev/payload-mailing'
-```
-
 ## API Reference
 
 ### `sendEmail<T>(payload, options)`
 
-Type-safe email sending with automatic template rendering and validation.
+Send emails with full type safety using your generated Payload types.
 
 ```typescript
 import { sendEmail } from '@xtr-dev/payload-mailing'
-import { Email } from './payload-types'
+import type { Email } from './payload-types'
 
 const email = await sendEmail<Email>(payload, {
-  template: {
-    slug: 'template-slug',
-    variables: { /* template variables */ }
+  template?: {
+    slug: string                    // Template slug
+    variables: Record<string, any>  // Template variables
   },
   data: {
-    to: 'user@example.com',
-    // Your custom fields are type-safe here!
-  }
+    to: string | string[]          // Recipients
+    cc?: string | string[]         // CC recipients
+    bcc?: string | string[]        // BCC recipients
+    subject?: string               // Email subject (overrides template)
+    html?: string                  // HTML content (overrides template)
+    text?: string                  // Text content (overrides template)
+    scheduledAt?: Date             // Schedule for later
+    priority?: number              // Priority (1-5, 1 = highest)
+    // ... your custom fields from Email collection
+  },
+  collectionSlug?: string          // Custom collection name (default: 'emails')
 })
 ```
 
-**Type Parameters:**
-- `T extends BaseEmailData` - Your generated Email type for full type safety
-
-**Options:**
-- `template.slug` - Template slug to render
-- `template.variables` - Variables to pass to template
-- `data` - Email data (merged with template output)
-- `collectionSlug` - Custom collection name (defaults to 'emails')
-
 ### `renderTemplate(payload, slug, variables)`
 
-Render an email template without sending.
+Render a template without sending an email.
 
 ```typescript
-const { html, text, subject } = await renderTemplate(
-  payload,
-  'welcome-email',
-  { name: 'John' }
-)
+import { renderTemplate } from '@xtr-dev/payload-mailing'
+
+const result = await renderTemplate(
+  payload: Payload,
+  slug: string,
+  variables: Record<string, any>
+): Promise<{
+  html: string    // Rendered HTML content
+  text: string    // Rendered text content
+  subject: string // Rendered subject line
+}>
 ```
 
 ### Helper Functions
 
-- `getMailing(payload)` - Get mailing context
-- `processEmails(payload)` - Manually trigger email processing
-- `retryFailedEmails(payload)` - Manually retry failed emails
-
-## Migration Guide (v0.0.x → v0.1.0)
-
-**🚨 BREAKING CHANGES**: The API has been simplified to use Payload collections directly.
-
-### Before (v0.0.x)
 ```typescript
-import { sendEmail, scheduleEmail } from '@xtr-dev/payload-mailing'
+import { processEmails, retryFailedEmails, getMailing } from '@xtr-dev/payload-mailing'
 
-// Old way
-const emailId = await sendEmail(payload, {
-  templateSlug: 'welcome',
-  to: 'user@example.com',
-  variables: { name: 'John' }
+// Process pending emails manually
+await processEmails(payload: Payload): Promise<void>
+
+// Retry failed emails manually
+await retryFailedEmails(payload: Payload): Promise<void>
+
+// Get mailing service instance
+const mailing = getMailing(payload: Payload): MailingService
+```
+
+### Job Task Types
+
+```typescript
+import type { SendTemplateEmailInput } from '@xtr-dev/payload-mailing'
+
+interface SendTemplateEmailInput {
+  templateSlug: string              // Template to use
+  to: string[]                      // Recipients
+  cc?: string[]                     // CC recipients
+  bcc?: string[]                    // BCC recipients
+  variables: Record<string, any>    // Template variables
+  scheduledAt?: string              // ISO date string for scheduling
+  priority?: number                 // Priority (1-5)
+  processImmediately?: boolean      // Send immediately (default: false)
+  [key: string]: any               // Your custom email collection fields
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Templates not rendering
+```typescript
+// Check template exists
+const template = await payload.findByID({
+  collection: 'email-templates',
+  id: 'your-template-slug'
 })
 
-const scheduledId = await scheduleEmail(payload, {
-  templateSlug: 'reminder',
-  to: 'user@example.com',
-  scheduledAt: new Date('2024-01-15T10:00:00Z'),
-  variables: { eventName: 'Launch' }
+// Verify template engine configuration
+mailingPlugin({
+  templateEngine: 'liquidjs', // Ensure correct engine
 })
 ```
 
-### After (v0.1.0+)
+#### Emails stuck in pending status
 ```typescript
-import { renderTemplate } from '@xtr-dev/payload-mailing'
+// Manually process email queue
+import { processEmails } from '@xtr-dev/payload-mailing'
+await processEmails(payload)
 
-// New way - render template first
-const { html, text, subject } = await renderTemplate(payload, 'welcome', {
-  name: 'John'
-})
-
-// Then create email using Payload collections (full type safety!)
-const email = await payload.create({
+// Check for processing errors
+const pendingEmails = await payload.find({
   collection: 'emails',
-  data: {
-    to: ['user@example.com'],
-    subject,
-    html,
-    text,
-    // For scheduling
-    scheduledAt: new Date('2024-01-15T10:00:00Z'),
-    // Add any custom fields from your collection
-    customField: 'value',
+  where: { status: { equals: 'pending' } }
+})
+```
+
+#### SMTP connection errors
+```bash
+# Verify environment variables
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password  # Use app password, not regular password
+
+# Test connection
+curl -v telnet://smtp.gmail.com:587
+```
+
+#### Template variables not working
+```typescript
+// Ensure variables match template syntax
+const variables = {
+  user: { name: 'John' },  // For {{user.name}}
+  welcomeUrl: 'https://...' // For {{welcomeUrl}}
+}
+
+// Check for typos in template
+{% if user.isPremium %}  <!-- Correct -->
+{% if user.isPremimum %} <!-- Typo - won't work -->
+```
+
+### Error Handling
+
+```typescript
+try {
+  const email = await sendEmail(payload, {
+    template: { slug: 'welcome', variables: { name: 'John' } },
+    data: { to: 'user@example.com' }
+  })
+} catch (error) {
+  if (error.message.includes('Template not found')) {
+    // Handle missing template
+    console.error('Template does not exist:', error.templateSlug)
+  } else if (error.message.includes('SMTP')) {
+    // Handle email delivery issues
+    console.error('Email delivery failed:', error.details)
+  } else {
+    // Handle other errors
+    console.error('Unexpected error:', error)
+  }
+}
+```
+
+### Debug Mode
+
+Enable detailed logging:
+
+```bash
+# Set environment variable
+PAYLOAD_AUTOMATION_LOG_LEVEL=debug npm run dev
+
+# Or in your code
+mailingPlugin({
+  onReady: async (payload) => {
+    console.log('Mailing plugin initialized')
+  },
+  beforeSend: async (options, email) => {
+    console.log('Sending email:', { to: options.to, subject: options.subject })
+    return options
   }
 })
 ```
-
-### Benefits of Migration
-- ✅ **Full TypeScript support** with your generated Payload types
-- ✅ **Use any custom fields** you add to your email collection
-- ✅ **Leverage Payload's features**: validation, hooks, access control
-- ✅ **One consistent API** - just use `payload.create()`
-- ✅ **No wrapper methods** - direct access to Payload's power
-
-## Recent Changes
-
-### v0.1.0 (Latest - Breaking Changes)
-
-**🚀 Major API Simplification:**
-- **REMOVED**: `sendEmail()` and `scheduleEmail()` wrapper methods
-- **REMOVED**: `SendEmailOptions` custom types
-- **ADDED**: Direct Payload collection usage with full type safety
-- **ADDED**: `renderTemplate()` helper for template rendering
-- **ADDED**: Support for LiquidJS, Mustache, and custom template engines
-- **IMPROVED**: Webpack compatibility with proper dynamic imports
-
-**Template Engine Enhancements:**
-- **NEW**: LiquidJS support (default) with modern syntax and logic
-- **NEW**: Mustache support for logic-less templates
-- **NEW**: Custom template renderer hook for maximum flexibility
-- **NEW**: Simple variable replacement as fallback
-- **FIXED**: All webpack compatibility issues resolved
-
-**Developer Experience:**
-- **IMPROVED**: Full TypeScript inference using generated Payload types
-- **IMPROVED**: Comprehensive migration guide and documentation
-- **IMPROVED**: Better error handling and async patterns
-- **SIMPLIFIED**: Cleaner codebase with fewer abstractions
 
 ## License
 
 MIT
 
 ## Contributing
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/xtr-dev/payload-mailing.git
+cd payload-mailing
+
+# Install dependencies
+pnpm install
+
+# Build the package
+pnpm build
+
+# Run tests
+pnpm test
+
+# Link for local development
+pnpm link --global
+```
+
+### Testing
+
+```bash
+# Run unit tests
+pnpm test
+
+# Run integration tests
+pnpm test:integration
+
+# Test with different PayloadCMS versions
+pnpm test:payload-3.0
+pnpm test:payload-latest
+```
 
 Issues and pull requests welcome at [GitHub repository](https://github.com/xtr-dev/payload-mailing)
