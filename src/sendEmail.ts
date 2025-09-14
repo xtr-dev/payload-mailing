@@ -132,6 +132,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   }
 
   // Create the email in the collection with proper typing
+  // The hooks will automatically create and populate the job relationship
   const email = await payload.create({
     collection: collectionSlug,
     data: emailData
@@ -142,54 +143,34 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     throw new Error('Failed to create email: invalid response from database')
   }
 
-  // Create an individual job for this email
-  const queueName = options.queue || mailingConfig.queue || 'default'
-
-  if (!payload.jobs) {
-    if (options.processImmediately) {
+  // If processImmediately is true, get the job from the relationship and process it now
+  if (options.processImmediately) {
+    if (!payload.jobs) {
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
-    } else {
-      console.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
-      return email as TEmail
     }
-  }
 
-  let jobId: string
-  try {
-    const job = await payload.jobs.queue({
-      queue: queueName,
-      task: 'process-email',
-      input: {
-        emailId: String(email.id)
-      },
-      // If scheduled, set the waitUntil date
-      waitUntil: emailData.scheduledAt ? new Date(emailData.scheduledAt) : undefined
+    // Wait a bit for hooks to complete and populate the job relationship
+    // This is necessary because hooks might run asynchronously
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Refetch the email to get the populated jobs relationship
+    const emailWithJobs = await payload.findByID({
+      collection: collectionSlug,
+      id: email.id,
     })
 
-    jobId = String(job.id)
-  } catch (error) {
-    // Clean up the orphaned email since job creation failed
-    try {
-      await payload.delete({
-        collection: collectionSlug,
-        id: email.id
-      })
-    } catch (deleteError) {
-      console.error(`Failed to clean up orphaned email ${email.id} after job creation failure:`, deleteError)
+    if (!emailWithJobs.jobs || emailWithJobs.jobs.length === 0) {
+      throw new Error(`No processing job found for email ${email.id}. The auto-scheduling may have failed.`)
     }
 
-    // Throw the original job creation error
-    const errorMsg = `Failed to create processing job for email ${email.id}: ${String(error)}`
-    throw new Error(errorMsg)
-  }
+    // Get the first job ID (should only be one for a new email)
+    const jobId = Array.isArray(emailWithJobs.jobs)
+      ? String(emailWithJobs.jobs[0])
+      : String(emailWithJobs.jobs)
 
-  // If processImmediately is true, process the job now
-  if (options.processImmediately) {
     try {
       await processJobById(payload, jobId)
     } catch (error) {
-      // For immediate processing failures, we could consider cleanup, but the job exists and could be retried later
-      // So we'll leave the email and job in place for potential retry
       throw new Error(`Failed to process email ${email.id} immediately: ${String(error)}`)
     }
   }
