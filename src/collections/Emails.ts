@@ -185,67 +185,42 @@ const Emails: CollectionConfig = {
     },
   ],
   hooks: {
-    beforeChange: [
-      async ({ data, originalDoc, req, operation }) => {
-        // Only process if this is a pending email and we have jobs configured
-        if (data.status !== 'pending' || !req.payload.jobs) {
-          return data
-        }
-
-        // For updates, check if status changed to pending or if this was already pending
-        if (operation === 'update') {
-          // If it was already pending and still pending, skip (unless jobs field is empty)
-          if (originalDoc?.status === 'pending' && data.jobs && data.jobs.length > 0) {
-            return data
-          }
-
-          // For updates where we need to check existing jobs, we need the document ID
-          if (originalDoc?.id) {
-            try {
-              const existingJobs = await findExistingJobs(req.payload, originalDoc.id)
-
-              if (existingJobs.totalDocs > 0) {
-                // Add existing jobs to the relationship
-                const existingJobIds = existingJobs.docs.map(job => job.id)
-                data.jobs = [...(data.jobs || []), ...existingJobIds.filter(id => !data.jobs?.includes(id))]
-                return data
-              }
-            } catch (error) {
-              console.error(`Failed to check existing jobs for email ${originalDoc.id}:`, error)
-            }
-          }
-        }
-
-        // For new emails or updates that need a new job, we'll create it after the document exists
-        // We'll handle this in afterChange for new documents since we need the ID
-        return data
-      }
-    ],
+    // Simple approach: Only use afterChange hook for job management
+    // This avoids complex interaction between hooks and ensures document ID is always available
     afterChange: [
       async ({ doc, previousDoc, req, operation }) => {
-        // Only process if this is a pending email, we have jobs configured, and no job exists yet
-        if (doc.status !== 'pending' || !req.payload.jobs) {
-          return
-        }
+        // Skip if:
+        // 1. Email is not pending status
+        // 2. Jobs are not configured
+        // 3. Email already has jobs (unless status just changed to pending)
 
-        // Skip if this is an update and status didn't change to pending, and jobs already exist
-        if (operation === 'update' && previousDoc?.status === 'pending' && doc.jobs && doc.jobs.length > 0) {
+        const shouldSkip =
+          doc.status !== 'pending' ||
+          !req.payload.jobs ||
+          (doc.jobs?.length > 0 && previousDoc?.status === 'pending')
+
+        if (shouldSkip) {
           return
         }
 
         try {
-          // Ensure a job exists for this email (will check for existing ones first)
+          // Ensure a job exists for this email
+          // This function handles:
+          // - Checking for existing jobs (duplicate prevention)
+          // - Creating new job if needed
+          // - Returning all job IDs
           const result = await ensureEmailJob(req.payload, doc.id, {
             scheduledAt: doc.scheduledAt,
           })
 
-          // If a new job was created or we found existing jobs, update the relationship
+          // Update the email's job relationship if we have jobs
+          // This handles both new jobs and existing jobs that weren't in the relationship
           if (result.jobIds.length > 0) {
             await updateEmailJobRelationship(req.payload, doc.id, result.jobIds, 'emails')
           }
         } catch (error) {
+          // Log error but don't throw - we don't want to fail the email operation
           console.error(`Failed to ensure job for email ${doc.id}:`, error)
-          // Don't throw - we don't want to fail the email creation/update
         }
       }
     ]

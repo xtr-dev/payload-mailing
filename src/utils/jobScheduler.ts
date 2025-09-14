@@ -24,6 +24,11 @@ export async function findExistingJobs(
 /**
  * Ensures a processing job exists for an email
  * Creates one if it doesn't exist, or returns existing job IDs
+ *
+ * This function is idempotent and safe for concurrent calls:
+ * - Multiple concurrent calls will only create one job
+ * - Existing jobs are detected and returned
+ * - Race conditions are handled by checking after creation
  */
 export async function ensureEmailJob(
   payload: Payload,
@@ -48,25 +53,41 @@ export async function ensureEmailJob(
     }
   }
 
-  // No existing job, create a new one
+  // No existing job found, try to create a new one
   const mailingContext = (payload as any).mailing
   const queueName = options?.queueName || mailingContext?.config?.queue || 'default'
 
-  const job = await payload.jobs.queue({
-    queue: queueName,
-    task: 'process-email',
-    input: {
-      emailId: String(emailId)
-    },
-    // If scheduled, set the waitUntil date
-    waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
-  })
+  try {
+    const job = await payload.jobs.queue({
+      queue: queueName,
+      task: 'process-email',
+      input: {
+        emailId: String(emailId)
+      },
+      // If scheduled, set the waitUntil date
+      waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
+    })
 
-  console.log(`Auto-scheduled processing job ${job.id} for email ${emailId}`)
+    console.log(`Auto-scheduled processing job ${job.id} for email ${emailId}`)
 
-  return {
-    jobIds: [job.id],
-    created: true
+    return {
+      jobIds: [job.id],
+      created: true
+    }
+  } catch (error) {
+    // Job creation failed - check if another process created one concurrently
+    const recheckedJobs = await findExistingJobs(payload, emailId)
+
+    if (recheckedJobs.totalDocs > 0) {
+      // Another process created a job while we were trying
+      return {
+        jobIds: recheckedJobs.docs.map(job => job.id),
+        created: false
+      }
+    }
+
+    // No concurrent job creation - this is a real error
+    throw error
   }
 }
 
