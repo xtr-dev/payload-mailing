@@ -90,7 +90,7 @@ export interface Config {
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
   globals: {};
   globalsSelect: {};
@@ -100,7 +100,7 @@ export interface Config {
   };
   jobs: {
     tasks: {
-      processEmails: ProcessEmailsJob;
+      'process-emails': ProcessEmailsTask;
       'send-email': TaskSendEmail;
       inline: {
         input: unknown;
@@ -133,7 +133,7 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
   firstName?: string | null;
   lastName?: string | null;
   updatedAt: string;
@@ -159,7 +159,7 @@ export interface User {
  * via the `definition` "posts".
  */
 export interface Post {
-  id: string;
+  id: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -168,7 +168,7 @@ export interface Post {
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
+  id: number;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -186,7 +186,7 @@ export interface Media {
  * via the `definition` "email-templates".
  */
 export interface EmailTemplate {
-  id: string;
+  id: number;
   /**
    * A descriptive name for this email template
    */
@@ -227,11 +227,11 @@ export interface EmailTemplate {
  * via the `definition` "emails".
  */
 export interface Email {
-  id: string;
+  id: number;
   /**
    * Email template used (optional if custom content provided)
    */
-  template?: (string | null) | EmailTemplate;
+  template?: (number | null) | EmailTemplate;
   /**
    * Recipient email addresses
    */
@@ -316,7 +316,7 @@ export interface Email {
  * via the `definition` "payload-jobs".
  */
 export interface PayloadJob {
-  id: string;
+  id: number;
   /**
    * Input data provided to the job
    */
@@ -363,7 +363,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'processEmails' | 'send-email';
+        taskSlug: 'inline' | 'process-emails' | 'send-email';
         taskID: string;
         input?:
           | {
@@ -396,7 +396,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'processEmails' | 'send-email') | null;
+  taskSlug?: ('inline' | 'process-emails' | 'send-email') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -408,36 +408,36 @@ export interface PayloadJob {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'posts';
-        value: string | Post;
+        value: number | Post;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
       } | null)
     | ({
         relationTo: 'email-templates';
-        value: string | EmailTemplate;
+        value: number | EmailTemplate;
       } | null)
     | ({
         relationTo: 'emails';
-        value: string | Email;
+        value: number | Email;
       } | null)
     | ({
         relationTo: 'payload-jobs';
-        value: string | PayloadJob;
+        value: number | PayloadJob;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -447,10 +447,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -470,7 +470,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -628,9 +628,9 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "ProcessEmailsJob".
+ * via the `definition` "ProcessEmailsTask".
  */
-export interface ProcessEmailsJob {
+export interface ProcessEmailsTask {
   input?: unknown;
   output?: unknown;
 }
@@ -640,6 +640,10 @@ export interface ProcessEmailsJob {
  */
 export interface TaskSendEmail {
   input: {
+    /**
+     * Process and send the email immediately instead of waiting for the queue processor
+     */
+    processImmediately?: boolean | null;
     /**
      * Use a template (leave empty for direct email)
      */

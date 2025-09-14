@@ -1,4 +1,4 @@
-import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import {
   FixedToolbarFeature,
@@ -6,7 +6,6 @@ import {
   HorizontalRuleFeature,
   InlineToolbarFeature,
 } from '@payloadcms/richtext-lexical'
-import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import path from 'path'
 import { buildConfig } from 'payload'
 import sharp from 'sharp'
@@ -24,36 +23,7 @@ if (!process.env.ROOT_DIR) {
   process.env.ROOT_DIR = dirname
 }
 
-const buildConfigWithMemoryDB = async () => {
-  // Use in-memory MongoDB for development and testing
-  if (process.env.NODE_ENV === 'test' || process.env.USE_MEMORY_DB === 'true' || !process.env.DATABASE_URI) {
-    console.log('🚀 Starting MongoDB in-memory database...')
-
-    const memoryDB = await MongoMemoryReplSet.create({
-      replSet: {
-        count: 1, // Single instance for dev (faster startup)
-        dbName: process.env.NODE_ENV === 'test' ? 'payloadmemory' : 'payload-mailing-dev',
-        storageEngine: 'wiredTiger',
-      },
-    })
-
-    const uri = `${memoryDB.getUri()}&retryWrites=true`
-    process.env.DATABASE_URI = uri
-
-    console.log('✅ MongoDB in-memory database started')
-    console.log(`📊 Database URI: ${uri.replace(/mongodb:\/\/[^@]*@/, 'mongodb://***@')}`)
-
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      console.log('🛑 Stopping MongoDB in-memory database...')
-      await memoryDB.stop()
-      process.exit(0)
-    })
-  } else {
-    console.log(`🔗 Using external MongoDB: ${process.env.DATABASE_URI?.replace(/mongodb:\/\/[^@]*@/, 'mongodb://***@')}`)
-  }
-
-  return buildConfig({
+export default buildConfig({
     admin: {
       importMap: {
         baseDir: path.resolve(dirname),
@@ -122,14 +92,28 @@ const buildConfigWithMemoryDB = async () => {
         },
       },
     ],
-    db: mongooseAdapter({
-      ensureIndexes: true,
-      url: process.env.DATABASE_URI || '',
+    db: sqliteAdapter({
+      client: {
+        url: process.env.DATABASE_URI || 'file:./dev.db',
+      },
     }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     onInit: async (payload) => {
       await seed(payload)
+    },
+    jobs: {
+      jobsCollectionOverrides: c => {
+        if (c.defaultJobsCollection.admin) c.defaultJobsCollection.admin.hidden = false
+        return c.defaultJobsCollection
+      },
+      autoRun: [
+        {
+          cron: '*/1 * * * *', // every minute
+          limit: 10, // limit jobs to process each run
+          queue: 'default', // name of the queue
+        },
+      ],
     },
     plugins: [
       mailingPlugin({
@@ -137,7 +121,7 @@ const buildConfigWithMemoryDB = async () => {
         initOrder: 'after',
         retryAttempts: 3,
         retryDelay: 60000, // 1 minute for dev
-        queue: 'email-queue',
+        queue: 'default',
 
         // Example: Collection overrides for customization
         // Uncomment and modify as needed for your use case
@@ -286,6 +270,3 @@ const buildConfigWithMemoryDB = async () => {
       outputFile: path.resolve(dirname, 'payload-types.ts'),
     },
   })
-}
-
-export default buildConfigWithMemoryDB()

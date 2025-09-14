@@ -1,6 +1,6 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { sendEmail } from '@xtr-dev/payload-mailing'
+import { sendEmail, processEmailById } from '@xtr-dev/payload-mailing'
 
 export async function POST(request: Request) {
   try {
@@ -41,10 +41,33 @@ export async function POST(request: Request) {
 
     const result = await sendEmail(payload, emailOptions)
 
+    // If it's "send now" (not scheduled), process the email immediately
+    if (type === 'send' && !scheduledAt) {
+      try {
+        await processEmailById(payload, String(result.id))
+        return Response.json({
+          success: true,
+          emailId: result.id,
+          message: 'Email sent successfully',
+          status: 'sent'
+        })
+      } catch (processError) {
+        // If immediate processing fails, return that it's queued
+        console.warn('Failed to process email immediately, left in queue:', processError)
+        return Response.json({
+          success: true,
+          emailId: result.id,
+          message: 'Email queued successfully (immediate processing failed)',
+          status: 'queued'
+        })
+      }
+    }
+
     return Response.json({
       success: true,
       emailId: result.id,
       message: scheduledAt ? 'Email scheduled successfully' : 'Email queued successfully',
+      status: scheduledAt ? 'scheduled' : 'queued'
     })
   } catch (error) {
     console.error('Test email error:', error)
