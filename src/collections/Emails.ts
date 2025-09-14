@@ -183,6 +183,58 @@ const Emails: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    afterChange: [
+      async ({ doc, previousDoc, req, operation }) => {
+        // Only process if this is a pending email and we have jobs configured
+        if (doc.status !== 'pending' || !req.payload.jobs) {
+          return
+        }
+
+        // Skip if this is an update and status didn't change to pending
+        if (operation === 'update' && previousDoc?.status === 'pending') {
+          return
+        }
+
+        try {
+          // Check if a processing job already exists for this email
+          const existingJobs = await req.payload.find({
+            collection: 'payload-jobs',
+            where: {
+              'input.emailId': {
+                equals: String(doc.id),
+              },
+              task: {
+                equals: 'process-email',
+              },
+            },
+            limit: 1,
+          })
+
+          // If no job exists, create one
+          if (existingJobs.totalDocs === 0) {
+            const mailingContext = (req.payload as any).mailing
+            const queueName = mailingContext?.config?.queue || 'default'
+
+            await req.payload.jobs.queue({
+              queue: queueName,
+              task: 'process-email',
+              input: {
+                emailId: String(doc.id)
+              },
+              // If scheduled, set the waitUntil date
+              waitUntil: doc.scheduledAt ? new Date(doc.scheduledAt) : undefined
+            })
+
+            console.log(`Auto-scheduled processing job for email ${doc.id}`)
+          }
+        } catch (error) {
+          console.error(`Failed to auto-schedule job for email ${doc.id}:`, error)
+          // Don't throw - we don't want to fail the email creation/update
+        }
+      }
+    ]
+  },
   timestamps: true,
   // indexes: [
   //   {
