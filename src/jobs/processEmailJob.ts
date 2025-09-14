@@ -64,7 +64,7 @@ export const processEmailJob = {
         }
       }
     } catch (error) {
-      throw new Error(`Failed to process email ${emailId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`Failed to process email ${emailId}: ${String(error)}`)
     }
   }
 }
