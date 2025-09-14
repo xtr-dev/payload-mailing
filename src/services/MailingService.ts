@@ -321,9 +321,9 @@ export class MailingService implements IMailingService {
     const email = await this.payload.findByID({
       collection: this.emailsCollection as any,
       id: emailId,
-    }) as BaseEmail
+    })
 
-    const newAttempts = (email.attempts || 0) + 1
+    const newAttempts = ((email as any).attempts || 0) + 1
 
     await this.payload.update({
       collection: this.emailsCollection as any,
