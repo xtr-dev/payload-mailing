@@ -1,5 +1,7 @@
 # @xtr-dev/payload-mailing
 
+[![npm version](https://img.shields.io/npm/v/@xtr-dev/payload-mailing.svg)](https://www.npmjs.com/package/@xtr-dev/payload-mailing)
+
 A template-based email system with scheduling and job processing for PayloadCMS 3.x.
 
 ⚠️ **Pre-release Warning**: This package is currently in active development (v0.0.x). Breaking changes may occur before v1.0.0. Not recommended for production use.
