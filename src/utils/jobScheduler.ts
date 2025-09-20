@@ -73,8 +73,8 @@ export async function ensureEmailJob(
       jobId: job.id,
       emailId: normalizedEmailId,
       scheduledAt: options?.scheduledAt || 'immediate',
-      task: job.task,
-      queue: job.queue
+      task: 'process-email',
+      queue: queueName
     })
 
     return {
