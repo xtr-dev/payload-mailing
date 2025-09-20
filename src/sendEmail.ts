@@ -139,7 +139,6 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   // If processImmediately is true, get the job from the relationship and process it now
   if (options.processImmediately) {
     const logger = createContextLogger(payload, 'IMMEDIATE')
-    logger.debug(`Starting immediate processing for email ${email.id}`)
 
     if (!payload.jobs) {
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
@@ -153,7 +152,6 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     const startTime = Date.now()
     let jobId: string | undefined
 
-    logger.debug(`Polling for job creation (max ${maxAttempts} attempts, ${maxTotalTime}ms timeout)`)
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       // Check total timeout before continuing
@@ -178,19 +176,19 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
         id: email.id,
       })
 
-      logger.debug(`Attempt ${attempt + 1}/${maxAttempts}: Found ${emailWithJobs.jobs?.length || 0} jobs for email ${email.id}`)
 
       if (emailWithJobs.jobs && emailWithJobs.jobs.length > 0) {
         // Job found! Get the first job ID (should only be one for a new email)
         const firstJob = Array.isArray(emailWithJobs.jobs) ? emailWithJobs.jobs[0] : emailWithJobs.jobs
         jobId = typeof firstJob === 'string' ? firstJob : String(firstJob.id || firstJob)
-        logger.info(`Found job ID: ${jobId}`)
         break
       }
 
       // Log on later attempts to help with debugging (reduced threshold)
       if (attempt >= 1) {
-        logger.debug(`Waiting for job creation for email ${email.id}, attempt ${attempt + 1}/${maxAttempts}`)
+        if (attempt >= 2) {
+          logger.debug(`Waiting for job creation for email ${email.id}, attempt ${attempt + 1}/${maxAttempts}`)
+        }
       }
     }
 
@@ -212,10 +210,9 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       )
     }
 
-    logger.info(`Starting job execution for job ${jobId}`)
     try {
       await processJobById(payload, jobId)
-      logger.info(`Successfully processed email ${email.id} immediately`)
+      logger.debug(`Successfully processed email ${email.id} immediately`)
     } catch (error) {
       logger.error(`Failed to process email ${email.id} immediately:`, error)
       throw new Error(`Failed to process email ${email.id} immediately: ${String(error)}`)
