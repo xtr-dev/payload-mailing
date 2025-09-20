@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from '../utils/jobScheduler.js'
+import { createContextLogger } from '../utils/logger.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
@@ -220,7 +221,8 @@ const Emails: CollectionConfig = {
           }
         } catch (error) {
           // Log error but don't throw - we don't want to fail the email operation
-          console.error(`Failed to ensure job for email ${doc.id}:`, error)
+          const logger = createContextLogger(req.payload, 'EMAILS_HOOK')
+          logger.error(`Failed to ensure job for email ${doc.id}:`, error)
         }
       }
     ]
