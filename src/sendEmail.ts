@@ -182,9 +182,8 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
       if (emailWithJobs.jobs && emailWithJobs.jobs.length > 0) {
         // Job found! Get the first job ID (should only be one for a new email)
-        jobId = Array.isArray(emailWithJobs.jobs)
-          ? String(emailWithJobs.jobs[0])
-          : String(emailWithJobs.jobs)
+        const firstJob = Array.isArray(emailWithJobs.jobs) ? emailWithJobs.jobs[0] : emailWithJobs.jobs
+        jobId = typeof firstJob === 'string' ? firstJob : String(firstJob.id || firstJob)
         logger.info(`Found job ID: ${jobId}`)
         break
       }
