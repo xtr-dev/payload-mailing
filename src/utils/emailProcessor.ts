@@ -37,16 +37,11 @@ export async function processEmailById(payload: Payload, emailId: string): Promi
  * @returns Promise that resolves when job is processed
  */
 export async function processJobById(payload: Payload, jobId: string): Promise<void> {
-  const logger = createContextLogger(payload, 'PROCESSOR')
-  logger.debug(`Starting processJobById for job ${jobId}`)
-
   if (!payload.jobs) {
     throw new Error('PayloadCMS jobs not configured - cannot process job immediately')
   }
 
   try {
-    logger.debug(`Running job ${jobId} with payload.jobs.run()`)
-
     // Run a specific job by its ID (using where clause to find the job)
     const result = await payload.jobs.run({
       where: {
@@ -55,9 +50,8 @@ export async function processJobById(payload: Payload, jobId: string): Promise<v
         }
       }
     })
-
-    logger.info(`Job ${jobId} execution completed`, { result })
   } catch (error) {
+    const logger = createContextLogger(payload, 'PROCESSOR')
     logger.error(`Job ${jobId} execution failed:`, error)
     throw new Error(`Failed to process job ${jobId}: ${String(error)}`)
   }
