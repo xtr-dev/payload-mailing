@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { createContextLogger } from './logger.js'
 
 /**
  * Finds existing processing jobs for an email
@@ -47,11 +48,16 @@ export async function ensureEmailJob(
   const mailingContext = (payload as any).mailing
   const queueName = options?.queueName || mailingContext?.config?.queue || 'default'
 
+  const logger = createContextLogger(payload, 'JOB_SCHEDULER')
+  logger.debug(`Ensuring job for email ${normalizedEmailId}`)
+  logger.debug(`Queue: ${queueName}, scheduledAt: ${options?.scheduledAt || 'immediate'}`)
+
   // First, optimistically try to create the job
   // If it fails due to uniqueness constraint, then check for existing jobs
   // This approach minimizes the race condition window
 
   try {
+    logger.debug(`Attempting to create new job for email ${normalizedEmailId}`)
     // Attempt to create job - rely on database constraints for duplicate prevention
     const job = await payload.jobs.queue({
       queue: queueName,
@@ -62,21 +68,32 @@ export async function ensureEmailJob(
       waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
     })
 
-    console.log(`Auto-scheduled processing job ${job.id} for email ${normalizedEmailId}`)
+    logger.info(`Auto-scheduled processing job ${job.id} for email ${normalizedEmailId}`)
+    logger.debug(`Job details`, {
+      jobId: job.id,
+      emailId: normalizedEmailId,
+      scheduledAt: options?.scheduledAt || 'immediate',
+      task: job.task,
+      queue: job.queue
+    })
 
     return {
       jobIds: [job.id],
       created: true
     }
   } catch (createError) {
+    logger.warn(`Job creation failed for email ${normalizedEmailId}: ${String(createError)}`)
+
     // Job creation failed - likely due to duplicate constraint or system issue
 
     // Check if duplicate jobs exist (handles race condition where another process created job)
     const existingJobs = await findExistingJobs(payload, normalizedEmailId)
 
+    logger.debug(`Found ${existingJobs.totalDocs} existing jobs after creation failure`)
+
     if (existingJobs.totalDocs > 0) {
       // Found existing jobs - return them (race condition handled successfully)
-      console.log(`Found existing jobs for email ${normalizedEmailId}: ${existingJobs.docs.map(j => j.id).join(', ')}`)
+      logger.info(`Using existing jobs for email ${normalizedEmailId}: ${existingJobs.docs.map(j => j.id).join(', ')}`)
       return {
         jobIds: existingJobs.docs.map(job => job.id),
         created: false
@@ -92,6 +109,7 @@ export async function ensureEmailJob(
 
     if (isLikelyUniqueConstraint) {
       // This should not happen if our check above worked, but provide a clear error
+      logger.error(`Unique constraint violation but no existing jobs found for email ${normalizedEmailId}`)
       throw new Error(
         `Database uniqueness constraint violation for email ${normalizedEmailId}, but no existing jobs found. ` +
         `This indicates a potential data consistency issue. Original error: ${errorMessage}`
@@ -99,6 +117,7 @@ export async function ensureEmailJob(
     }
 
     // Non-constraint related error
+    logger.error(`Non-constraint job creation error for email ${normalizedEmailId}: ${errorMessage}`)
     throw new Error(`Failed to create job for email ${normalizedEmailId}: ${errorMessage}`)
   }
 }
@@ -134,7 +153,8 @@ export async function updateEmailJobRelationship(
     })
   } catch (error) {
     const normalizedEmailId = String(emailId)
-    console.error(`Failed to update email ${normalizedEmailId} with job relationship:`, error)
+    const logger = createContextLogger(payload, 'JOB_SCHEDULER')
+    logger.error(`Failed to update email ${normalizedEmailId} with job relationship:`, error)
     throw error
   }
 }

@@ -1,5 +1,6 @@
 import type { PayloadRequest, Payload } from 'payload'
 import { processAllEmails } from '../utils/emailProcessor.js'
+import { createContextLogger } from '../utils/logger.js'
 
 /**
  * Data passed to the process emails task
@@ -67,7 +68,8 @@ export const scheduleEmailsJob = async (
   delay?: number
 ) => {
   if (!payload.jobs) {
-    console.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
+    const logger = createContextLogger(payload, 'SCHEDULER')
+    logger.warn('PayloadCMS jobs not configured - emails will not be processed automatically')
     return
   }
 
@@ -79,6 +81,7 @@ export const scheduleEmailsJob = async (
       waitUntil: delay ? new Date(Date.now() + delay) : undefined,
     } as any)
   } catch (error) {
-    console.error('Failed to schedule email processing job:', error)
+    const logger = createContextLogger(payload, 'SCHEDULER')
+    logger.error('Failed to schedule email processing job:', error)
   }
 }
