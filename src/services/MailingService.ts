@@ -366,7 +366,7 @@ export class MailingService implements IMailingService {
     if (engine === 'liquidjs') {
       try {
         await this.ensureLiquidJSInitialized()
-        if (this.liquid && typeof this.liquid !== 'boolean') {
+        if (this.liquid) {
           return await this.liquid.parseAndRender(template, variables)
         }
       } catch (error) {

@@ -13,7 +13,6 @@ export interface ProcessEmailJobInput {
 
 /**
  * Job definition for processing a single email
- * This replaces the batch processing approach with individual email jobs
  */
 export const processEmailJob = {
   slug: 'process-email',
