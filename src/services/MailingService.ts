@@ -127,6 +127,17 @@ export class MailingService implements IMailingService {
       throw new Error(`Email template not found: ${templateSlug}`)
     }
 
+    return this.renderTemplateDocument(template, variables)
+  }
+
+  /**
+   * Render a template document (for when you already have the template loaded)
+   * This avoids duplicate template lookups
+   * @internal
+   */
+  async renderTemplateDocument(template: BaseEmailTemplateDocument, variables: TemplateVariables): Promise<{ html: string; text: string; subject: string }> {
+    this.ensureInitialized()
+
     const emailContent = await this.renderEmailTemplate(template, variables)
     const subject = await this.renderTemplateString(template.subject || '', variables)
 
