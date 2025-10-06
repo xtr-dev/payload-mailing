@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import { getMailing, renderTemplate, parseAndValidateEmails, sanitizeFromName } from './utils/helpers.js'
+import { getMailing, renderTemplateWithId, parseAndValidateEmails, sanitizeFromName } from './utils/helpers.js'
 import { BaseEmailDocument } from './types/index.js'
 import { processJobById } from './utils/emailProcessor.js'
 import { createContextLogger } from './utils/logger.js'
@@ -50,23 +50,8 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   let emailData: Partial<TEmail> = { ...options.data } as Partial<TEmail>
 
   if (options.template) {
-    // Find the template document to get its ID for the relationship field
-    const templatesCollection = mailingConfig.collections.templates || 'email-templates'
-    const { docs: templateDocs } = await payload.find({
-      collection: templatesCollection as any,
-      where: {
-        slug: {
-          equals: options.template.slug,
-        },
-      },
-      limit: 1,
-    })
-
-    if (!templateDocs || templateDocs.length === 0) {
-      throw new Error(`Template not found: ${options.template.slug}`)
-    }
-
-    const { html, text, subject } = await renderTemplate(
+    // Look up and render the template in a single operation to avoid duplicate lookups
+    const { html, text, subject, templateId } = await renderTemplateWithId(
       payload,
       options.template.slug,
       options.template.variables || {}
@@ -74,7 +59,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     emailData = {
       ...emailData,
-      template: templateDocs[0].id,
+      template: templateId,
       subject,
       html,
       text,

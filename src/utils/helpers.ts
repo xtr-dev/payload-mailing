@@ -130,6 +130,53 @@ export const renderTemplate = async (payload: Payload, templateSlug: string, var
   return mailing.service.renderTemplate(templateSlug, variables)
 }
 
+/**
+ * Render a template and return both rendered content and template ID
+ * This is used by sendEmail to avoid duplicate template lookups
+ * @internal
+ */
+export const renderTemplateWithId = async (
+  payload: Payload,
+  templateSlug: string,
+  variables: TemplateVariables
+): Promise<{ html: string; text: string; subject: string; templateId: PayloadID }> => {
+  const mailing = getMailing(payload)
+  const templatesCollection = mailing.config.collections?.templates || 'email-templates'
+
+  // Runtime validation: Ensure the collection exists in Payload
+  if (!payload.collections[templatesCollection]) {
+    throw new Error(
+      `Templates collection '${templatesCollection}' not found. ` +
+      `Available collections: ${Object.keys(payload.collections).join(', ')}`
+    )
+  }
+
+  // Look up the template document once
+  const { docs: templateDocs } = await payload.find({
+    collection: templatesCollection as any,
+    where: {
+      slug: {
+        equals: templateSlug,
+      },
+    },
+    limit: 1,
+  })
+
+  if (!templateDocs || templateDocs.length === 0) {
+    throw new Error(`Template not found: ${templateSlug}`)
+  }
+
+  const templateDoc = templateDocs[0]
+
+  // Render using the document directly to avoid duplicate lookup
+  const rendered = await mailing.service.renderTemplateDocument(templateDoc, variables)
+
+  return {
+    ...rendered,
+    templateId: templateDoc.id,
+  }
+}
+
 export const processEmails = async (payload: Payload): Promise<void> => {
   const mailing = getMailing(payload)
   return mailing.service.processEmails()
