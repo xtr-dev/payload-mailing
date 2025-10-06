@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
+import { resolveID } from '../utils/helpers.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
@@ -9,6 +10,26 @@ const Emails: CollectionConfig = {
     defaultColumns: ['subject', 'to', 'status', 'jobs', 'scheduledAt', 'sentAt'],
     group: 'Mailing',
     description: 'Email delivery and status tracking',
+  },
+  defaultPopulate: {
+    template: true,
+    to: true,
+    cc: true,
+    bcc: true,
+    from: true,
+    replyTo: true,
+    jobs: true,
+    status: true,
+    attempts: true,
+    lastAttemptAt: true,
+    error: true,
+    priority: true,
+    scheduledAt: true,
+    sentAt: true,
+    variables: true,
+    html: true,
+    text: true,
+    createdAt: true,
   },
   fields: [
     {
@@ -177,9 +198,10 @@ const Emails: CollectionConfig = {
         readOnly: true,
       },
       filterOptions: ({ id }) => {
+        const emailId = resolveID({ id })
         return {
           'input.emailId': {
-            equals: id,
+            equals: emailId ? String(emailId) : '',
           },
         }
       },

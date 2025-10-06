@@ -1,5 +1,5 @@
 import { Payload } from 'payload'
-import { TemplateVariables } from '../types/index.js'
+import { TemplateVariables, PayloadID, PayloadRelation } from '../types/index.js'
 
 /**
  * Parse and validate email addresses
@@ -72,6 +72,49 @@ export const sanitizeFromName = (fromName: string | null | undefined): string | 
 
   const sanitized = sanitizeDisplayName(fromName, false)
   return sanitized.length > 0 ? sanitized : undefined
+}
+
+/**
+ * Type guard to check if a Payload relation is populated (object) or unpopulated (ID)
+ */
+export const isPopulated = <T extends { id: PayloadID }>(
+  value: PayloadRelation<T> | null | undefined
+): value is T => {
+  return value !== null && value !== undefined && typeof value === 'object' && 'id' in value
+}
+
+/**
+ * Resolves a Payload relation to just the ID
+ * Handles both populated (object with id) and unpopulated (string/number) values
+ */
+export const resolveID = <T extends { id: PayloadID }>(
+  value: PayloadRelation<T> | null | undefined
+): PayloadID | undefined => {
+  if (value === null || value === undefined) return undefined
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value
+  }
+
+  if (typeof value === 'object' && 'id' in value) {
+    return value.id
+  }
+
+  return undefined
+}
+
+/**
+ * Resolves an array of Payload relations to an array of IDs
+ * Handles mixed arrays of populated and unpopulated values
+ */
+export const resolveIDs = <T extends { id: PayloadID }>(
+  values: (PayloadRelation<T> | null | undefined)[] | null | undefined
+): PayloadID[] => {
+  if (!values || !Array.isArray(values)) return []
+
+  return values
+    .map(value => resolveID(value))
+    .filter((id): id is PayloadID => id !== undefined)
 }
 
 export const getMailing = (payload: Payload) => {
