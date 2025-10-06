@@ -12,7 +12,7 @@ const Emails: CollectionConfig = {
     description: 'Email delivery and status tracking',
   },
   defaultPopulate: {
-    template: true,
+    templateSlug: true,
     to: true,
     cc: true,
     bcc: true,
@@ -38,6 +38,14 @@ const Emails: CollectionConfig = {
       relationTo: 'email-templates' as const,
       admin: {
         description: 'Email template used (optional if custom content provided)',
+      },
+    },
+    {
+      name: 'templateSlug',
+      type: 'text',
+      admin: {
+        description: 'Slug of the email template (auto-populated from template relationship)',
+        readOnly: true,
       },
     },
     {
@@ -208,6 +216,27 @@ const Emails: CollectionConfig = {
     },
   ],
   hooks: {
+    beforeChange: [
+      async ({ data, req }) => {
+        // Auto-populate templateSlug from template relationship
+        if (data.template) {
+          try {
+            const template = await req.payload.findByID({
+              collection: 'email-templates',
+              id: typeof data.template === 'string' ? data.template : data.template.id,
+            })
+            data.templateSlug = template.slug
+          } catch (error) {
+            // If template lookup fails, clear the slug
+            data.templateSlug = undefined
+          }
+        } else {
+          // Clear templateSlug if template is removed
+          data.templateSlug = undefined
+        }
+        return data
+      }
+    ],
     // Simple approach: Only use afterChange hook for job management
     // This avoids complex interaction between hooks and ensures document ID is always available
     afterChange: [
