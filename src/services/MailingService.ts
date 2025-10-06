@@ -233,6 +233,7 @@ export class MailingService implements IMailingService {
       const email = await this.payload.findByID({
         collection: this.emailsCollection as any,
         id: emailId,
+        depth: 1,
       }) as BaseEmailDocument
 
       // Combine from and fromName for nodemailer using proper sanitization
