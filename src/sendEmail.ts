@@ -50,6 +50,22 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   let emailData: Partial<TEmail> = { ...options.data } as Partial<TEmail>
 
   if (options.template) {
+    // Find the template document to get its ID for the relationship field
+    const templatesCollection = mailingConfig.collections.templates || 'email-templates'
+    const { docs: templateDocs } = await payload.find({
+      collection: templatesCollection as any,
+      where: {
+        slug: {
+          equals: options.template.slug,
+        },
+      },
+      limit: 1,
+    })
+
+    if (!templateDocs || templateDocs.length === 0) {
+      throw new Error(`Template not found: ${options.template.slug}`)
+    }
+
     const { html, text, subject } = await renderTemplate(
       payload,
       options.template.slug,
@@ -58,6 +74,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     emailData = {
       ...emailData,
+      template: templateDocs[0].id,
       subject,
       html,
       text,
