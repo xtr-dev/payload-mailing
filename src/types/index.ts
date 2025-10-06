@@ -1,6 +1,12 @@
 import { Payload } from 'payload'
 import type { CollectionConfig, RichTextField } from 'payload'
 
+// Payload ID type (string or number)
+export type PayloadID = string | number
+
+// Payload relation type - can be populated (object with id) or unpopulated (just the ID)
+export type PayloadRelation<T extends { id: PayloadID }> = T | PayloadID
+
 // JSON value type that matches Payload's JSON field type
 export type JSONValue = string | number | boolean | { [k: string]: unknown } | unknown[] | null | undefined
 

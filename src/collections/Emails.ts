@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
+import { resolveID } from '../utils/helpers.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
@@ -197,9 +198,10 @@ const Emails: CollectionConfig = {
         readOnly: true,
       },
       filterOptions: ({ id }) => {
+        const emailId = resolveID({ id })
         return {
           'input.emailId': {
-            equals: id,
+            equals: emailId ? String(emailId) : '',
           },
         }
       },
