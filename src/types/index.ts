@@ -14,6 +14,7 @@ export type JSONValue = string | number | boolean | { [k: string]: unknown } | u
 export interface BaseEmailDocument {
   id: string | number
   template?: any
+  templateSlug?: string | null
   to: string[]
   cc?: string[] | null
   bcc?: string[] | null
