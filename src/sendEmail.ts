@@ -3,6 +3,7 @@ import { getMailing, renderTemplate, parseAndValidateEmails, sanitizeFromName } 
 import { BaseEmailDocument } from './types/index.js'
 import { processJobById } from './utils/emailProcessor.js'
 import { createContextLogger } from './utils/logger.js'
+import { pollForJobId } from './utils/jobPolling.js'
 
 // Options for sending emails
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
@@ -130,57 +131,14 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
     }
 
-    const maxAttempts = 5
-    const initialDelay = 25
-    const maxTotalTime = 3000
-    const startTime = Date.now()
-    let jobId: string | undefined
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (Date.now() - startTime > maxTotalTime) {
-        throw new Error(
-          `Job polling timed out after ${maxTotalTime}ms for email ${email.id}. ` +
-          `The auto-scheduling may have failed or is taking longer than expected.`
-        )
-      }
-
-      const delay = Math.min(initialDelay * Math.pow(2, attempt), 400)
-
-      if (attempt > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
-
-      const emailWithJobs = await payload.findByID({
-        collection: collectionSlug,
-        id: email.id,
-      })
-
-      if (emailWithJobs.jobs && emailWithJobs.jobs.length > 0) {
-        const firstJob = Array.isArray(emailWithJobs.jobs) ? emailWithJobs.jobs[0] : emailWithJobs.jobs
-        jobId = typeof firstJob === 'string' ? firstJob : String(firstJob.id || firstJob)
-        break
-      }
-
-      if (attempt >= 2) {
-        logger.debug(`Waiting for job creation for email ${email.id}, attempt ${attempt + 1}/${maxAttempts}`)
-      }
-    }
-
-    if (!jobId) {
-      const timeoutMsg = Date.now() - startTime >= maxTotalTime
-      const errorType = timeoutMsg ? 'POLLING_TIMEOUT' : 'JOB_NOT_FOUND'
-      const baseMessage = timeoutMsg
-        ? `Job polling timed out after ${maxTotalTime}ms for email ${email.id}`
-        : `No processing job found for email ${email.id} after ${maxAttempts} attempts (${Date.now() - startTime}ms)`
-
-      throw new Error(
-        `${errorType}: ${baseMessage}. ` +
-        `This indicates the email was created but job auto-scheduling failed. ` +
-        `The email exists in the database but immediate processing cannot proceed. ` +
-        `You may need to: 1) Check job queue configuration, 2) Verify database hooks are working, ` +
-        `3) Process the email later using processEmailById('${email.id}').`
-      )
-    }
+    // Poll for the job ID using configurable polling mechanism
+    const { jobId } = await pollForJobId({
+      payload,
+      collectionSlug,
+      emailId: email.id,
+      config: mailingConfig.jobPolling,
+      logger,
+    })
 
     try {
       await processJobById(payload, jobId)

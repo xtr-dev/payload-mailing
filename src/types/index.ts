@@ -68,6 +68,13 @@ export interface BeforeSendMailOptions {
 
 export type BeforeSendHook = (options: BeforeSendMailOptions, email: BaseEmailDocument) => BeforeSendMailOptions | Promise<BeforeSendMailOptions>
 
+export interface JobPollingConfig {
+  maxAttempts?: number        // Maximum number of polling attempts (default: 5)
+  initialDelay?: number       // Initial delay in milliseconds (default: 25)
+  maxTotalTime?: number       // Maximum total polling time in milliseconds (default: 3000)
+  maxBackoffDelay?: number    // Maximum delay between attempts in milliseconds (default: 400)
+}
+
 export interface MailingPluginConfig {
   collections?: {
     templates?: string | Partial<CollectionConfig>
@@ -83,6 +90,7 @@ export interface MailingPluginConfig {
   richTextEditor?: RichTextField['editor']
   beforeSend?: BeforeSendHook
   initOrder?: 'before' | 'after'
+  jobPolling?: JobPollingConfig
 }
 
 export interface QueuedEmail {
