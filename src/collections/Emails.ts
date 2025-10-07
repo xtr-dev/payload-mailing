@@ -206,7 +206,7 @@ const Emails: CollectionConfig = {
         readOnly: true,
       },
       filterOptions: ({ id }) => {
-        const emailId = resolveID({ id })
+        const emailId = resolveID(id)
         return {
           'input.emailId': {
             equals: emailId ? String(emailId) : '',
