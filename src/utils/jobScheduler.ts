@@ -129,7 +129,11 @@ export async function updateEmailJobRelationship(
       id: normalizedEmailId,
     })
 
-    const currentJobs = (currentEmail.jobs || []).map((job: any) => String(job))
+    // Extract IDs from job objects or use the value directly if it's already an ID
+    // Jobs can be populated (objects with id field) or just IDs (strings/numbers)
+    const currentJobs = (currentEmail.jobs || []).map((job: any) =>
+      typeof job === 'object' && job !== null && job.id ? String(job.id) : String(job)
+    )
     const allJobs = [...new Set([...currentJobs, ...normalizedJobIds])] // Deduplicate with normalized strings
 
     await payload.update({
