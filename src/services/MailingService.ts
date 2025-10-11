@@ -1,10 +1,10 @@
-import { Payload } from 'payload'
+import {CollectionSlug, EmailAdapter, Payload, SendEmailOptions} from 'payload'
 import { Liquid } from 'liquidjs'
 import {
   MailingPluginConfig,
   TemplateVariables,
   MailingService as IMailingService,
-  BaseEmail, BaseEmailTemplate, BaseEmailDocument, BaseEmailTemplateDocument
+  BaseEmailDocument, BaseEmailTemplateDocument
 } from '../types/index.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 import { sanitizeDisplayName } from '../utils/helpers.js'
@@ -12,7 +12,6 @@ import { sanitizeDisplayName } from '../utils/helpers.js'
 export class MailingService implements IMailingService {
   public payload: Payload
   private config: MailingPluginConfig
-  private emailAdapter: any
   private templatesCollection: string
   private emailsCollection: string
   private liquid: Liquid | null | false = null
@@ -31,14 +30,13 @@ export class MailingService implements IMailingService {
     if (!this.payload.email) {
       throw new Error('Payload email configuration is required. Please configure email in your Payload config.')
     }
-    this.emailAdapter = this.payload.email
   }
 
   private ensureInitialized(): void {
     if (!this.payload || !this.payload.db) {
       throw new Error('MailingService payload not properly initialized')
     }
-    if (!this.emailAdapter) {
+    if (!this.payload.email) {
       throw new Error('Email adapter not configured. Please ensure Payload has email configured.')
     }
   }
@@ -153,7 +151,7 @@ export class MailingService implements IMailingService {
     const currentTime = new Date().toISOString()
 
     const { docs: pendingEmails } = await this.payload.find({
-      collection: this.emailsCollection as any,
+      collection: this.emailsCollection as CollectionSlug,
       where: {
         and: [
           {
@@ -193,7 +191,7 @@ export class MailingService implements IMailingService {
     const retryTime = new Date(Date.now() - retryDelay).toISOString()
 
     const { docs: failedEmails } = await this.payload.find({
-      collection: this.emailsCollection as any,
+      collection: this.emailsCollection as CollectionSlug,
       where: {
         and: [
           {
@@ -233,7 +231,7 @@ export class MailingService implements IMailingService {
   async processEmailItem(emailId: string): Promise<void> {
     try {
       await this.payload.update({
-        collection: this.emailsCollection as any,
+        collection: this.emailsCollection as CollectionSlug,
         id: emailId,
         data: {
           status: 'processing',
@@ -242,7 +240,7 @@ export class MailingService implements IMailingService {
       })
 
       const email = await this.payload.findByID({
-        collection: this.emailsCollection as any,
+        collection: this.emailsCollection as CollectionSlug,
         id: emailId,
         depth: 1,
       }) as BaseEmailDocument
@@ -255,7 +253,7 @@ export class MailingService implements IMailingService {
         fromField = this.getDefaultFrom()
       }
 
-      let mailOptions: any = {
+      let mailOptions: SendEmailOptions = {
         from: fromField,
         to: email.to,
         cc: email.cc || undefined,
@@ -264,6 +262,19 @@ export class MailingService implements IMailingService {
         subject: email.subject,
         html: email.html,
         text: email.text || undefined,
+      }
+
+      if (!mailOptions.from) {
+        throw new Error('Email from field is required')
+      }
+      if (!mailOptions.to || (Array.isArray(mailOptions.to) && mailOptions.to.length === 0)) {
+        throw new Error('Email to field is required')
+      }
+      if (!mailOptions.subject) {
+        throw new Error('Email subject is required')
+      }
+      if (!mailOptions.html && !mailOptions.text) {
+        throw new Error('Email content is required')
       }
 
       // Call beforeSend hook if configured
@@ -291,10 +302,10 @@ export class MailingService implements IMailingService {
       }
 
       // Send email using Payload's email adapter
-      await this.emailAdapter.sendEmail(mailOptions)
+      await this.payload.email.sendEmail(mailOptions)
 
       await this.payload.update({
-        collection: this.emailsCollection as any,
+        collection: this.emailsCollection as CollectionSlug,
         id: emailId,
         data: {
           status: 'sent',
@@ -308,7 +319,7 @@ export class MailingService implements IMailingService {
       const maxAttempts = this.config.retryAttempts || 3
 
       await this.payload.update({
-        collection: this.emailsCollection as any,
+        collection: this.emailsCollection as CollectionSlug,
         id: emailId,
         data: {
           status: attempts >= maxAttempts ? 'failed' : 'pending',
@@ -325,14 +336,14 @@ export class MailingService implements IMailingService {
 
   private async incrementAttempts(emailId: string): Promise<number> {
     const email = await this.payload.findByID({
-      collection: this.emailsCollection as any,
+      collection: this.emailsCollection as CollectionSlug,
       id: emailId,
     })
 
     const newAttempts = ((email as any).attempts || 0) + 1
 
     await this.payload.update({
-      collection: this.emailsCollection as any,
+      collection: this.emailsCollection as CollectionSlug,
       id: emailId,
       data: {
         attempts: newAttempts,
