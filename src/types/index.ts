@@ -1,4 +1,4 @@
-import { Payload } from 'payload'
+import {Payload, SendEmailOptions} from 'payload'
 import type { CollectionConfig, RichTextField } from 'payload'
 
 // Payload ID type (string or number)
@@ -46,28 +46,11 @@ export interface BaseEmailTemplateDocument {
   updatedAt?: string | Date | null
 }
 
-export type BaseEmail<TEmail extends BaseEmailDocument = BaseEmailDocument, TEmailTemplate extends BaseEmailTemplateDocument = BaseEmailTemplateDocument> = Omit<TEmail, 'id' | 'template'> & {template: Omit<TEmailTemplate, 'id'> | TEmailTemplate['id'] | undefined | null}
-
-export type BaseEmailTemplate<TEmailTemplate extends BaseEmailTemplateDocument = BaseEmailTemplateDocument> = Omit<TEmailTemplate, 'id'>
-
 export type TemplateRendererHook = (template: string, variables: Record<string, any>) => string | Promise<string>
 
 export type TemplateEngine = 'liquidjs' | 'mustache' | 'simple'
 
-export interface BeforeSendMailOptions {
-  from: string
-  to: string[]
-  cc?: string[]
-  bcc?: string[]
-  replyTo?: string
-  subject: string
-  html: string
-  text?: string
-  attachments?: any[]
-  [key: string]: any
-}
-
-export type BeforeSendHook = (options: BeforeSendMailOptions, email: BaseEmailDocument) => BeforeSendMailOptions | Promise<BeforeSendMailOptions>
+export type BeforeSendHook = (options: SendEmailOptions, email: BaseEmailDocument) => SendEmailOptions | Promise<SendEmailOptions>
 
 export interface JobPollingConfig {
   maxAttempts?: number        // Maximum number of polling attempts (default: 5)
