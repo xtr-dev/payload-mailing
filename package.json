@@ -10,6 +10,11 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./tasks": {
+      "import": "./dist/tasks/index.js",
+      "types": "./dist/tasks/index.d.ts",
+      "default": "./dist/tasks/index.js"
     }
   },
   "scripts": {
@@ -42,7 +47,13 @@
   "author": "XTR Development",
   "license": "MIT",
   "peerDependencies": {
-    "payload": "^3.37.0"
+    "payload": "^3.37.0",
+    "@xtr-dev/payload-automation": "^0.0.40"
+  },
+  "peerDependenciesMeta": {
+    "@xtr-dev/payload-automation": {
+      "optional": true
+    }
   },
   "dependencies": {
     "nodemailer": "^6.9.8"

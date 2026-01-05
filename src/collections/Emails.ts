@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { findExistingJobs, ensureEmailJob, updateEmailJobRelationship } from '../utils/jobScheduler.js'
+import { ensureEmailJob } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
 import { resolveID } from '../utils/helpers.js'
 
@@ -261,15 +261,14 @@ const Emails: CollectionConfig = {
           // - Checking for existing jobs (duplicate prevention)
           // - Creating new job if needed
           // - Returning all job IDs
-          const result = await ensureEmailJob(req.payload, doc.id, {
+          //
+          // Note: We don't call updateEmailJobRelationship here because:
+          // 1. The jobs field has filterOptions that dynamically queries jobs by emailId
+          // 2. Updating the relationship in afterChange causes transaction isolation issues
+          //    (the new job isn't committed yet, so the relationship validation fails)
+          await ensureEmailJob(req.payload, doc.id, {
             scheduledAt: doc.scheduledAt,
           })
-
-          // Update the email's job relationship if we have jobs
-          // This handles both new jobs and existing jobs that weren't in the relationship
-          if (result.jobIds.length > 0) {
-            await updateEmailJobRelationship(req.payload, doc.id, result.jobIds, 'emails')
-          }
         } catch (error) {
           // Log error but don't throw - we don't want to fail the email operation
           const logger = createContextLogger(req.payload, 'EMAILS_HOOK')
