@@ -63,6 +63,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       subject,
       html,
       text,
+      variables: options.template.variables || {},
     } as Partial<TEmail>
   }
 
