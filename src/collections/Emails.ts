@@ -276,9 +276,16 @@ const Emails: CollectionConfig = {
           // 1. The jobs field has filterOptions that dynamically queries jobs by emailId
           // 2. Updating the relationship in afterChange causes transaction isolation issues
           //    (the new job isn't committed yet, so the relationship validation fails)
-          await ensureEmailJob(req.payload, doc.id, {
+          const { jobIds } = await ensureEmailJob(req.payload, doc.id, {
             scheduledAt: doc.scheduledAt,
           })
+
+          // Hand the queued job ID(s) back to the caller through the request
+          // context. sendEmail's `processImmediately` path reads this to run the
+          // job right away instead of polling for it to appear.
+          if (req.context && jobIds.length > 0) {
+            (req.context as { emailJobIds?: (number | string)[] }).emailJobIds = jobIds
+          }
         } catch (error) {
           // Log error but don't throw - we don't want to fail the email operation
           const logger = createContextLogger(req.payload, 'EMAILS_HOOK')

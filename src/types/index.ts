@@ -51,6 +51,12 @@ export type TemplateEngine = 'liquidjs' | 'mustache' | 'simple'
 
 export type BeforeSendHook = (options: SendEmailOptions, email: BaseEmailDocument) => Promise<SendEmailOptions> | SendEmailOptions
 
+/**
+ * @deprecated No longer used. `sendEmail({ processImmediately: true })` no longer
+ * polls for the auto-scheduled job — the job ID is handed back synchronously via
+ * the request context when the email is created — so these tuning options have no
+ * effect and will be removed in a future release.
+ */
 export interface JobPollingConfig {
   initialDelay?: number       // Initial delay in milliseconds (default: 25)
   maxAttempts?: number        // Maximum number of polling attempts (default: 5)
@@ -67,6 +73,7 @@ export interface MailingPluginConfig {
   defaultFrom?: string
   defaultFromName?: string
   initOrder?: 'after' | 'before'
+  /** @deprecated No longer used — immediate sends no longer poll. See {@link JobPollingConfig}. */
   jobPolling?: JobPollingConfig
   queue?: string
   retryAttempts?: number

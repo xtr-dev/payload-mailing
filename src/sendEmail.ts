@@ -4,7 +4,7 @@ import type { BaseEmailDocument } from './types/index.js'
 
 import { processJobById } from './utils/emailProcessor.js'
 import { getMailing, parseAndValidateEmails, renderTemplateWithId, sanitizeFromName } from './utils/helpers.js'
-import { pollForJobId } from './utils/jobPolling.js'
+import { ensureEmailJob } from './utils/jobScheduler.js'
 import { createContextLogger } from './utils/logger.js'
 
 // Options for sending emails
@@ -120,8 +120,15 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     emailData.updatedAt = emailData.updatedAt.toISOString()
   }
 
+  // Pass a context object into the create operation. The Emails afterChange hook
+  // runs synchronously within this call and writes the IDs of the job(s) it
+  // queues onto this same object (Payload assigns `req.context` to the object we
+  // pass here by reference), letting us run the job below without polling for it.
+  const createContext: { emailJobIds?: (number | string)[] } = {}
+
   const email = await payload.create({
     collection: collectionSlug,
+    context: createContext,
     data: emailData
   })
 
@@ -136,14 +143,26 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       throw new Error('PayloadCMS jobs not configured - cannot process email immediately')
     }
 
-    // Poll for the job ID using configurable polling mechanism
-    const { jobId } = await pollForJobId({
-      collectionSlug,
-      config: mailingConfig.config.jobPolling,
-      emailId: email.id,
-      logger,
-      payload,
-    })
+    // Resolve the processing job without polling. The job is queued
+    // synchronously while `payload.create` runs its afterChange hook, which hands
+    // the job ID(s) back through the shared request context — so the ID is
+    // already available here. If the context is empty (e.g. a custom email
+    // collection that doesn't run the plugin's hook, or an email created in a
+    // non-pending status), queue the job directly; `ensureEmailJob` returns the
+    // new job ID without any lookup. Both paths obtain the ID from the queue
+    // operation itself rather than querying for it, which also avoids the
+    // payload-jobs `input.emailId` lookup that some database adapters can't run.
+    const handedOffJobIds = createContext.emailJobIds
+    let jobId = Array.isArray(handedOffJobIds) && handedOffJobIds.length > 0
+      ? String(handedOffJobIds[0])
+      : undefined
+
+    if (!jobId) {
+      const { jobIds } = await ensureEmailJob(payload, email.id, {
+        scheduledAt: emailData.scheduledAt as Date | string | undefined,
+      })
+      jobId = String(jobIds[0])
+    }
 
     try {
       await processJobById(payload, jobId)
