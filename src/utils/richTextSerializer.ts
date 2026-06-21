@@ -33,7 +33,7 @@ function escapeHtml(input: string): string {
  */
 function safeUrl(rawUrl: string): string {
   const url = (rawUrl || '#').trim()
-  if (/^(https?:|mailto:)/i.test(url) || /^[^a-z]|^[#/]/i.test(url)) {
+  if (/^(?:https?:|mailto:)/i.test(url) || /^[^a-z]/i.test(url)) {
     return escapeHtml(url)
   }
   return '#'
