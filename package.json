@@ -48,8 +48,8 @@
   "author": "XTR Development",
   "license": "MIT",
   "peerDependencies": {
-    "payload": "^3.37.0",
-    "@xtr-dev/payload-automation": "^0.0.40"
+    "@xtr-dev/payload-automation": "^0.0.40",
+    "payload": "^3.37.0"
   },
   "peerDependenciesMeta": {
     "@xtr-dev/payload-automation": {
@@ -82,10 +82,10 @@
     "copyfiles": "^2.4.1",
     "cross-env": "^7.0.3",
     "eslint": "^9.23.0",
-    "eslint-config-next": "^15.4.4",
+    "eslint-config-next": "^15.5.19",
     "graphql": "^16.8.1",
     "mongodb-memory-server": "^10.1.4",
-    "next": "^15.4.4",
+    "next": "^15.5.19",
     "open": "^10.1.0",
     "payload": "3.55.1",
     "prettier": "^3.4.2",
