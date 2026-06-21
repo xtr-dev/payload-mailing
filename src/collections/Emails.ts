@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { resolveID } from '../utils/helpers.js'
+import { getMailing, resolveID } from '../utils/helpers.js'
 import { ensureEmailJob } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
 
@@ -222,9 +222,18 @@ const Emails: CollectionConfig = {
         // Auto-populate templateSlug from template relationship
         if (data.template) {
           try {
+            // Resolve the configured templates collection slug at runtime, since it
+            // is customizable via the plugin's `collections.templates` option.
+            // Fall back to the default slug if the mailing context is unavailable.
+            let templatesCollection = 'email-templates'
+            try {
+              templatesCollection = getMailing(req.payload).collections.templates
+            } catch {
+              // Mailing context not initialized; keep the default slug.
+            }
             const template = await req.payload.findByID({
               id: typeof data.template === 'string' ? data.template : data.template.id,
-              collection: 'email-templates',
+              collection: templatesCollection,
             })
             data.templateSlug = template.slug
           } catch (error) {
