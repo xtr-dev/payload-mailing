@@ -147,8 +147,8 @@ mailingPlugin({
 Use `{{}}` to insert data in templates:
 
 - `{{user.name}}` - User data from variables
-- `{{formatDate createdAt "short"}}` - Built-in date formatting
-- `{{formatCurrency amount "USD"}}` - Currency formatting
+- `{{ createdAt | formatDate: "short" }}` - Built-in date formatting
+- `{{ amount | formatCurrency: "USD" }}` - Currency formatting
 
 ### Template Structure
 
@@ -179,7 +179,7 @@ Welcome to {{siteName}}!
 
 ---
 **Account Details:**
-- Created: {{formatDate user.createdAt "long"}}
+- Created: {{ user.createdAt | formatDate: "long" }}
 - Email: {{user.email}}
 - Plan: {{user.plan | capitalize}}
 
