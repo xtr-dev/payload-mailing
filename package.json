@@ -15,6 +15,11 @@
       "import": "./dist/tasks/index.js",
       "types": "./dist/tasks/index.d.ts",
       "default": "./dist/tasks/index.js"
+    },
+    "./client": {
+      "import": "./dist/exports/client.js",
+      "types": "./dist/exports/client.d.ts",
+      "default": "./dist/exports/client.js"
     }
   },
   "scripts": {
@@ -48,11 +53,23 @@
   "author": "XTR Development",
   "license": "MIT",
   "peerDependencies": {
+    "@payloadcms/ui": "^3.37.0",
     "@xtr-dev/payload-automation": "^0.0.40",
-    "payload": "^3.37.0"
+    "payload": "^3.37.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
+    "@payloadcms/ui": {
+      "optional": true
+    },
     "@xtr-dev/payload-automation": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     }
   },

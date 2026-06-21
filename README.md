@@ -9,6 +9,8 @@ A template-based email system with scheduling and job processing for PayloadCMS 
 ## Features
 
 - 📧 Template-based emails with LiquidJS, Mustache, or custom engines
+- 🧱 Reusable email layouts (header/footer/branding wrappers)
+- 👁️ In-admin live render preview (HTML + plain text) with sample variables
 - ⏰ Email scheduling for future delivery
 - 🔄 Automatic retry mechanism for failed sends
 - 🎯 Full TypeScript support with generated Payload types
@@ -230,10 +232,48 @@ nothing changes: the **Layout** field is not added to the collection and every
 template renders **exactly as before**. A template set to **None** also renders
 unwrapped.
 
-> **Roadmap:** An in-admin render preview for templates/layouts is planned as a
-> follow-up (issue #88, Part 2). A collection-based layout source (editor-managed
-> layouts) may also be offered in a future release as an alternative to the
-> config map.
+> **Roadmap:** A collection-based layout source (editor-managed layouts) may be
+> offered in a future release as an alternative to the config map.
+
+## In-admin render preview
+
+The templates collection includes a live **Preview** panel in the edit view that
+renders the current (unsaved) template and shows both outputs side by side:
+
+- the **HTML** output, in a sandboxed `iframe` (scripts disabled, so preview
+  content can never execute), and
+- the **plain-text** output, in a monospace panel.
+
+A **Sample variables** JSON field seeds the preview — e.g. `{ "firstName": "Ada" }`.
+Edit the content, subject, sample variables, or selected layout and the preview
+re-renders (debounced). Rendering goes through the same server-side pipeline used
+to send real emails (`POST <api>/mailing/preview-template`), so the preview honors
+the configured **template engine** and the selected **layout** rather than
+reimplementing serialization in the browser. The `sampleVariables` field is used
+only for previewing — it is never stored on sent emails.
+
+### Registering the client component
+
+The preview ships a client component (`@xtr-dev/payload-mailing/client#TemplatePreview`),
+so after adding or upgrading the plugin you must regenerate your import map:
+
+```bash
+payload generate:importmap
+```
+
+### Disabling the preview
+
+The preview is enabled by default. To omit the preview field and its client
+component (for example, if you prefer not to regenerate the import map), set:
+
+```typescript
+mailingPlugin({
+  adminPreview: false,
+})
+```
+
+The preview render endpoint is always registered; only the admin field and its
+component are gated by this option.
 
 ## Templates
 

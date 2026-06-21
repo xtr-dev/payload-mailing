@@ -90,6 +90,14 @@ export interface JobPollingConfig {
 }
 
 export interface MailingPluginConfig {
+  /**
+   * Enables the in-admin template render preview (live HTML + plain-text) on the
+   * templates collection. Enabled by default. Set to `false` to omit the preview
+   * UI field and its client component — useful for apps that prefer not to
+   * regenerate their importMap. The preview render endpoint is registered
+   * regardless of this flag.
+   */
+  adminPreview?: boolean
   beforeSend?: BeforeSendHook
   collections?: {
     emails?: Partial<CollectionConfig> | string

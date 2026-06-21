@@ -30,9 +30,46 @@ const createLayoutField = (layoutNames: string[]): Field | null => {
   }
 }
 
+/**
+ * Builds the in-admin render-preview fields: a `sampleVariables` JSON input that
+ * seeds the preview, and a `preview` UI field that renders the live HTML and
+ * plain-text output via the plugin's client component. Returns an empty array
+ * when the preview is disabled, leaving the collection schema unchanged.
+ *
+ * The component is referenced by its package client-export path so the host app
+ * resolves it through its generated importMap.
+ */
+const createPreviewFields = (enablePreview: boolean): Field[] => {
+  if (!enablePreview) {
+    return []
+  }
+
+  return [
+    {
+      name: 'sampleVariables',
+      type: 'json',
+      admin: {
+        description:
+          'Sample variables used to render the live preview below (e.g. {"firstName": "Ada"}). Only used for previewing — not stored on sent emails.',
+      },
+      defaultValue: {},
+    },
+    {
+      name: 'preview',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@xtr-dev/payload-mailing/client#TemplatePreview',
+        },
+      },
+    },
+  ]
+}
+
 export const createEmailTemplatesCollection = (
   editor?: RichTextField['editor'],
   layoutNames: string[] = [],
+  enablePreview = false,
 ): CollectionConfig => ({
   slug: 'email-templates',
   admin: {
@@ -91,6 +128,8 @@ export const createEmailTemplatesCollection = (
     },
     // Only present when layouts are configured; filtered out otherwise.
     ...([createLayoutField(layoutNames)].filter(Boolean) as Field[]),
+    // In-admin render preview (sampleVariables + preview UI); empty when disabled.
+    ...createPreviewFields(enablePreview),
   ],
   timestamps: true,
 })

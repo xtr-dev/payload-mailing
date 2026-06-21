@@ -5,6 +5,8 @@ import { sendEmail } from '@xtr-dev/payload-mailing'
 import { createPayloadRequest, getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
+import { previewTemplateHandler } from '../src/endpoints/previewTemplate.js'
+
 // import { customEndpointHandler } from '../src/endpoints/customEndpointHandler.js'
 
 let payload: Payload
@@ -66,6 +68,41 @@ describe('Plugin integration tests', () => {
       (job) => job.input?.emailId === String(email.id)
     )
     expect(jobForEmail).toBeDefined()
+  })
+
+  test('preview-template endpoint renders draft content + sample variables', async () => {
+    const draftContent = {
+      root: { children: [{ children: [{ text: 'Hello {{ firstName }}', type: 'text' }], type: 'paragraph' }] },
+    }
+
+    // Minimal PayloadRequest shape the handler needs (auth user, JSON body, payload).
+    const req = {
+      body: 'present',
+      headers: new Headers({ 'Content-Length': '999', 'Content-Type': 'application/json' }),
+      method: 'POST',
+      payload,
+      text: async () =>
+        JSON.stringify({
+          content: draftContent,
+          subject: 'Welcome {{ firstName }}',
+          variables: { firstName: 'Ada' },
+        }),
+      user: { id: 'tester' },
+    } as unknown as Parameters<typeof previewTemplateHandler>[0]
+
+    const response = await previewTemplateHandler(req)
+    expect(response.status).toBe(200)
+
+    const result = (await response.json()) as { html: string; subject: string; text: string }
+    expect(result.subject).toBe('Welcome Ada')
+    expect(result.html).toContain('Hello Ada')
+    expect(result.text).toContain('Hello Ada')
+  })
+
+  test('preview-template endpoint rejects unauthenticated requests', async () => {
+    const req = { method: 'POST', payload, user: null } as unknown as Parameters<typeof previewTemplateHandler>[0]
+    const response = await previewTemplateHandler(req)
+    expect(response.status).toBe(401)
   })
 
   test('sendEmail({ processImmediately: true }) processes synchronously without polling', async () => {

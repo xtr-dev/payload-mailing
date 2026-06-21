@@ -74,3 +74,57 @@ describe('renderTemplateDocument — variable escaping (simple engine)', () => {
     expect(subject).toBe('<b>bad</b>')
   })
 })
+
+// This is the exact render path the in-admin preview endpoint invokes
+// (renderTemplateDocument with draft content + selected layout + sample
+// variables), so these also cover the layout composition added in Part 1.
+describe('renderTemplateDocument — layout composition', () => {
+  const layoutsConfig = {
+    layouts: {
+      branded: {
+        html: '<header>ACME</header><main>{{ content }}</main>',
+        text: '== ACME ==\n{{ content }}',
+      },
+    },
+  }
+
+  test('wraps the HTML and text body in the configured defaultLayout', async () => {
+    const svc = makeService({ ...layoutsConfig, defaultLayout: 'branded' })
+    const { html, text } = await svc.renderTemplateDocument(
+      template('Hello, {{ name }}!', 'hi'),
+      { name: 'Ada' },
+    )
+    expect(html).toContain('<header>ACME</header>')
+    expect(html).toContain('<main>')
+    expect(html).toContain('Hello, Ada!')
+    expect(text).toContain('== ACME ==')
+    expect(text).toContain('Hello, Ada!')
+  })
+
+  test('the template body is injected verbatim (escaped once, not double-escaped)', async () => {
+    const svc = makeService({ ...layoutsConfig, defaultLayout: 'branded' })
+    const { html } = await svc.renderTemplateDocument(
+      template('Hi {{ name }}', 'hi'),
+      { name: XSS },
+    )
+    // Escaped exactly once by the body render; the layout wrap must not re-escape.
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+    expect(html).not.toContain('&amp;lt;')
+  })
+
+  test('a template layout of "none" opts out of the defaultLayout', async () => {
+    const svc = makeService({ ...layoutsConfig, defaultLayout: 'branded' })
+    const tpl = { ...template('Body', 'hi'), layout: 'none' }
+    const { html } = await svc.renderTemplateDocument(tpl, {})
+    expect(html).not.toContain('ACME')
+    expect(html).toContain('Body')
+  })
+
+  test('no layouts configured renders the body unwrapped (back-compat)', async () => {
+    const svc = makeService()
+    const { html, text } = await svc.renderTemplateDocument(template('Plain', 'hi'), {})
+    expect(html).toContain('Plain')
+    expect(html).not.toContain('ACME')
+    expect(text).toContain('Plain')
+  })
+})
