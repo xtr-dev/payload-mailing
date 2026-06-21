@@ -11,12 +11,15 @@ import type {
 } from '../types/index.js'
 
 import { sanitizeDisplayName } from '../utils/helpers.js'
-import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
+import { escapeHtml, serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
 export class MailingService implements IMailingService {
   private config: MailingPluginConfig
   private emailsCollection: string
   private liquid: false | Liquid | null = null
+  // Separate engine with auto HTML-escaping enabled, used when substituting
+  // variables into the HTML body so untrusted values cannot inject markup.
+  private liquidEscaped: false | Liquid | null = null
   private templatesCollection: string
   public payload: Payload
 
@@ -51,42 +54,22 @@ export class MailingService implements IMailingService {
     try {
       const liquidModule = await import('liquidjs')
       const { Liquid: LiquidEngine } = liquidModule
+
+      // Two engines share identical filters but differ in output handling:
+      // `liquid` emits variable output verbatim (correct for plain-text bodies
+      // and subjects), while `liquidEscaped` HTML-escapes every `{{ output }}`
+      // so untrusted variables cannot inject markup into the HTML body. Authors
+      // opt back into raw HTML per-variable with the `| raw` filter.
       this.liquid = new LiquidEngine()
+      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape' })
 
-      // Register custom filters (equivalent to Handlebars helpers)
-      if (this.liquid) {
-        this.liquid.registerFilter('formatDate', (date: any, format?: string) => {
-          if (!date) {return ''}
-          const d = new Date(date)
-          if (format === 'short') {
-            return d.toLocaleDateString()
-          }
-          if (format === 'long') {
-            return d.toLocaleDateString('en-US', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            })
-          }
-          return d.toLocaleString()
-        })
-
-        this.liquid.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
-          if (typeof amount !== 'number') {return amount}
-          return new Intl.NumberFormat('en-US', {
-            currency,
-            style: 'currency'
-          }).format(amount)
-        })
-
-        this.liquid.registerFilter('capitalize', (str: any) => {
-          if (typeof str !== 'string') {return str}
-          return str.charAt(0).toUpperCase() + str.slice(1)
-        })
-      }
+      this.registerLiquidFilters(this.liquid)
+      this.registerLiquidFilters(this.liquidEscaped)
     } catch (error) {
       console.warn('LiquidJS not available. Falling back to simple variable replacement. Install liquidjs or use a different templateEngine.')
-      this.liquid = false // Mark as failed to avoid retries
+      // Mark both as failed to avoid retries.
+      this.liquid = false
+      this.liquidEscaped = false
     }
   }
 
@@ -151,6 +134,41 @@ export class MailingService implements IMailingService {
     return newAttempts
   }
 
+  /**
+   * Registers the built-in template filters (equivalent to Handlebars helpers)
+   * on a LiquidJS engine instance.
+   */
+  private registerLiquidFilters(engine: Liquid): void {
+    engine.registerFilter('formatDate', (date: any, format?: string) => {
+      if (!date) {return ''}
+      const d = new Date(date)
+      if (format === 'short') {
+        return d.toLocaleDateString()
+      }
+      if (format === 'long') {
+        return d.toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        })
+      }
+      return d.toLocaleString()
+    })
+
+    engine.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
+      if (typeof amount !== 'number') {return amount}
+      return new Intl.NumberFormat('en-US', {
+        currency,
+        style: 'currency'
+      }).format(amount)
+    })
+
+    engine.registerFilter('capitalize', (str: any) => {
+      if (typeof str !== 'string') {return str}
+      return str.charAt(0).toUpperCase() + str.slice(1)
+    })
+  }
+
   private async renderEmailTemplate(template: BaseEmailTemplateDocument, variables: Record<string, any> = {}): Promise<{ html: string; text: string }> {
     if (!template.content) {
       return { html: '', text: '' }
@@ -160,15 +178,22 @@ export class MailingService implements IMailingService {
     let html = serializeRichTextToHTML(template.content)
     let text = serializeRichTextToText(template.content)
 
-    // Apply template variables to the rendered content
-    html = await this.renderTemplateString(html, variables)
+    // Apply template variables to the rendered content. Only the HTML body
+    // escapes substituted values — the plain-text body must keep characters
+    // like `&` verbatim, otherwise recipients see literal entities (`&amp;`).
+    html = await this.renderTemplateString(html, variables, { escapeHtml: true })
     text = await this.renderTemplateString(text, variables)
 
     return { html, text }
   }
 
-  private async renderTemplateString(template: string, variables: Record<string, any>): Promise<string> {
-    // Use custom template renderer if provided
+  private async renderTemplateString(
+    template: string,
+    variables: Record<string, any>,
+    options: { escapeHtml?: boolean } = {}
+  ): Promise<string> {
+    // Use custom template renderer if provided. Custom renderers are
+    // responsible for their own output escaping.
     if (this.config.templateRenderer) {
       try {
         return await this.config.templateRenderer(template, variables)
@@ -184,8 +209,11 @@ export class MailingService implements IMailingService {
     if (engine === 'liquidjs') {
       try {
         await this.ensureLiquidJSInitialized()
-        if (this.liquid) {
-          return await this.liquid.parseAndRender(template, variables)
+        // For HTML output use the auto-escaping engine so untrusted variable
+        // values cannot inject markup; elsewhere emit values verbatim.
+        const liquid = options.escapeHtml ? this.liquidEscaped : this.liquid
+        if (liquid) {
+          return await liquid.parseAndRender(template, variables)
         }
       } catch (error) {
         console.error('LiquidJS template rendering error:', error)
@@ -205,7 +233,7 @@ export class MailingService implements IMailingService {
     }
 
     // Fallback to simple variable replacement
-    return this.simpleVariableReplacement(template, variables)
+    return this.simpleVariableReplacement(template, variables, options)
   }
 
   private async renderWithMustache(template: string, variables: Record<string, any>): Promise<null | string> {
@@ -226,10 +254,18 @@ export class MailingService implements IMailingService {
     return sanitizeDisplayName(name, true) // escapeQuotes = true for email headers
   }
 
-  private simpleVariableReplacement(template: string, variables: Record<string, any>): string {
+  private simpleVariableReplacement(
+    template: string,
+    variables: Record<string, any>,
+    options: { escapeHtml?: boolean } = {}
+  ): string {
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
       const value = variables[key]
-      return value !== undefined ? String(value) : match
+      if (value === undefined) {return match}
+      const str = String(value)
+      // The simple engine has no escaping syntax, so HTML-escape substituted
+      // values when rendering into the HTML body to avoid markup injection.
+      return options.escapeHtml ? escapeHtml(str) : str
     })
   }
 

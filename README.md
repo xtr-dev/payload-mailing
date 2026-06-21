@@ -142,6 +142,23 @@ mailingPlugin({
 })
 ```
 
+### Variable escaping & untrusted data
+
+Rich-text content is HTML-escaped during serialization, and template
+**variables substituted into the HTML body are HTML-escaped by default** so that
+untrusted values (names, user input, etc.) cannot inject markup or scripts into
+the email. This applies to the built-in engines:
+
+- **LiquidJS** (default) and **Simple** — HTML-body variables are auto-escaped.
+  In LiquidJS, opt a specific variable back into raw HTML with the `raw` filter:
+  `{{ trustedHtml | raw }}`.
+- **Mustache** — already escapes `{{ var }}` by default; use `{{{ var }}}` for raw.
+- **Custom renderer** — you are responsible for escaping your own output.
+
+Escaping is applied to the **HTML body only**. The plain-text body and the
+subject line keep variable values verbatim, so characters like `&` are not
+turned into entities for recipients.
+
 ## Templates
 
 Use `{{}}` to insert data in templates:
