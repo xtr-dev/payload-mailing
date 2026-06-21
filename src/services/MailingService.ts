@@ -54,7 +54,7 @@ export class MailingService implements IMailingService {
       this.liquid = new LiquidEngine()
 
       // Register custom filters (equivalent to Handlebars helpers)
-      if (this.liquid && typeof this.liquid !== 'boolean') {
+      if (this.liquid) {
         this.liquid.registerFilter('formatDate', (date: any, format?: string) => {
           if (!date) {return ''}
           const d = new Date(date)
