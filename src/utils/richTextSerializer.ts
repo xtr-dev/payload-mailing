@@ -200,12 +200,3 @@ function serializeNodeToText(node: SerializedLexicalNode): string {
       return ''
   }
 }
-
-/**
- * Applies Handlebars variables to richtext-generated HTML/text
- */
-export function applyVariablesToContent(content: string, variables: Record<string, any>): string {
-  // This function can be extended to handle more complex variable substitution
-  // For now, it works with the Handlebars rendering that happens later
-  return content
-}
