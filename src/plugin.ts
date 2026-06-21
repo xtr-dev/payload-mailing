@@ -16,8 +16,11 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
   const templatesSlug = typeof templatesConfig === 'string' ? templatesConfig : 'email-templates'
   const templatesOverrides = typeof templatesConfig === 'object' ? templatesConfig : {}
 
-  // Create base templates collection with custom editor if provided
-  const baseTemplatesCollection = createEmailTemplatesCollection(pluginConfig.richTextEditor)
+  // Create base templates collection with custom editor if provided. The
+  // configured layout names drive the template's `layout` select options so
+  // editors can only pick layouts that actually exist.
+  const layoutNames = Object.keys(pluginConfig.layouts || {})
+  const baseTemplatesCollection = createEmailTemplatesCollection(pluginConfig.richTextEditor, layoutNames)
 
   const templatesCollection = {
     ...baseTemplatesCollection,

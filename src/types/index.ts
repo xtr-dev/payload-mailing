@@ -39,6 +39,9 @@ export interface BaseEmailTemplateDocument {
   content?: any
   createdAt?: Date | null | string
   id: number | string
+  // Name of the configured layout to wrap this template's body in, or 'none'
+  // / null to opt out. When unset, the plugin's defaultLayout (if any) applies.
+  layout?: null | string
   name: string
   slug: string
   subject?: null | string
@@ -50,6 +53,28 @@ export type TemplateRendererHook = (template: string, variables: Record<string, 
 export type TemplateEngine = 'liquidjs' | 'mustache' | 'simple'
 
 export type BeforeSendHook = (options: SendEmailOptions, email: BaseEmailDocument) => Promise<SendEmailOptions> | SendEmailOptions
+
+/**
+ * A reusable email layout. The rendered template body is injected into the
+ * layout at the `{{ content }}` slot, producing the final HTML (and, when a
+ * `text` layout is provided, the final plain-text body). Layout strings are
+ * rendered through the same template engine as templates themselves, so they
+ * can use the same variables, filters, and `{{ content }}` slot syntax.
+ */
+export interface EmailLayout {
+  /**
+   * HTML layout wrapper. Must contain a `{{ content }}` slot where the rendered
+   * template HTML body is injected (e.g. `<html><body>{{ content }}</body></html>`).
+   */
+  html: string
+  /**
+   * Optional plain-text layout wrapper. Must contain a `{{ content }}` slot
+   * where the rendered plain-text body is injected so the text/MIME alternative
+   * stays correct. When omitted, the plain-text body is left unwrapped,
+   * preserving the current (pre-layout) plain-text behavior.
+   */
+  text?: string
+}
 
 /**
  * @deprecated No longer used. `sendEmail({ processImmediately: true })` no longer
@@ -72,9 +97,24 @@ export interface MailingPluginConfig {
   }
   defaultFrom?: string
   defaultFromName?: string
+  /**
+   * Name of the layout (a key of `layouts`) applied to templates that do not
+   * select their own layout. When omitted, templates with no explicit layout
+   * render exactly as they did before layouts existed (no wrapping).
+   */
+  defaultLayout?: string
   initOrder?: 'after' | 'before'
   /** @deprecated No longer used — immediate sends no longer poll. See {@link JobPollingConfig}. */
   jobPolling?: JobPollingConfig
+  /**
+   * Named, reusable email layouts. Each key is a layout name selectable per
+   * template (via the template's `layout` field) and usable as `defaultLayout`.
+   * The rendered template body is injected into the layout's `{{ content }}`
+   * slot. Defining layouts in config keeps them versioned in code with no new
+   * collection or migration; a collection-based alternative may be offered in a
+   * future release for editor-managed layouts.
+   */
+  layouts?: { [name: string]: EmailLayout }
   queue?: string
   retryAttempts?: number
   retryDelay?: number

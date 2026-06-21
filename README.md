@@ -159,6 +159,82 @@ Escaping is applied to the **HTML body only**. The plain-text body and the
 subject line keep variable values verbatim, so characters like `&` are not
 turned into entities for recipients.
 
+## Layouts
+
+Layouts let you define a reusable wrapper (header, footer, branding, container
+table, etc.) once and apply it to many templates. The rendered template body is
+injected into the layout at a `{{ content }}` slot, producing the final HTML and
+plain text.
+
+### Configuring layouts
+
+Layouts are declared as a **config map** of named layouts in the plugin options.
+Keeping them in code means they are versioned with your application, require no
+new collection or database migration, and carry the lowest risk:
+
+```typescript
+mailingPlugin({
+  // ...
+  layouts: {
+    branded: {
+      html: `<!DOCTYPE html>
+<html>
+  <body style="font-family: sans-serif;">
+    <header><img src="https://example.com/logo.png" alt="{{ siteName }}"></header>
+    <main>{{ content }}</main>
+    <footer>© {{ siteName }} — <a href="{{ unsubscribeUrl }}">Unsubscribe</a></footer>
+  </body>
+</html>`,
+      text: `{{ siteName }}
+------------------------------
+
+{{ content }}
+
+------------------------------
+Unsubscribe: {{ unsubscribeUrl }}`,
+    },
+  },
+  // Applied to templates that do not pick their own layout:
+  defaultLayout: 'branded',
+})
+```
+
+### The `{{ content }}` slot
+
+Each layout must contain a `{{ content }}` slot where the rendered body is
+injected. Layout strings run through the **same template engine** as templates,
+so they can use the same variables and filters. The plugin renders the layout
+with all of your template variables plus a `content` variable equal to the
+already-rendered body. Because the body was already escaped during its own
+render pass, it is injected verbatim (no double-escaping).
+
+- The **HTML** layout wraps the HTML body via its `{{ content }}` slot.
+- The optional **`text`** layout wraps the plain-text body via its own
+  `{{ content }}` slot, keeping the text/MIME alternative correct. If a layout
+  omits `text`, the plain-text body is sent **unwrapped** (current behavior).
+
+### Selecting a layout per template
+
+When one or more layouts are configured, templates gain a **Layout** select
+field in the admin UI. The options are derived from your configured layout names
+plus:
+
+- **Use default** — defers to the plugin's `defaultLayout` (this is the default).
+- **None** — explicitly sends the body without any layout, even when a
+  `defaultLayout` is configured.
+
+### Back-compat
+
+Layouts are fully opt-in. If you configure no `layouts` and no `defaultLayout`,
+nothing changes: the **Layout** field is not added to the collection and every
+template renders **exactly as before**. A template set to **None** also renders
+unwrapped.
+
+> **Roadmap:** An in-admin render preview for templates/layouts is planned as a
+> follow-up (issue #88, Part 2). A collection-based layout source (editor-managed
+> layouts) may also be offered in a future release as an alternative to the
+> config map.
+
 ## Templates
 
 Use `{{}}` to insert data in templates:

@@ -6,6 +6,7 @@ import { EmailAdapter} from 'payload'
 import type {
   BaseEmailDocument,
   BaseEmailTemplateDocument,
+  EmailLayout,
   MailingService as IMailingService,
   MailingPluginConfig, TemplateVariables
 } from '../types/index.js'
@@ -258,6 +259,22 @@ export class MailingService implements IMailingService {
     html = await this.renderTemplateString(html, variables, { escapeHtml: true })
     text = await this.renderTemplateString(text, variables)
 
+    // Wrap the rendered body in the resolved layout, if any. The layout strings
+    // run through the same engine as templates, with a `content` variable equal
+    // to the already-rendered body so authors reference it via the `{{ content }}`
+    // slot. The body is injected verbatim — it was escaped during its own render
+    // pass — so the HTML layout uses `escapeHtml: false` to avoid double-escaping.
+    const layout = this.resolveLayout(template)
+    if (layout) {
+      html = await this.renderTemplateString(layout.html, { ...variables, content: html })
+
+      // Only wrap plain text when the layout defines a text variant; otherwise
+      // keep the unwrapped body so the text/MIME alternative matches today's output.
+      if (layout.text) {
+        text = await this.renderTemplateString(layout.text, { ...variables, content: text })
+      }
+    }
+
     return { html, text }
   }
 
@@ -318,6 +335,47 @@ export class MailingService implements IMailingService {
     } catch (error) {
       return null
     }
+  }
+
+  /**
+   * Resolves which configured layout (if any) applies to a template.
+   *
+   * Precedence: the template's own `layout` field wins, falling back to the
+   * plugin's `defaultLayout` when the template leaves it at "default"/unset.
+   * The "none" value explicitly opts out, even when a `defaultLayout` exists.
+   * Returns `null` when no layout applies, in which case the body renders
+   * exactly as it did before layouts existed (full back-compat).
+   */
+  private resolveLayout(template: BaseEmailTemplateDocument): EmailLayout | null {
+    const layouts = this.config.layouts
+    if (!layouts) {
+      return null
+    }
+
+    const templateChoice = template.layout
+
+    // 'none' is an explicit opt-out that overrides any configured defaultLayout.
+    if (templateChoice === 'none') {
+      return null
+    }
+
+    // A named choice other than the "use default" sentinel selects directly;
+    // anything else (the 'default' sentinel, null, undefined) defers to
+    // defaultLayout.
+    const layoutName =
+      templateChoice && templateChoice !== 'default' ? templateChoice : this.config.defaultLayout
+
+    if (!layoutName) {
+      return null
+    }
+
+    const layout = layouts[layoutName]
+    if (!layout) {
+      console.warn(`Email layout '${layoutName}' is not configured. Sending without a layout.`)
+      return null
+    }
+
+    return layout
   }
 
   /**
