@@ -57,4 +57,19 @@ jobs:
             exit 1
           fi
 
-          echo "✅ $PKG_VERSION is a valid release bump (npm latest: $NPM_VERSION). Merging will publish it."
+          # 4) Required release notes: CHANGELOG.md must carry a non-empty
+          #    "## [$PKG_VERSION]" section. These become the tag message and the
+          #    GitHub Release body when the publish workflow runs on merge.
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::Version bumped to $PKG_VERSION but CHANGELOG.md is missing. Add a '## [$PKG_VERSION]' section with release notes."
+            exit 1
+          fi
+          NOTES="$(bash scripts/extract-release-notes.sh "$PKG_VERSION")"
+          if [ -z "$NOTES" ]; then
+            echo "::error::No release notes for $PKG_VERSION. Add a non-empty '## [$PKG_VERSION]' section to CHANGELOG.md before releasing."
+            exit 1
+          fi
+
+          echo "✅ $PKG_VERSION is a valid release bump (npm latest: $NPM_VERSION) with release notes. Merging will publish it."
+          echo "Release notes for $PKG_VERSION:"
+          echo "$NOTES"
