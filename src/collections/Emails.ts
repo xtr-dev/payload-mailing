@@ -1,44 +1,45 @@
 import type { CollectionConfig } from 'payload'
+
+import { resolveID } from '../utils/helpers.js'
 import { ensureEmailJob } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
-import { resolveID } from '../utils/helpers.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
   admin: {
-    useAsTitle: 'subject',
     defaultColumns: ['subject', 'to', 'status', 'jobs', 'scheduledAt', 'sentAt'],
-    group: 'Mailing',
     description: 'Email delivery and status tracking',
+    group: 'Mailing',
+    useAsTitle: 'subject',
   },
   defaultPopulate: {
-    templateSlug: true,
-    to: true,
-    cc: true,
-    bcc: true,
-    from: true,
-    replyTo: true,
-    jobs: true,
-    status: true,
     attempts: true,
-    lastAttemptAt: true,
+    bcc: true,
+    cc: true,
+    createdAt: true,
     error: true,
+    from: true,
+    html: true,
+    jobs: true,
+    lastAttemptAt: true,
     priority: true,
+    replyTo: true,
     scheduledAt: true,
     sentAt: true,
-    variables: true,
-    html: true,
+    status: true,
+    templateSlug: true,
     text: true,
-    createdAt: true,
+    to: true,
+    variables: true,
   },
   fields: [
     {
       name: 'template',
       type: 'relationship',
-      relationTo: 'email-templates' as const,
       admin: {
         description: 'Email template used (optional if custom content provided)',
       },
+      relationTo: 'email-templates' as const,
     },
     {
       name: 'templateSlug',
@@ -51,27 +52,27 @@ const Emails: CollectionConfig = {
     {
       name: 'to',
       type: 'text',
-      required: true,
-      hasMany: true,
       admin: {
         description: 'Recipient email addresses',
       },
+      hasMany: true,
+      required: true,
     },
     {
       name: 'cc',
       type: 'text',
-      hasMany: true,
       admin: {
         description: 'CC email addresses',
       },
+      hasMany: true,
     },
     {
       name: 'bcc',
       type: 'text',
-      hasMany: true,
       admin: {
         description: 'BCC email addresses',
       },
+      hasMany: true,
     },
     {
       name: 'from',
@@ -97,19 +98,19 @@ const Emails: CollectionConfig = {
     {
       name: 'subject',
       type: 'text',
-      required: true,
       admin: {
         description: 'Email subject line',
       },
+      required: true,
     },
     {
       name: 'html',
       type: 'textarea',
-      required: true,
       admin: {
         description: 'Rendered HTML content of the email',
         rows: 8,
       },
+      required: true,
     },
     {
       name: 'text',
@@ -130,53 +131,53 @@ const Emails: CollectionConfig = {
       name: 'scheduledAt',
       type: 'date',
       admin: {
-        description: 'When this email should be sent (leave empty for immediate)',
         date: {
           pickerAppearance: 'dayAndTime',
         },
+        description: 'When this email should be sent (leave empty for immediate)',
       },
     },
     {
       name: 'sentAt',
       type: 'date',
       admin: {
-        description: 'When this email was actually sent',
         date: {
           pickerAppearance: 'dayAndTime',
         },
+        description: 'When this email was actually sent',
       },
     },
     {
       name: 'status',
       type: 'select',
-      required: true,
+      admin: {
+        description: 'Current status of this email',
+      },
+      defaultValue: 'pending',
       options: [
         { label: 'Pending', value: 'pending' },
         { label: 'Processing', value: 'processing' },
         { label: 'Sent', value: 'sent' },
         { label: 'Failed', value: 'failed' },
       ],
-      defaultValue: 'pending',
-      admin: {
-        description: 'Current status of this email',
-      },
+      required: true,
     },
     {
       name: 'attempts',
       type: 'number',
-      defaultValue: 0,
       admin: {
         description: 'Number of send attempts made',
       },
+      defaultValue: 0,
     },
     {
       name: 'lastAttemptAt',
       type: 'date',
       admin: {
-        description: 'When the last send attempt was made',
         date: {
           pickerAppearance: 'dayAndTime',
         },
+        description: 'When the last send attempt was made',
       },
     },
     {
@@ -190,19 +191,17 @@ const Emails: CollectionConfig = {
     {
       name: 'priority',
       type: 'number',
-      defaultValue: 5,
       admin: {
         description: 'Email priority (1=highest, 10=lowest)',
       },
+      defaultValue: 5,
     },
     {
       name: 'jobs',
       type: 'relationship',
-      relationTo: 'payload-jobs',
-      hasMany: true,
       admin: {
-        description: 'Processing jobs associated with this email',
         allowCreate: false,
+        description: 'Processing jobs associated with this email',
         readOnly: true,
       },
       filterOptions: ({ id }) => {
@@ -213,6 +212,8 @@ const Emails: CollectionConfig = {
           },
         }
       },
+      hasMany: true,
+      relationTo: 'payload-jobs',
     },
   ],
   hooks: {
@@ -222,8 +223,8 @@ const Emails: CollectionConfig = {
         if (data.template) {
           try {
             const template = await req.payload.findByID({
-              collection: 'email-templates',
               id: typeof data.template === 'string' ? data.template : data.template.id,
+              collection: 'email-templates',
             })
             data.templateSlug = template.slug
           } catch (error) {
@@ -240,7 +241,7 @@ const Emails: CollectionConfig = {
     // Simple approach: Only use afterChange hook for job management
     // This avoids complex interaction between hooks and ensures document ID is always available
     afterChange: [
-      async ({ doc, previousDoc, req, operation }) => {
+      async ({ doc, operation, previousDoc, req }) => {
         // Skip if:
         // 1. Email is not pending status
         // 2. Jobs are not configured
@@ -277,7 +278,6 @@ const Emails: CollectionConfig = {
       }
     ]
   },
-  timestamps: true,
   indexes: [
     {
       fields: ['status', 'scheduledAt'],
@@ -286,6 +286,7 @@ const Emails: CollectionConfig = {
       fields: ['priority', 'createdAt'],
     },
   ],
+  timestamps: true,
 }
 
 export default Emails

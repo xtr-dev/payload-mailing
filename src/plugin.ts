@@ -1,9 +1,11 @@
 import type {CollectionConfig, Config, Field} from 'payload'
-import { MailingPluginConfig, MailingContext } from './types/index.js'
-import { MailingService } from './services/MailingService.js'
-import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
+
+import type { MailingContext, MailingPluginConfig } from './types/index.js'
+
 import Emails from './collections/Emails.js'
+import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 import { mailingJobs } from './jobs/index.js'
+import { MailingService } from './services/MailingService.js'
 
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
@@ -96,14 +98,14 @@ export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Con
       const mailingService = new MailingService(payload, pluginConfig)
 
       // Add mailing context to payload for developer access
-      ;(payload as any).mailing = {
+      ;(payload).mailing = {
+        collections: {
+          emails: emailsSlug,
+          templates: templatesSlug,
+        },
+        config: pluginConfig,
         payload,
         service: mailingService,
-        config: pluginConfig,
-        collections: {
-          templates: templatesSlug,
-          emails: emailsSlug,
-        },
       } as MailingContext
 
       if (pluginConfig.initOrder !== 'after' && config.onInit) {

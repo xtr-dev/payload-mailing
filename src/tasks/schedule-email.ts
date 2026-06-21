@@ -1,40 +1,41 @@
 import type { TaskConfig, TaskHandler } from 'payload'
+
 import { sendEmail } from '../sendEmail.js'
 
 export interface ScheduleEmailInput {
-  to: string | string[]
+  bcc?: string | string[]
+  cc?: string | string[]
   from?: string
   fromName?: string
+  html?: string
+  priority?: 'critical' | 'high' | 'low' | 'normal'
+  processImmediately?: boolean
+  replyTo?: string
+  scheduledAt?: string
   subject?: string
   templateSlug?: string
   templateVariables?: Record<string, unknown>
-  html?: string
   text?: string
-  cc?: string | string[]
-  bcc?: string | string[]
-  replyTo?: string
-  scheduledAt?: string
-  priority?: 'low' | 'normal' | 'high' | 'critical'
-  processImmediately?: boolean
+  to: string | string[]
 }
 
 export interface ScheduleEmailOutput {
-  emailId: string | number
-  status: string
+  emailId: number | string
   scheduledAt?: string
+  status: string
 }
 
 // Map string priority to numeric value
 const priorityMap: Record<string, number> = {
+  critical: 4,
+  high: 3,
   low: 1,
   normal: 2,
-  high: 3,
-  critical: 4,
 }
 
 // Ensure value is an array of strings
 const ensureStringArray = (value: string | string[] | undefined): string[] | undefined => {
-  if (!value) return undefined
+  if (!value) {return undefined}
   return Array.isArray(value) ? value : [value]
 }
 
@@ -71,17 +72,17 @@ const scheduleEmailHandler: TaskHandler<'schedule-email'> = async ({ input, req 
     const priorityValue = typedInput.priority ? priorityMap[typedInput.priority] : 2
 
     const emailOptions: Parameters<typeof sendEmail>[1] = {
-      processImmediately: typedInput.processImmediately ?? false,
       data: {
-        to: toArray,
+        bcc: bccArray,
+        cc: ccArray,
         from: typedInput.from,
         fromName: typedInput.fromName,
-        cc: ccArray,
-        bcc: bccArray,
-        replyTo: typedInput.replyTo,
         priority: priorityValue,
+        replyTo: typedInput.replyTo,
         scheduledAt: typedInput.scheduledAt,
+        to: toArray,
       },
+      processImmediately: typedInput.processImmediately ?? false,
     }
 
     // Use template if provided
@@ -94,8 +95,8 @@ const scheduleEmailHandler: TaskHandler<'schedule-email'> = async ({ input, req 
       // Use direct content
       emailOptions.data = {
         ...emailOptions.data,
-        subject: typedInput.subject,
         html: typedInput.html,
+        subject: typedInput.subject,
         text: typedInput.text,
       }
     }
@@ -105,8 +106,8 @@ const scheduleEmailHandler: TaskHandler<'schedule-email'> = async ({ input, req 
     return {
       output: {
         emailId: String(email.id),
-        status: (email as { status?: string }).status || 'pending',
         scheduledAt: typedInput.scheduledAt,
+        status: (email as { status?: string }).status || 'pending',
       },
     }
   } catch (error) {
@@ -162,17 +163,16 @@ const scheduleEmailHandler: TaskHandler<'schedule-email'> = async ({ input, req 
  */
 export const ScheduleEmailTask = {
   slug: 'schedule-email',
-  label: 'Schedule Email',
   handler: scheduleEmailHandler,
   inputSchema: [
     {
       name: 'to',
       type: 'text',
-      required: true,
       admin: {
         description:
           'Recipient email address(es). Use JSONata for dynamic values (e.g., "trigger.doc.customer.email")',
       },
+      required: true,
     },
     {
       name: 'templateSlug',
@@ -254,26 +254,27 @@ export const ScheduleEmailTask = {
     {
       name: 'priority',
       type: 'select',
+      admin: {
+        description: 'Email priority level',
+      },
+      defaultValue: 'normal',
       options: [
         { label: 'Low', value: 'low' },
         { label: 'Normal', value: 'normal' },
         { label: 'High', value: 'high' },
         { label: 'Critical', value: 'critical' },
       ],
-      defaultValue: 'normal',
-      admin: {
-        description: 'Email priority level',
-      },
     },
     {
       name: 'processImmediately',
       type: 'checkbox',
-      defaultValue: false,
       admin: {
         description: 'Process and send the email immediately instead of queuing',
       },
+      defaultValue: false,
     },
   ],
+  label: 'Schedule Email',
   outputSchema: [
     {
       name: 'emailId',

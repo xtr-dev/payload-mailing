@@ -28,7 +28,7 @@
     "dev:generate-importmap": "npm run dev:payload generate:importmap",
     "dev:generate-types": "npm run dev:payload generate:types",
     "dev:payload": "cross-env PAYLOAD_CONFIG_PATH=./dev/payload.config.ts payload",
-    "lint": "eslint",
+    "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "echo 'Tests temporarily disabled during development'",

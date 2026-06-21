@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+
 import { createContextLogger } from './logger.js'
 
 /**
@@ -6,10 +7,11 @@ import { createContextLogger } from './logger.js'
  */
 export async function findExistingJobs(
   payload: Payload,
-  emailId: string | number
+  emailId: number | string
 ): Promise<{ docs: any[], totalDocs: number }> {
   return await payload.find({
     collection: 'payload-jobs',
+    limit: 10,
     where: {
       'input.emailId': {
         equals: String(emailId),
@@ -18,7 +20,6 @@ export async function findExistingJobs(
         equals: 'process-email',
       },
     },
-    limit: 10,
   })
 }
 
@@ -34,12 +35,12 @@ export async function findExistingJobs(
  */
 export async function ensureEmailJob(
   payload: Payload,
-  emailId: string | number,
+  emailId: number | string,
   options?: {
-    scheduledAt?: string | Date
     queueName?: string
+    scheduledAt?: Date | string
   }
-): Promise<{ jobIds: (string | number)[], created: boolean }> {
+): Promise<{ created: boolean, jobIds: (number | string)[] }> {
   if (!payload.jobs) {
     throw new Error('PayloadCMS jobs not configured - cannot create email job')
   }
@@ -57,19 +58,19 @@ export async function ensureEmailJob(
   try {
     // Attempt to create job - rely on database constraints for duplicate prevention
     const job = await payload.jobs.queue({
-      queue: queueName,
-      task: 'process-email',
       input: {
         emailId: normalizedEmailId
       },
+      queue: queueName,
+      task: 'process-email',
       waitUntil: options?.scheduledAt ? new Date(options.scheduledAt) : undefined
     })
 
     logger.info(`Auto-scheduled processing job ${job.id} for email ${normalizedEmailId}`)
 
     return {
-      jobIds: [job.id],
-      created: true
+      created: true,
+      jobIds: [job.id]
     }
   } catch (createError) {
 
@@ -83,8 +84,8 @@ export async function ensureEmailJob(
       // Found existing jobs - return them (race condition handled successfully)
       logger.debug(`Using existing jobs for email ${normalizedEmailId}: ${existingJobs.docs.map(j => j.id).join(', ')}`)
       return {
-        jobIds: existingJobs.docs.map(job => job.id),
-        created: false
+        created: false,
+        jobIds: existingJobs.docs.map(job => job.id)
       }
     }
 
@@ -115,8 +116,8 @@ export async function ensureEmailJob(
  */
 export async function updateEmailJobRelationship(
   payload: Payload,
-  emailId: string | number,
-  jobIds: (string | number)[],
+  emailId: number | string,
+  jobIds: (number | string)[],
   collectionSlug: string = 'emails'
 ): Promise<void> {
   try {
@@ -125,8 +126,8 @@ export async function updateEmailJobRelationship(
 
     // Get current jobs to avoid overwriting
     const currentEmail = await payload.findByID({
-      collection: collectionSlug,
       id: normalizedEmailId,
+      collection: collectionSlug,
     })
 
     // Extract IDs from job objects or use the value directly if it's already an ID
@@ -137,8 +138,8 @@ export async function updateEmailJobRelationship(
     const allJobs = [...new Set([...currentJobs, ...normalizedJobIds])] // Deduplicate with normalized strings
 
     await payload.update({
-      collection: collectionSlug,
       id: normalizedEmailId,
+      collection: collectionSlug,
       data: {
         jobs: allJobs
       }

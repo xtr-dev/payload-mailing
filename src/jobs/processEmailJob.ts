@@ -1,4 +1,5 @@
 import type { PayloadRequest } from 'payload'
+
 import { processEmailById } from '../utils/emailProcessor.js'
 
 /**
@@ -8,7 +9,7 @@ export interface ProcessEmailJobInput {
   /**
    * The ID of the email to process
    */
-  emailId: string | number
+  emailId: number | string
 }
 
 /**
@@ -16,32 +17,6 @@ export interface ProcessEmailJobInput {
  */
 export const processEmailJob = {
   slug: 'process-email',
-  label: 'Process Individual Email',
-  inputSchema: [
-    {
-      name: 'emailId',
-      type: 'text' as const,
-      required: true,
-      label: 'Email ID',
-      admin: {
-        description: 'The ID of the email to process and send'
-      }
-    }
-  ],
-  outputSchema: [
-    {
-      name: 'success',
-      type: 'checkbox' as const
-    },
-    {
-      name: 'emailId',
-      type: 'text' as const
-    },
-    {
-      name: 'status',
-      type: 'text' as const
-    }
-  ],
   handler: async ({ input, req }: { input: ProcessEmailJobInput; req: PayloadRequest }) => {
     const payload = (req as any).payload
     const { emailId } = input
@@ -56,16 +31,42 @@ export const processEmailJob = {
 
       return {
         output: {
-          success: true,
           emailId: String(emailId),
+          message: `Email ${emailId} processed successfully`,
           status: 'sent',
-          message: `Email ${emailId} processed successfully`
+          success: true
         }
       }
     } catch (error) {
       throw new Error(`Failed to process email ${emailId}: ${String(error)}`)
     }
-  }
+  },
+  inputSchema: [
+    {
+      name: 'emailId',
+      type: 'text' as const,
+      admin: {
+        description: 'The ID of the email to process and send'
+      },
+      label: 'Email ID',
+      required: true
+    }
+  ],
+  label: 'Process Individual Email',
+  outputSchema: [
+    {
+      name: 'success',
+      type: 'checkbox' as const
+    },
+    {
+      name: 'emailId',
+      type: 'text' as const
+    },
+    {
+      name: 'status',
+      type: 'text' as const
+    }
+  ]
 }
 
 export default processEmailJob
