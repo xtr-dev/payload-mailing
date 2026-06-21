@@ -3,24 +3,39 @@ import type { Payload } from 'payload'
 import { createContextLogger } from './logger.js'
 
 /**
- * Finds existing processing jobs for an email
+ * Finds existing `process-email` jobs queued for a given email.
+ *
+ * The default payload-jobs collection identifies the task in the top-level
+ * `taskSlug` field (not `task` — that is only the argument name passed to
+ * `queue()`), so the query filters on `taskSlug`. The email id lives inside the
+ * `input` JSON column, whose nested path (`input.emailId`) is not filterable on
+ * every database adapter — notably SQLite returns no matches — so it is matched
+ * in JS rather than in the `where` clause. Completed jobs are removed by
+ * Payload's `deleteJobOnComplete`, so the live set scanned here stays small.
  */
 export async function findExistingJobs(
   payload: Payload,
   emailId: number | string
 ): Promise<{ docs: any[], totalDocs: number }> {
-  return await payload.find({
+  const normalizedEmailId = String(emailId)
+
+  const result = await payload.find({
     collection: 'payload-jobs',
-    limit: 10,
+    depth: 0,
+    pagination: false,
+    sort: '-createdAt',
     where: {
-      'input.emailId': {
-        equals: String(emailId),
-      },
-      task: {
+      taskSlug: {
         equals: 'process-email',
       },
     },
   })
+
+  const docs = result.docs.filter(
+    (job: any) => String(job?.input?.emailId) === normalizedEmailId
+  )
+
+  return { docs, totalDocs: docs.length }
 }
 
 /**
