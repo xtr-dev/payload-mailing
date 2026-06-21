@@ -2,6 +2,8 @@ import type { Payload } from 'payload'
 
 import type { JobPollingConfig } from '../types/index.js'
 
+import { findExistingJobs } from './jobScheduler.js'
+
 export interface PollForJobIdOptions {
   collectionSlug: string
   config?: JobPollingConfig
@@ -43,7 +45,7 @@ const DEFAULT_JOB_POLLING_CONFIG: Required<JobPollingConfig> = {
  * @throws Error if job is not found within the configured limits
  */
 export const pollForJobId = async (options: PollForJobIdOptions): Promise<PollForJobIdResult> => {
-  const { collectionSlug, emailId, logger, payload } = options
+  const { emailId, logger, payload } = options
 
   // Merge user config with defaults
   const config: Required<JobPollingConfig> = {
@@ -74,16 +76,16 @@ export const pollForJobId = async (options: PollForJobIdOptions): Promise<PollFo
       await new Promise(resolve => setTimeout(resolve, delay))
     }
 
-    // Fetch the email document to check for associated jobs
-    const emailWithJobs = await payload.findByID({
-      id: emailId,
-      collection: collectionSlug,
-    })
+    // Query the jobs collection directly rather than reading the email's `jobs`
+    // relationship: the afterChange hook intentionally never persists that
+    // relationship (it only scopes an admin dropdown via filterOptions), so the
+    // stored value stays empty. The auto-scheduled job is, however, queryable by
+    // its `input.emailId`, which is exactly what findExistingJobs does.
+    const existingJobs = await findExistingJobs(payload, emailId)
 
-    // Check if jobs array exists and has entries
-    if (emailWithJobs.jobs && emailWithJobs.jobs.length > 0) {
-      const firstJob = Array.isArray(emailWithJobs.jobs) ? emailWithJobs.jobs[0] : emailWithJobs.jobs
-      jobId = typeof firstJob === 'string' ? firstJob : String(firstJob.id || firstJob)
+    if (existingJobs.totalDocs > 0) {
+      const firstJob = existingJobs.docs[0]
+      jobId = String(firstJob.id)
 
       return {
         attempts: attempt + 1,
