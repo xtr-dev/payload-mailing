@@ -39,6 +39,50 @@ export class MailingService implements IMailingService {
     }
   }
 
+  /**
+   * Atomically claim an email for processing by transitioning it out of
+   * `expectedStatus` into `processing`.
+   *
+   * The candidate `find` in processEmails/retryFailedEmails and this status
+   * update are separate steps, so two concurrent runs (e.g. an overlapping
+   * cron tick and a per-email job) can both select the same row. To prevent
+   * double-sending we guard the transition on the row's *current* status:
+   * the bulk `update` only matches the row while it is still in
+   * `expectedStatus`, so exactly one run can move it to `processing`. The
+   * loser's `where` matches nothing and `docs` comes back empty, letting us
+   * detect that we did not win the claim and skip the row.
+   *
+   * @returns `true` if this run won the claim, `false` if another run already
+   *   claimed it (or the row no longer matches `expectedStatus`).
+   */
+  private async claimEmail(emailId: string, expectedStatus: 'failed' | 'pending'): Promise<boolean> {
+    const { docs } = await this.payload.update({
+      collection: this.emailsCollection,
+      data: {
+        lastAttemptAt: new Date().toISOString(),
+        status: 'processing',
+      },
+      where: {
+        and: [
+          {
+            id: {
+              equals: emailId,
+            },
+          },
+          {
+            status: {
+              equals: expectedStatus,
+            },
+          },
+        ],
+      },
+    })
+
+    // A non-empty `docs` means this run's guarded update matched and moved the
+    // row; an empty `docs` means another run already claimed it first.
+    return docs.length > 0
+  }
+
   private ensureInitialized(): void {
     if (!this.payload || !this.payload.db) {
       throw new Error('MailingService payload not properly initialized')
@@ -269,17 +313,15 @@ export class MailingService implements IMailingService {
     })
   }
 
-  async processEmailItem(emailId: string): Promise<void> {
-    try {
-      await this.payload.update({
-        id: emailId,
-        collection: this.emailsCollection,
-        data: {
-          lastAttemptAt: new Date().toISOString(),
-          status: 'processing',
-        },
-      })
+  async processEmailItem(emailId: string, expectedStatus: 'failed' | 'pending' = 'pending'): Promise<void> {
+    // Win the atomic claim before doing any work; if a concurrent run already
+    // claimed this row, skip it so the email is never sent twice.
+    const claimed = await this.claimEmail(emailId, expectedStatus)
+    if (!claimed) {
+      return
+    }
 
+    try {
       const email = await this.payload.findByID({
         id: emailId,
         collection: this.emailsCollection,
@@ -409,7 +451,7 @@ export class MailingService implements IMailingService {
     })
 
     for (const email of pendingEmails) {
-      await this.processEmailItem(String(email.id))
+      await this.processEmailItem(String(email.id), 'pending')
     }
   }
 
@@ -482,7 +524,7 @@ export class MailingService implements IMailingService {
     })
 
     for (const email of failedEmails) {
-      await this.processEmailItem(String(email.id))
+      await this.processEmailItem(String(email.id), 'failed')
     }
   }
 
