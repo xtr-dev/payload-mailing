@@ -27,11 +27,15 @@ export async function findExistingJobs(
  * Ensures a processing job exists for an email
  * Creates one if it doesn't exist, or returns existing job IDs
  *
- * This function is idempotent and safe for concurrent calls:
- * - Uses atomic check-and-create pattern with retry logic
- * - Multiple concurrent calls will only create one job
- * - Database-level uniqueness prevents duplicate jobs
- * - Race conditions are handled with exponential backoff retry
+ * Duplicate prevention works by querying for existing process-email jobs
+ * before queueing a new one (see findExistingJobs). There is no database-level
+ * uniqueness constraint on the payload-jobs collection, because this plugin
+ * does not own or configure that collection. As a result this check is NOT
+ * fully atomic: two calls running concurrently can both observe "no existing
+ * job" and each create one. The pre-check eliminates duplicates in the common
+ * sequential case and greatly narrows the race window, but cannot close it
+ * entirely. The post-create catch block below provides best-effort cleanup by
+ * returning any already-existing jobs instead of surfacing an error.
  */
 export async function ensureEmailJob(
   payload: Payload,
@@ -51,12 +55,20 @@ export async function ensureEmailJob(
 
   const logger = createContextLogger(payload, 'JOB_SCHEDULER')
 
-  // First, optimistically try to create the job
-  // If it fails due to uniqueness constraint, then check for existing jobs
-  // This approach minimizes the race condition window
+  // Check for an existing job before queueing a new one. This is the primary
+  // duplicate-prevention mechanism, since there is no DB uniqueness constraint
+  // to fall back on. It is not race-free (see the function doc comment), but it
+  // prevents duplicates for the common sequential case.
+  const preExistingJobs = await findExistingJobs(payload, normalizedEmailId)
+  if (preExistingJobs.totalDocs > 0) {
+    logger.debug(`Using existing jobs for email ${normalizedEmailId}: ${preExistingJobs.docs.map(j => j.id).join(', ')}`)
+    return {
+      created: false,
+      jobIds: preExistingJobs.docs.map(job => job.id)
+    }
+  }
 
   try {
-    // Attempt to create job - rely on database constraints for duplicate prevention
     const job = await payload.jobs.queue({
       input: {
         emailId: normalizedEmailId
@@ -74,14 +86,13 @@ export async function ensureEmailJob(
     }
   } catch (createError) {
 
-    // Job creation failed - likely due to duplicate constraint or system issue
-
-    // Check if duplicate jobs exist (handles race condition where another process created job)
+    // Queueing failed. Defense-in-depth: if a concurrent call slipped past the
+    // pre-check above and created a job in the meantime, re-query and return it
+    // instead of propagating the error. This narrows (but does not close) the
+    // race window left open by the absence of a DB uniqueness constraint.
     const existingJobs = await findExistingJobs(payload, normalizedEmailId)
 
-
     if (existingJobs.totalDocs > 0) {
-      // Found existing jobs - return them (race condition handled successfully)
       logger.debug(`Using existing jobs for email ${normalizedEmailId}: ${existingJobs.docs.map(j => j.id).join(', ')}`)
       return {
         created: false,
@@ -89,23 +100,8 @@ export async function ensureEmailJob(
       }
     }
 
-    // No existing jobs found - this is a genuine error
-    // Enhanced error context for better debugging
+    // No existing jobs found - this is a genuine queueing error.
     const errorMessage = String(createError)
-    const isLikelyUniqueConstraint = errorMessage.toLowerCase().includes('duplicate') ||
-                                     errorMessage.toLowerCase().includes('unique') ||
-                                     errorMessage.toLowerCase().includes('constraint')
-
-    if (isLikelyUniqueConstraint) {
-      // This should not happen if our check above worked, but provide a clear error
-      logger.warn(`Unique constraint violation but no existing jobs found for email ${normalizedEmailId}`)
-      throw new Error(
-        `Database uniqueness constraint violation for email ${normalizedEmailId}, but no existing jobs found. ` +
-        `This indicates a potential data consistency issue. Original error: ${errorMessage}`
-      )
-    }
-
-    // Non-constraint related error
     logger.error(`Job creation error for email ${normalizedEmailId}: ${errorMessage}`)
     throw new Error(`Failed to create job for email ${normalizedEmailId}: ${errorMessage}`)
   }
