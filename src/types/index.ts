@@ -113,7 +113,7 @@ export interface TemplateVariables {
 }
 
 export interface MailingService {
-  processEmailItem(emailId: string): Promise<void>
+  processEmailItem(emailId: string, expectedStatus?: 'failed' | 'pending'): Promise<void>
   processEmails(): Promise<void>
   renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }>
   renderTemplateDocument(template: BaseEmailTemplateDocument, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }>
