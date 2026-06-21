@@ -56,6 +56,18 @@ jobs:
             exit 1
           fi
 
+      - name: Extract release notes
+        if: steps.decide.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          bash scripts/extract-release-notes.sh "${{ steps.decide.outputs.version }}" > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::No release notes found for v${{ steps.decide.outputs.version }} in CHANGELOG.md. The version-check gate should have caught this on the PR."
+            exit 1
+          fi
+          echo "Release notes for v${{ steps.decide.outputs.version }}:"
+          cat RELEASE_NOTES.md
+
       - name: Setup Node.js
         if: steps.decide.outputs.publish == 'true'
         uses: actions/setup-node@v4
@@ -85,7 +97,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.decide.outputs.version }}" -m "Release v${{ steps.decide.outputs.version }}"
+          git tag -a "v${{ steps.decide.outputs.version }}" -F RELEASE_NOTES.md
           git push origin "v${{ steps.decide.outputs.version }}"
 
       - name: Publish to NPM
@@ -93,3 +105,12 @@ jobs:
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.decide.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.decide.outputs.version }}" \
+            --title "v${{ steps.decide.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md
