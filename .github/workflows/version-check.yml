@@ -1,0 +1,60 @@
+name: Version Check
+
+# Validates the version bump ONLY when a PR actually changes it. PRs that don't
+# touch the version pass cleanly (no release intended), so this never blocks
+# ordinary work — it just keeps releases correct when you do bump.
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version bump (only if present)
+        run: |
+          set -euo pipefail
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+
+          # Source of truth for "what's already released" is npm itself.
+          NPM_VERSION="$(npm view "$PKG_NAME" version 2>/dev/null || echo '0.0.0')"
+
+          echo "package.json version: $PKG_VERSION"
+          echo "npm latest version:   $NPM_VERSION"
+
+          # No bump relative to npm → this PR is not a release. Pass.
+          if [ "$PKG_VERSION" = "$NPM_VERSION" ]; then
+            echo "::notice::No version bump in this PR — nothing will be published on merge."
+            exit 0
+          fi
+
+          # A bump is present → validate it is a correct release.
+
+          # 1) Must be valid semver.
+          if ! printf '%s' "$PKG_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "::error::package.json version '$PKG_VERSION' is not valid semver."
+            exit 1
+          fi
+
+          # 2) Must be strictly greater than the published npm version.
+          HIGHEST="$(printf '%s\n%s\n' "$NPM_VERSION" "$PKG_VERSION" | sort -V | tail -n1)"
+          if [ "$HIGHEST" != "$PKG_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) is lower than the published npm version ($NPM_VERSION). A release must increase the version."
+            exit 1
+          fi
+
+          # 3) The release tag must not already exist.
+          if git rev-parse "v$PKG_VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$PKG_VERSION already exists — choose a new version."
+            exit 1
+          fi
+
+          echo "✅ $PKG_VERSION is a valid release bump (npm latest: $NPM_VERSION). Merging will publish it."
