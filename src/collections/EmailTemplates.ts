@@ -41,7 +41,7 @@ export const createEmailTemplatesCollection = (editor?: RichTextField['editor'])
       name: 'subject',
       type: 'text',
       admin: {
-        description: 'Email subject line. You can use Handlebars variables like {{firstName}} or {{siteName}}.',
+        description: 'Email subject line. You can use Liquid variables like {{ firstName }} or {{ siteName }}.',
       },
       required: true,
     },
@@ -49,7 +49,7 @@ export const createEmailTemplatesCollection = (editor?: RichTextField['editor'])
       name: 'content',
       type: 'richText',
       admin: {
-        description: 'Email content with rich text formatting. Supports Handlebars variables like {{firstName}} and helpers like {{formatDate createdAt "long"}}. Content is converted to HTML and plain text automatically.',
+        description: 'Email content with rich text formatting. Supports Liquid variables like {{ firstName }} and filters like {{ createdAt | formatDate: "long" }}. Content is converted to HTML and plain text automatically. Set templateEngine to "mustache" or "simple" in the plugin config for alternative syntaxes.',
       },
       editor: editor || lexicalEditor({
         features: ({ defaultFeatures }) => [
