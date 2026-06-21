@@ -18,8 +18,10 @@ interface SerializedLexicalNode {
 
 /**
  * Escapes HTML-significant characters to prevent HTML injection in serialized output.
+ * Exported so the rendering pipeline can reuse the exact same escaping when it
+ * substitutes template variables into the HTML body (see MailingService).
  */
-function escapeHtml(input: string): string {
+export function escapeHtml(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -31,7 +33,7 @@ function escapeHtml(input: string): string {
  * Allow-lists safe URL schemes (http, https, mailto) plus relative/anchor URLs,
  * escapes the result, and returns '#' for anything else (e.g. javascript:).
  */
-function safeUrl(rawUrl: string): string {
+export function safeUrl(rawUrl: string): string {
   const url = (rawUrl || '#').trim()
   if (/^(?:https?:|mailto:)/i.test(url) || /^[^a-z]/i.test(url)) {
     return escapeHtml(url)

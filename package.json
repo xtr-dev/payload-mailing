@@ -31,7 +31,8 @@
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
     "prepublishOnly": "npm run clean && npm run build",
-    "test": "echo 'Tests temporarily disabled during development'",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:int": "vitest"
   },
