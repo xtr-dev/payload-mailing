@@ -123,6 +123,61 @@ export default buildConfig({
         retryDelay: 60000, // 1 minute for dev
         queue: 'default',
 
+        // Example designed layout. The rendered template body is injected into
+        // the `{{ content }}` slot, giving every email a shared branded header
+        // and footer. Layout strings run through the same engine as templates,
+        // so `{{ content }}` (and any other variables) are substituted here too.
+        // `defaultLayout` applies it to templates that don't pick their own.
+        layouts: {
+          branded: {
+            html: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+            <tr>
+              <td style="background:#4f46e5;padding:28px 32px;">
+                <span style="font-size:20px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">&#10022; Acme Mail</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;font-size:15px;line-height:1.6;color:#1f2937;">{{ content }}</td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;background:#f9fafb;border-top:1px solid #eef0f2;font-size:12px;line-height:1.5;color:#6b7280;">
+                You're receiving this email from Acme Mail.<br />
+                123 Example Street &middot; Amsterdam &middot; NL<br />
+                <a href="https://example.com/unsubscribe" style="color:#4f46e5;text-decoration:none;">Unsubscribe</a>
+                &middot;
+                <a href="https://example.com/preferences" style="color:#4f46e5;text-decoration:none;">Email preferences</a>
+              </td>
+            </tr>
+          </table>
+          <div style="font-size:11px;color:#9ca3af;padding:16px 0;">&copy; Acme Mail</div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`,
+            text: `ACME MAIL
+=========================================
+
+{{ content }}
+
+-----------------------------------------
+You're receiving this email from Acme Mail.
+123 Example Street, Amsterdam, NL
+Unsubscribe: https://example.com/unsubscribe`,
+          },
+        },
+        defaultLayout: 'branded',
+
         // Optional: Custom rich text editor configuration
         // Comment out to use default lexical editor
         richTextEditor: lexicalEditor({
