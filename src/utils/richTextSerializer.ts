@@ -17,6 +17,29 @@ interface SerializedLexicalNode {
 }
 
 /**
+ * Escapes HTML-significant characters to prevent HTML injection in serialized output.
+ */
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * Allow-lists safe URL schemes (http, https, mailto) plus relative/anchor URLs,
+ * escapes the result, and returns '#' for anything else (e.g. javascript:).
+ */
+function safeUrl(rawUrl: string): string {
+  const url = (rawUrl || '#').trim()
+  if (/^(https?:|mailto:)/i.test(url) || /^[^a-z]|^[#/]/i.test(url)) {
+    return escapeHtml(url)
+  }
+  return '#'
+}
+
+/**
  * Converts Lexical richtext content to HTML
  */
 export function serializeRichTextToHTML(richTextData: SerializedEditorState): string {
@@ -60,7 +83,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode): string {
 
     case 'link': {
       const linkChildren = node.children ? serializeNodesToHTML(node.children) : ''
-      const url = node.url || '#'
+      const url = safeUrl(node.url || '#')
       const target = node.newTab ? ' target="_blank" rel="noopener noreferrer"' : ''
       return `<a href="${url}"${target}>${linkChildren}</a>`
     }
@@ -87,7 +110,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode): string {
     }
 
     case 'text': {
-      let text = node.text || ''
+      let text = escapeHtml(node.text || '')
 
       // Apply text formatting using proper nesting order
       if (node.format) {
