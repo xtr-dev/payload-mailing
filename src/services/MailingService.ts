@@ -11,6 +11,7 @@ import type {
 } from '../types/index.js'
 
 import { sanitizeDisplayName } from '../utils/helpers.js'
+import { createContextLogger } from '../utils/logger.js'
 import { escapeHtml, serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 
 export class MailingService implements IMailingService {
@@ -20,6 +21,12 @@ export class MailingService implements IMailingService {
   // Separate engine with auto HTML-escaping enabled, used when substituting
   // variables into the HTML body so untrusted values cannot inject markup.
   private liquidEscaped: false | Liquid | null = null
+  // Shared in-flight promise for LiquidJS initialization. Concurrent first
+  // callers await this single promise so the dynamic `import('liquidjs')` and
+  // engine construction run exactly once, even when several emails render
+  // before initialization completes.
+  private liquidInitPromise: null | Promise<void> = null
+  private logger: ReturnType<typeof createContextLogger>
   private templatesCollection: string
   public payload: Payload
 
@@ -32,6 +39,8 @@ export class MailingService implements IMailingService {
 
     const emailsConfig = config.collections?.emails
     this.emailsCollection = typeof emailsConfig === 'string' ? emailsConfig : 'emails'
+
+    this.logger = createContextLogger(payload, 'MAILING')
 
     // Use Payload's configured email adapter
     if (!this.payload.email) {
@@ -51,26 +60,15 @@ export class MailingService implements IMailingService {
   private async ensureLiquidJSInitialized(): Promise<void> {
     if (this.liquid !== null) {return} // Already initialized or failed
 
-    try {
-      const liquidModule = await import('liquidjs')
-      const { Liquid: LiquidEngine } = liquidModule
-
-      // Two engines share identical filters but differ in output handling:
-      // `liquid` emits variable output verbatim (correct for plain-text bodies
-      // and subjects), while `liquidEscaped` HTML-escapes every `{{ output }}`
-      // so untrusted variables cannot inject markup into the HTML body. Authors
-      // opt back into raw HTML per-variable with the `| raw` filter.
-      this.liquid = new LiquidEngine()
-      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape' })
-
-      this.registerLiquidFilters(this.liquid)
-      this.registerLiquidFilters(this.liquidEscaped)
-    } catch (error) {
-      console.warn('LiquidJS not available. Falling back to simple variable replacement. Install liquidjs or use a different templateEngine.')
-      // Mark both as failed to avoid retries.
-      this.liquid = false
-      this.liquidEscaped = false
+    // Cache the initialization promise so concurrent first callers all await
+    // the same run instead of each importing liquidjs and constructing their
+    // own engines (the last writer would otherwise win and the others' engines
+    // would be discarded mid-render).
+    if (!this.liquidInitPromise) {
+      this.liquidInitPromise = this.initializeLiquidJS()
     }
+
+    await this.liquidInitPromise
   }
 
   /**
@@ -97,8 +95,9 @@ export class MailingService implements IMailingService {
   }
 
   private async getTemplateBySlug(templateSlug: string): Promise<BaseEmailTemplateDocument | null> {
+    let docs
     try {
-      const { docs } = await this.payload.find({
+      ;({ docs } = await this.payload.find({
         collection: this.templatesCollection as any,
         limit: 1,
         where: {
@@ -106,13 +105,16 @@ export class MailingService implements IMailingService {
             equals: templateSlug,
           },
         },
-      })
-
-      return docs.length > 0 ? docs[0] as BaseEmailTemplateDocument : null
+      }))
     } catch (error) {
-      console.error(`Template with slug '${templateSlug}' not found:`, error)
-      return null
+      // A query failure (e.g. DB connectivity) is a genuine error, not a
+      // missing template. Log and rethrow so callers can surface it instead of
+      // silently treating it as "template not found".
+      this.logger.error(`Failed to query template with slug '${templateSlug}':`, error)
+      throw error
     }
+
+    return docs.length > 0 ? docs[0] as BaseEmailTemplateDocument : null
   }
 
   private async incrementAttempts(emailId: string): Promise<number> {
@@ -132,6 +134,34 @@ export class MailingService implements IMailingService {
     })
 
     return newAttempts
+  }
+
+  /**
+   * Performs the one-time LiquidJS engine setup. Invoked through the cached
+   * `liquidInitPromise` so the dynamic import and engine construction never run
+   * concurrently.
+   */
+  private async initializeLiquidJS(): Promise<void> {
+    try {
+      const liquidModule = await import('liquidjs')
+      const { Liquid: LiquidEngine } = liquidModule
+
+      // Two engines share identical filters but differ in output handling:
+      // `liquid` emits variable output verbatim (correct for plain-text bodies
+      // and subjects), while `liquidEscaped` HTML-escapes every `{{ output }}`
+      // so untrusted variables cannot inject markup into the HTML body. Authors
+      // opt back into raw HTML per-variable with the `| raw` filter.
+      this.liquid = new LiquidEngine()
+      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape' })
+
+      this.registerLiquidFilters(this.liquid)
+      this.registerLiquidFilters(this.liquidEscaped)
+    } catch (error) {
+      this.logger.warn('LiquidJS not available. Falling back to simple variable replacement. Install liquidjs or use a different templateEngine.', error)
+      // Mark both as failed to avoid retries.
+      this.liquid = false
+      this.liquidEscaped = false
+    }
   }
 
   /**
@@ -198,7 +228,7 @@ export class MailingService implements IMailingService {
       try {
         return await this.config.templateRenderer(template, variables)
       } catch (error) {
-        console.error('Custom template renderer error:', error)
+        this.logger.error('Custom template renderer error:', error)
         return template
       }
     }
@@ -216,7 +246,7 @@ export class MailingService implements IMailingService {
           return await liquid.parseAndRender(template, variables)
         }
       } catch (error) {
-        console.error('LiquidJS template rendering error:', error)
+        this.logger.error('LiquidJS template rendering error:', error)
       }
     }
 
@@ -228,7 +258,7 @@ export class MailingService implements IMailingService {
           return mustacheResult
         }
       } catch (error) {
-        console.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.')
+        this.logger.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.', error)
       }
     }
 
@@ -337,7 +367,7 @@ export class MailingService implements IMailingService {
             throw new Error('beforeSend hook must not remove both "html" and "text" properties')
           }
         } catch (error) {
-          console.error('Error in beforeSend hook:', error)
+          this.logger.error('Error in beforeSend hook:', error)
           throw new Error(`beforeSend hook failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
       }
@@ -370,7 +400,7 @@ export class MailingService implements IMailingService {
       })
 
       if (attempts >= maxAttempts) {
-        console.error(`Email ${emailId} failed permanently after ${attempts} attempts:`, error)
+        this.logger.error(`Email ${emailId} failed permanently after ${attempts} attempts:`, error)
       }
     }
   }
@@ -379,6 +409,10 @@ export class MailingService implements IMailingService {
     this.ensureInitialized()
     const currentTime = new Date().toISOString()
 
+    // Each invocation processes at most 50 due-pending emails (highest priority,
+    // oldest first). This bounds the work and memory of a single run; a backlog
+    // larger than the cap is drained across successive calls. Drive repeated
+    // calls from a scheduled job to keep a large queue moving.
     const { docs: pendingEmails } = await this.payload.find({
       collection: this.emailsCollection,
       limit: 50,

@@ -44,7 +44,7 @@ export async function processJobById(payload: Payload, jobId: string): Promise<v
 
   try {
     // Run a specific job by its ID (using where clause to find the job)
-    const result = await payload.jobs.run({
+    await payload.jobs.run({
       where: {
         id: {
           equals: jobId

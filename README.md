@@ -507,7 +507,10 @@ const result = await renderTemplate(
 ```typescript
 import { processEmails, retryFailedEmails, getMailing } from '@xtr-dev/payload-mailing'
 
-// Process pending emails manually
+// Process pending emails manually.
+// Each call handles at most 50 due-pending emails (highest priority, oldest
+// first). A larger backlog is drained across successive calls, so schedule this
+// to run repeatedly (e.g. via a cron job) to keep a large queue moving.
 await processEmails(payload: Payload): Promise<void>
 
 // Retry failed emails manually
