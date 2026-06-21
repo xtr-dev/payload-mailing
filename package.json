@@ -48,8 +48,8 @@
   "author": "XTR Development",
   "license": "MIT",
   "peerDependencies": {
-    "payload": "^3.37.0",
-    "@xtr-dev/payload-automation": "^0.0.40"
+    "@xtr-dev/payload-automation": "^0.0.40",
+    "payload": "^3.37.0"
   },
   "peerDependenciesMeta": {
     "@xtr-dev/payload-automation": {
@@ -65,13 +65,13 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
-    "@payloadcms/db-mongodb": "^3.37.0",
-    "@payloadcms/db-postgres": "^3.37.0",
-    "@payloadcms/db-sqlite": "^3.37.0",
+    "@payloadcms/db-mongodb": "3.55.1",
+    "@payloadcms/db-postgres": "3.55.1",
+    "@payloadcms/db-sqlite": "3.55.1",
     "@payloadcms/eslint-config": "^3.9.0",
-    "@payloadcms/next": "^3.37.0",
-    "@payloadcms/richtext-lexical": "^3.37.0",
-    "@payloadcms/ui": "^3.37.0",
+    "@payloadcms/next": "3.55.1",
+    "@payloadcms/richtext-lexical": "3.55.1",
+    "@payloadcms/ui": "3.55.1",
     "@playwright/test": "^1.52.0",
     "@swc-node/register": "^1.10.9",
     "@swc/cli": "^0.6.0",
@@ -82,12 +82,12 @@
     "copyfiles": "^2.4.1",
     "cross-env": "^7.0.3",
     "eslint": "^9.23.0",
-    "eslint-config-next": "^15.4.4",
+    "eslint-config-next": "^15.5.19",
     "graphql": "^16.8.1",
     "mongodb-memory-server": "^10.1.4",
-    "next": "^15.4.4",
+    "next": "^15.5.19",
     "open": "^10.1.0",
-    "payload": "^3.37.0",
+    "payload": "3.55.1",
     "prettier": "^3.4.2",
     "qs-esm": "^7.0.2",
     "react": "^19.1.0",
