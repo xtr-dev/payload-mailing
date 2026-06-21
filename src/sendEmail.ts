@@ -139,7 +139,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
     // Poll for the job ID using configurable polling mechanism
     const { jobId } = await pollForJobId({
       collectionSlug,
-      config: mailingConfig.jobPolling,
+      config: mailingConfig.config.jobPolling,
       emailId: email.id,
       logger,
       payload,

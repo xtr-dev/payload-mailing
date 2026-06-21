@@ -109,10 +109,15 @@ export interface MailingService {
   processEmailItem(emailId: string): Promise<void>
   processEmails(): Promise<void>
   renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }>
+  renderTemplateDocument(template: BaseEmailTemplateDocument, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }>
   retryFailedEmails(): Promise<void>
 }
 
 export interface MailingContext {
+  collections: {
+    emails: string
+    templates: string
+  }
   config: MailingPluginConfig
   payload: Payload
   service: MailingService
