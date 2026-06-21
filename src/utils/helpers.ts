@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 
-import type { PayloadID, PayloadRelation, TemplateVariables } from '../types/index.js'
+import type { BaseEmailTemplateDocument, MailingContext, PayloadID, PayloadRelation, TemplateVariables } from '../types/index.js'
 
 /**
  * Parse and validate email addresses
@@ -120,8 +120,8 @@ export const resolveIDs = <T extends { id: PayloadID }>(
     .filter((id): id is PayloadID => id !== undefined)
 }
 
-export const getMailing = (payload: Payload) => {
-  const mailing = (payload as any).mailing
+export const getMailing = (payload: Payload): MailingContext => {
+  const mailing = (payload as any).mailing as MailingContext | undefined
   if (!mailing) {
     throw new Error('Mailing plugin not initialized. Make sure you have added the mailingPlugin to your Payload config.')
   }
@@ -144,7 +144,7 @@ export const renderTemplateWithId = async (
   variables: TemplateVariables
 ): Promise<{ html: string; subject: string; templateId: PayloadID; text: string }> => {
   const mailing = getMailing(payload)
-  const templatesCollection = mailing.config.collections?.templates || 'email-templates'
+  const templatesCollection = mailing.collections.templates || 'email-templates'
 
   // Runtime validation: Ensure the collection exists in Payload
   if (!payload.collections[templatesCollection]) {
@@ -172,7 +172,7 @@ export const renderTemplateWithId = async (
   const templateDoc = templateDocs[0]
 
   // Render using the document directly to avoid duplicate lookup
-  const rendered = await mailing.service.renderTemplateDocument(templateDoc, variables)
+  const rendered = await mailing.service.renderTemplateDocument(templateDoc as unknown as BaseEmailTemplateDocument, variables)
 
   return {
     ...rendered,
