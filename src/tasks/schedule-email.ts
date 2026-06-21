@@ -25,12 +25,12 @@ export interface ScheduleEmailOutput {
   status: string
 }
 
-// Map string priority to numeric value
+// Map string priority to numeric value (1 = highest, 10 = lowest)
 const priorityMap: Record<string, number> = {
-  critical: 4,
+  critical: 1,
   high: 3,
-  low: 1,
-  normal: 2,
+  low: 7,
+  normal: 5,
 }
 
 // Ensure value is an array of strings
@@ -69,7 +69,7 @@ const scheduleEmailHandler: TaskHandler<'schedule-email'> = async ({ input, req 
     const toArray = ensureStringArray(typedInput.to)
     const ccArray = ensureStringArray(typedInput.cc)
     const bccArray = ensureStringArray(typedInput.bcc)
-    const priorityValue = typedInput.priority ? priorityMap[typedInput.priority] : 2
+    const priorityValue = typedInput.priority ? priorityMap[typedInput.priority] : 5
 
     const emailOptions: Parameters<typeof sendEmail>[1] = {
       data: {
