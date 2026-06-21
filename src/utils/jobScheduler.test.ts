@@ -14,6 +14,11 @@ describe('findExistingJobs', () => {
     // must NOT appear in the where clause (it is matched in JS instead).
     expect(arg.where).not.toHaveProperty('input.emailId')
     expect(arg.where).not.toHaveProperty('task')
+    // The scan must be bounded (newest-first) rather than loading the whole
+    // jobs backlog into memory.
+    expect(typeof arg.limit).toBe('number')
+    expect(arg.limit).toBeLessThanOrEqual(100)
+    expect(arg.sort).toBe('-createdAt')
   })
 
   test('matches the email id against the input JSON in JS', async () => {
