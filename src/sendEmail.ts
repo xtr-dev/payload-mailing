@@ -1,23 +1,25 @@
-import { Payload } from 'payload'
-import { getMailing, renderTemplateWithId, parseAndValidateEmails, sanitizeFromName } from './utils/helpers.js'
-import { BaseEmailDocument } from './types/index.js'
+import type { Payload } from 'payload'
+
+import type { BaseEmailDocument } from './types/index.js'
+
 import { processJobById } from './utils/emailProcessor.js'
-import { createContextLogger } from './utils/logger.js'
+import { getMailing, parseAndValidateEmails, renderTemplateWithId, sanitizeFromName } from './utils/helpers.js'
 import { pollForJobId } from './utils/jobPolling.js'
+import { createContextLogger } from './utils/logger.js'
 
 // Options for sending emails
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
+  // Common options
+  collectionSlug?: string // defaults to 'emails'
+  // Direct email data
+  data?: Partial<T>
+  processImmediately?: boolean // if true, creates job and processes it immediately
+  queue?: string // queue name for the job, defaults to mailing config queue
   // Template-based email
   template?: {
     slug: string
     variables?: Record<string, any>
   }
-  // Direct email data
-  data?: Partial<T>
-  // Common options
-  collectionSlug?: string // defaults to 'emails'
-  processImmediately?: boolean // if true, creates job and processes it immediately
-  queue?: string // queue name for the job, defaults to mailing config queue
 }
 
 /**
@@ -51,7 +53,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
   if (options.template) {
     // Look up and render the template in a single operation to avoid duplicate lookups
-    const { html, text, subject, templateId } = await renderTemplateWithId(
+    const { html, subject, templateId, text } = await renderTemplateWithId(
       payload,
       options.template.slug,
       options.template.variables || {}
@@ -59,9 +61,9 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     emailData = {
       ...emailData,
-      template: templateId,
-      subject,
       html,
+      subject,
+      template: templateId,
       text,
       variables: options.template.variables || {},
     } as Partial<TEmail>
@@ -136,11 +138,11 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     // Poll for the job ID using configurable polling mechanism
     const { jobId } = await pollForJobId({
-      payload,
       collectionSlug,
-      emailId: email.id,
       config: mailingConfig.jobPolling,
+      emailId: email.id,
       logger,
+      payload,
     })
 
     try {

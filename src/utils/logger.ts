@@ -24,9 +24,9 @@ export function getPluginLogger(payload: Payload) {
   if (!pluginLogger) {
     return {
       debug: (...args: any[]) => console.log('[MAILING DEBUG]', ...args),
+      error: (...args: any[]) => console.error('[MAILING ERROR]', ...args),
       info: (...args: any[]) => console.log('[MAILING INFO]', ...args),
       warn: (...args: any[]) => console.warn('[MAILING WARN]', ...args),
-      error: (...args: any[]) => console.error('[MAILING ERROR]', ...args),
     }
   }
 
@@ -41,8 +41,8 @@ export function createContextLogger(payload: Payload, context: string) {
 
   return {
     debug: (message: string, ...args: any[]) => logger.debug(`[${context}] ${message}`, ...args),
+    error: (message: string, ...args: any[]) => logger.error(`[${context}] ${message}`, ...args),
     info: (message: string, ...args: any[]) => logger.info(`[${context}] ${message}`, ...args),
     warn: (message: string, ...args: any[]) => logger.warn(`[${context}] ${message}`, ...args),
-    error: (message: string, ...args: any[]) => logger.error(`[${context}] ${message}`, ...args),
   }
 }

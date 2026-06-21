@@ -1,31 +1,32 @@
-import { Payload } from 'payload'
-import { JobPollingConfig } from '../types/index.js'
+import type { Payload } from 'payload'
+
+import type { JobPollingConfig } from '../types/index.js'
 
 export interface PollForJobIdOptions {
-  payload: Payload
   collectionSlug: string
-  emailId: string | number
   config?: JobPollingConfig
+  emailId: number | string
   logger?: {
     debug: (message: string, ...args: any[]) => void
+    error: (message: string, ...args: any[]) => void
     info: (message: string, ...args: any[]) => void
     warn: (message: string, ...args: any[]) => void
-    error: (message: string, ...args: any[]) => void
   }
+  payload: Payload
 }
 
 export interface PollForJobIdResult {
-  jobId: string
   attempts: number
   elapsedTime: number
+  jobId: string
 }
 
 // Default job polling configuration values
 const DEFAULT_JOB_POLLING_CONFIG: Required<JobPollingConfig> = {
-  maxAttempts: 5,
   initialDelay: 25,
-  maxTotalTime: 3000,
+  maxAttempts: 5,
   maxBackoffDelay: 400,
+  maxTotalTime: 3000,
 }
 
 /**
@@ -42,7 +43,7 @@ const DEFAULT_JOB_POLLING_CONFIG: Required<JobPollingConfig> = {
  * @throws Error if job is not found within the configured limits
  */
 export const pollForJobId = async (options: PollForJobIdOptions): Promise<PollForJobIdResult> => {
-  const { payload, collectionSlug, emailId, logger } = options
+  const { collectionSlug, emailId, logger, payload } = options
 
   // Merge user config with defaults
   const config: Required<JobPollingConfig> = {
@@ -50,7 +51,7 @@ export const pollForJobId = async (options: PollForJobIdOptions): Promise<PollFo
     ...options.config,
   }
 
-  const { maxAttempts, initialDelay, maxTotalTime, maxBackoffDelay } = config
+  const { initialDelay, maxAttempts, maxBackoffDelay, maxTotalTime } = config
   const startTime = Date.now()
   let jobId: string | undefined
 
@@ -75,8 +76,8 @@ export const pollForJobId = async (options: PollForJobIdOptions): Promise<PollFo
 
     // Fetch the email document to check for associated jobs
     const emailWithJobs = await payload.findByID({
-      collection: collectionSlug,
       id: emailId,
+      collection: collectionSlug,
     })
 
     // Check if jobs array exists and has entries
@@ -85,9 +86,9 @@ export const pollForJobId = async (options: PollForJobIdOptions): Promise<PollFo
       jobId = typeof firstJob === 'string' ? firstJob : String(firstJob.id || firstJob)
 
       return {
-        jobId,
         attempts: attempt + 1,
         elapsedTime: Date.now() - startTime,
+        jobId,
       }
     }
 

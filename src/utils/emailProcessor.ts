@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+
 import { createContextLogger } from './logger.js'
 
 /**
