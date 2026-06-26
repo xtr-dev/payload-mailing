@@ -15,7 +15,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      # contents: write — push the release tag and create the GitHub Release.
+      # id-token: write — mint the short-lived OIDC token npm uses for trusted
+      # publishing (no long-lived NPM_TOKEN) and for build provenance.
       contents: write
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -79,6 +83,11 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         uses: pnpm/action-setup@v4
 
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 ships npm 10.x.
+      - name: Update npm for trusted publishing
+        if: steps.decide.outputs.publish == 'true'
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         if: steps.decide.outputs.publish == 'true'
         run: pnpm install --frozen-lockfile
@@ -100,11 +109,12 @@ jobs:
           git tag -a "v${{ steps.decide.outputs.version }}" -F RELEASE_NOTES.md
           git push origin "v${{ steps.decide.outputs.version }}"
 
+      # Authenticated via OIDC trusted publishing (configured on npm for this
+      # repo + workflow), so no NODE_AUTH_TOKEN is needed. --provenance attaches
+      # a build attestation, which the public repo + id-token permission allow.
       - name: Publish to NPM
         if: steps.decide.outputs.publish == 'true'
-        run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
 
       - name: Create GitHub Release
         if: steps.decide.outputs.publish == 'true'
