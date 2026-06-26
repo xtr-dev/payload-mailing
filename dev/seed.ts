@@ -150,7 +150,7 @@ export const seed = async (payload: Payload) => {
                     format: 0,
                     mode: 'normal',
                     style: '',
-                    text: 'Get started by exploring the admin panel and creating your own email templates. Your account was created on {{formatDate createdAt "long"}}.',
+                    text: 'Get started by exploring the admin panel and creating your own email templates. Your account was created on {{ createdAt | formatDate: "long" }}.',
                     type: 'text',
                     version: 1,
                   },
@@ -200,6 +200,14 @@ export const seed = async (payload: Payload) => {
             version: 1,
           },
         },
+        // Declared variables. firstName and siteName are required, so sending
+        // this template without them (e.g. with empty {} variables) is rejected
+        // before any email is queued.
+        variables: [
+          { name: 'firstName', description: "Recipient's first name", required: true },
+          { name: 'siteName', description: 'Product / site name shown in the copy', required: true },
+          { name: 'createdAt', description: 'Account creation date (ISO string)', required: false },
+        ],
       },
     })
 
