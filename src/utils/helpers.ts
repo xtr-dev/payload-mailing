@@ -2,6 +2,8 @@ import type { Payload } from 'payload'
 
 import type { BaseEmailTemplateDocument, MailingContext, PayloadID, PayloadRelation, TemplateVariables } from '../types/index.js'
 
+import { validateRequiredTemplateVariables } from './templateVariables.js'
+
 /**
  * Parse and validate email addresses
  * @internal
@@ -169,10 +171,15 @@ export const renderTemplateWithId = async (
     throw new Error(`Template not found: ${templateSlug}`)
   }
 
-  const templateDoc = templateDocs[0]
+  const templateDoc = templateDocs[0] as unknown as BaseEmailTemplateDocument
+
+  // Reject the send before anything is queued when the template declares
+  // required variables the caller did not supply, rather than dispatching an
+  // email with the variables left as empty placeholders.
+  validateRequiredTemplateVariables(templateDoc, variables)
 
   // Render using the document directly to avoid duplicate lookup
-  const rendered = await mailing.service.renderTemplateDocument(templateDoc as unknown as BaseEmailTemplateDocument, variables)
+  const rendered = await mailing.service.renderTemplateDocument(templateDoc, variables)
 
   return {
     ...rendered,

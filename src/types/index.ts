@@ -35,6 +35,17 @@ export interface BaseEmailDocument {
   variables?: JSONValue
 }
 
+/**
+ * A variable a template declares it expects. Used to validate that callers
+ * supply the variables a template depends on: when `required` is true, sending
+ * the template without a non-empty value for `name` is rejected.
+ */
+export interface TemplateVariableDefinition {
+  description?: null | string
+  name: string
+  required?: boolean | null
+}
+
 export interface BaseEmailTemplateDocument {
   content?: any
   createdAt?: Date | null | string
@@ -46,6 +57,9 @@ export interface BaseEmailTemplateDocument {
   slug: string
   subject?: null | string
   updatedAt?: Date | null | string
+  // Variables this template declares it expects; required ones are validated at
+  // send time. Absent for drafts (e.g. the in-admin preview), which skips checks.
+  variables?: null | TemplateVariableDefinition[]
 }
 
 export type TemplateRendererHook = (template: string, variables: Record<string, any>) => Promise<string> | string

@@ -126,6 +126,43 @@ export const createEmailTemplatesCollection = (
       }),
       required: true,
     },
+    {
+      name: 'variables',
+      type: 'array',
+      admin: {
+        description:
+          'Declare the variables this template expects. Variables marked Required must be supplied with a non-empty value when sending, otherwise the send is rejected before any email is queued. Leave empty to accept any variables.',
+      },
+      fields: [
+        {
+          name: 'name',
+          type: 'text',
+          admin: {
+            description: 'Variable name as referenced in the template, e.g. firstName (without the {{ }}).',
+          },
+          required: true,
+        },
+        {
+          name: 'required',
+          type: 'checkbox',
+          admin: {
+            description: 'Reject sends that omit this variable or pass an empty value.',
+          },
+          defaultValue: false,
+        },
+        {
+          name: 'description',
+          type: 'text',
+          admin: {
+            description: 'Optional note describing what this variable is for.',
+          },
+        },
+      ],
+      labels: {
+        plural: 'Variables',
+        singular: 'Variable',
+      },
+    },
     // Only present when layouts are configured; filtered out otherwise.
     ...([createLayoutField(layoutNames)].filter(Boolean) as Field[]),
     // In-admin render preview (sampleVariables + preview UI); empty when disabled.

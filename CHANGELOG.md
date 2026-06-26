@@ -36,6 +36,13 @@ To cut a release: move your `## [Unreleased]` notes under a new
 - **Template-engine adapter layer** abstracting LiquidJS, Mustache, the simple
   replacer, and custom renderers, so layout composition applies the correct
   escaping model for each engine.
+- **Required template variables**: templates can declare the variables they
+  expect (via a new **Variables** field) and mark some as required. Sending a
+  template without a required variable is rejected before the email is queued,
+  with an error naming the missing variables — preventing emails that go out
+  with unrendered placeholders or blank values. Fully opt-in; templates that
+  declare nothing are unconstrained, and the preview/`renderTemplate` paths are
+  not affected.
 
 ### Fixed
 
