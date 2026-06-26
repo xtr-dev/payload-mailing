@@ -9,6 +9,8 @@ A template-based email system with scheduling and job processing for PayloadCMS 
 ## Features
 
 - 📧 Template-based emails with LiquidJS, Mustache, or custom engines
+- 🧱 Reusable email layouts (header/footer/branding wrappers)
+- 👁️ In-admin live render preview (HTML + plain text) with sample variables
 - ⏰ Email scheduling for future delivery
 - 🔄 Automatic retry mechanism for failed sends
 - 🎯 Full TypeScript support with generated Payload types
@@ -158,6 +160,139 @@ the email. This applies to the built-in engines:
 Escaping is applied to the **HTML body only**. The plain-text body and the
 subject line keep variable values verbatim, so characters like `&` are not
 turned into entities for recipients.
+
+## Layouts
+
+Layouts let you define a reusable wrapper (header, footer, branding, container
+table, etc.) once and apply it to many templates. The rendered template body is
+injected into the layout at a `{{ content }}` slot, producing the final HTML and
+plain text.
+
+### Configuring layouts
+
+Layouts are declared as a **config map** of named layouts in the plugin options.
+Keeping them in code means they are versioned with your application, require no
+new collection or database migration, and carry the lowest risk:
+
+```typescript
+mailingPlugin({
+  // ...
+  layouts: {
+    branded: {
+      html: `<!DOCTYPE html>
+<html>
+  <body style="font-family: sans-serif;">
+    <header><img src="https://example.com/logo.png" alt="{{ siteName }}"></header>
+    <main>{{ content }}</main>
+    <footer>© {{ siteName }} — <a href="{{ unsubscribeUrl }}">Unsubscribe</a></footer>
+  </body>
+</html>`,
+      text: `{{ siteName }}
+------------------------------
+
+{{ content }}
+
+------------------------------
+Unsubscribe: {{ unsubscribeUrl }}`,
+    },
+  },
+  // Applied to templates that do not pick their own layout:
+  defaultLayout: 'branded',
+})
+```
+
+### The `{{ content }}` slot
+
+Each layout must contain a `{{ content }}` slot where the rendered body is
+injected. Layout strings run through the **same template engine** as templates,
+so they can use the same variables and filters. The plugin renders the layout
+with all of your template variables plus a `content` variable equal to the
+already-rendered body.
+
+- The **HTML** layout wraps the HTML body via its `{{ content }}` slot.
+- The optional **`text`** layout wraps the plain-text body via its own
+  `{{ content }}` slot, keeping the text/MIME alternative correct. If a layout
+  omits `text`, the plain-text body is sent **unwrapped** (current behavior).
+
+#### Escaping in layouts
+
+The plugin keeps the same escaping guarantees inside layouts as it does in
+template bodies, regardless of which engine you use:
+
+- **`content` is injected verbatim.** The body was already escaped during its
+  own render pass, so it is never escaped again — no double-encoding.
+- **A layout's own variables (e.g. `{{ siteName }}`) are always HTML-escaped**
+  in the HTML layout — with no opt-out, on every engine — so untrusted values
+  surfaced in a header or footer cannot inject markup. (The plain-text layout
+  emits them verbatim.) `{{ name | raw }}` in LiquidJS and `{{{ name }}}` in
+  Mustache do **not** unescape a layout variable: it is escaped before the
+  engine runs, so the raw syntax just emits the already-escaped text. If you
+  need static HTML in a layout (e.g. a styled footer or nav bar), embed it
+  directly in the layout template string rather than passing it as a variable.
+- **Mustache** users may write the `content` slot as either `{{ content }}` or
+  `{{{ content }}}` — both inject the body raw. (Mustache normally escapes
+  `{{ }}` output; the plugin handles the `content` slot so it is never
+  double-escaped either way.)
+
+### Selecting a layout per template
+
+When one or more layouts are configured, templates gain a **Layout** select
+field in the admin UI. The options are derived from your configured layout names
+plus:
+
+- **Use default** — defers to the plugin's `defaultLayout` (this is the default).
+- **None** — explicitly sends the body without any layout, even when a
+  `defaultLayout` is configured.
+
+### Back-compat
+
+Layouts are fully opt-in. If you configure no `layouts` and no `defaultLayout`,
+nothing changes: the **Layout** field is not added to the collection and every
+template renders **exactly as before**. A template set to **None** also renders
+unwrapped.
+
+> **Roadmap:** A collection-based layout source (editor-managed layouts) may be
+> offered in a future release as an alternative to the config map.
+
+## In-admin render preview
+
+The templates collection includes a live **Preview** panel in the edit view that
+renders the current (unsaved) template and shows both outputs side by side:
+
+- the **HTML** output, in a sandboxed `iframe` (scripts disabled, so preview
+  content can never execute), and
+- the **plain-text** output, in a monospace panel.
+
+A **Sample variables** JSON field seeds the preview — e.g. `{ "firstName": "Ada" }`.
+Edit the content, subject, sample variables, or selected layout and the preview
+re-renders (debounced). Rendering goes through the same server-side pipeline used
+to send real emails (`POST <api>/mailing/preview-template`), so the preview honors
+the configured **template engine** and the selected **layout** rather than
+reimplementing serialization in the browser. The `sampleVariables` field is used
+only for previewing — it is never stored on sent emails.
+
+### Registering the client component
+
+The preview ships a client component (`@xtr-dev/payload-mailing/client#TemplatePreview`),
+so after adding or upgrading the plugin you must regenerate your import map:
+
+```bash
+payload generate:importmap
+```
+
+### Disabling the preview
+
+The preview is enabled by default. To omit the preview field and its client
+component (for example, if you prefer not to regenerate the import map), set:
+
+```typescript
+mailingPlugin({
+  adminPreview: false,
+})
+```
+
+The preview render endpoint is always registered; only the admin field and its
+component are gated by this option.
 
 ## Templates
 

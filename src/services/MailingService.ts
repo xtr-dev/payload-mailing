@@ -6,18 +6,31 @@ import { EmailAdapter} from 'payload'
 import type {
   BaseEmailDocument,
   BaseEmailTemplateDocument,
+  EmailLayout,
   MailingService as IMailingService,
   MailingPluginConfig, TemplateVariables
 } from '../types/index.js'
+import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js'
 
 import { sanitizeDisplayName } from '../utils/helpers.js'
 import { createContextLogger } from '../utils/logger.js'
-import { escapeHtml, serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
+import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
+import {
+  CustomRendererAdapter,
+  LiquidEngineAdapter,
+  MustacheEngineAdapter,
+  SimpleEngineAdapter,
+} from './templateEngines.js'
 
 export class MailingService implements IMailingService {
   private config: MailingPluginConfig
+  // Lazily-built engine adapters, cached after first use. `simpleAdapter` has no
+  // dependencies to load and doubles as the fallback when an optional engine
+  // package is missing or a render throws.
+  private customAdapter: null | TemplateEngineAdapter = null
   private emailsCollection: string
   private liquid: false | Liquid | null = null
+  private liquidAdapter: null | TemplateEngineAdapter = null
   // Separate engine with auto HTML-escaping enabled, used when substituting
   // variables into the HTML body so untrusted values cannot inject markup.
   private liquidEscaped: false | Liquid | null = null
@@ -27,6 +40,9 @@ export class MailingService implements IMailingService {
   // before initialization completes.
   private liquidInitPromise: null | Promise<void> = null
   private logger: ReturnType<typeof createContextLogger>
+  private mustacheAdapter: null | TemplateEngineAdapter = null
+  private mustacheModule: false | MustacheModule | null = null
+  private readonly simpleAdapter: TemplateEngineAdapter = new SimpleEngineAdapter()
   private templatesCollection: string
   public payload: Payload
 
@@ -138,6 +154,61 @@ export class MailingService implements IMailingService {
     return fromEmail || ''
   }
 
+  /**
+   * Selects (and caches) the template engine adapter for the configured engine.
+   * A custom `templateRenderer` hook takes precedence over the built-in engines.
+   * When an optional engine package is missing, the simple replacer is used as a
+   * fallback, preserving the behaviour from before engines were adapter-based.
+   */
+  private async getEngineAdapter(): Promise<TemplateEngineAdapter> {
+    if (this.config.templateRenderer) {
+      if (!this.customAdapter) {
+        this.customAdapter = new CustomRendererAdapter(
+          this.config.templateRenderer,
+          (message, error) => this.logger.error(message, error),
+        )
+      }
+      return this.customAdapter
+    }
+
+    const engine = this.config.templateEngine || 'liquidjs'
+
+    if (engine === 'liquidjs') {
+      await this.ensureLiquidJSInitialized()
+      if (this.liquid && this.liquidEscaped) {
+        if (!this.liquidAdapter) {
+          this.liquidAdapter = new LiquidEngineAdapter(
+            this.liquid,
+            this.liquidEscaped,
+            this.simpleAdapter,
+            (message, error) => this.logger.error(message, error),
+          )
+        }
+        return this.liquidAdapter
+      }
+      // LiquidJS failed to load; fall back to the simple replacer.
+      return this.simpleAdapter
+    }
+
+    if (engine === 'mustache') {
+      const mustache = await this.loadMustache()
+      if (mustache) {
+        if (!this.mustacheAdapter) {
+          this.mustacheAdapter = new MustacheEngineAdapter(
+            mustache,
+            this.simpleAdapter,
+            (message, error) => this.logger.error(message, error),
+          )
+        }
+        return this.mustacheAdapter
+      }
+      // Mustache failed to load; fall back to the simple replacer.
+      return this.simpleAdapter
+    }
+
+    return this.simpleAdapter
+  }
+
   private async getTemplateBySlug(templateSlug: string): Promise<BaseEmailTemplateDocument | null> {
     let docs
     try {
@@ -209,6 +280,25 @@ export class MailingService implements IMailingService {
   }
 
   /**
+   * Dynamically imports the optional `mustache` package, caching the result.
+   * Returns `null` (and warns once) when the package is not installed.
+   */
+  private async loadMustache(): Promise<MustacheModule | null> {
+    if (this.mustacheModule !== null) {
+      return this.mustacheModule || null
+    }
+    try {
+      const mustacheModule = await import('mustache')
+      this.mustacheModule = (mustacheModule.default || mustacheModule) as MustacheModule
+      return this.mustacheModule
+    } catch (error) {
+      this.logger.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.', error)
+      this.mustacheModule = false
+      return null
+    }
+  }
+
+  /**
    * Registers the built-in template filters (equivalent to Handlebars helpers)
    * on a LiquidJS engine instance.
    */
@@ -248,6 +338,8 @@ export class MailingService implements IMailingService {
       return { html: '', text: '' }
     }
 
+    const adapter = await this.getEngineAdapter()
+
     // Serialize richtext to HTML and text
     let html = serializeRichTextToHTML(template.content)
     let text = serializeRichTextToText(template.content)
@@ -255,69 +347,67 @@ export class MailingService implements IMailingService {
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters
     // like `&` verbatim, otherwise recipients see literal entities (`&amp;`).
-    html = await this.renderTemplateString(html, variables, { escapeHtml: true })
-    text = await this.renderTemplateString(text, variables)
+    html = await adapter.renderHtml(html, variables)
+    text = await adapter.render(text, variables)
+
+    // Wrap the rendered body in the resolved layout, if any. The body is the
+    // `content` slot and is injected verbatim — it was already escaped during
+    // its own render pass — while the layout's own variables are HTML-escaped
+    // (HTML layout) or emitted verbatim (text layout). Each engine adapter
+    // applies that split according to its own escaping model.
+    const layout = this.resolveLayout(template)
+    if (layout) {
+      html = await adapter.composeLayout(layout.html, html, variables, true)
+
+      // Only wrap plain text when the layout defines a text variant; otherwise
+      // keep the unwrapped body so the text/MIME alternative matches today's output.
+      if (layout.text) {
+        text = await adapter.composeLayout(layout.text, text, variables, false)
+      }
+    }
 
     return { html, text }
   }
 
-  private async renderTemplateString(
-    template: string,
-    variables: Record<string, any>,
-    options: { escapeHtml?: boolean } = {}
-  ): Promise<string> {
-    // Use custom template renderer if provided. Custom renderers are
-    // responsible for their own output escaping.
-    if (this.config.templateRenderer) {
-      try {
-        return await this.config.templateRenderer(template, variables)
-      } catch (error) {
-        this.logger.error('Custom template renderer error:', error)
-        return template
-      }
-    }
-
-    const engine = this.config.templateEngine || 'liquidjs'
-
-    // Use LiquidJS if configured
-    if (engine === 'liquidjs') {
-      try {
-        await this.ensureLiquidJSInitialized()
-        // For HTML output use the auto-escaping engine so untrusted variable
-        // values cannot inject markup; elsewhere emit values verbatim.
-        const liquid = options.escapeHtml ? this.liquidEscaped : this.liquid
-        if (liquid) {
-          return await liquid.parseAndRender(template, variables)
-        }
-      } catch (error) {
-        this.logger.error('LiquidJS template rendering error:', error)
-      }
-    }
-
-    // Use Mustache if configured
-    if (engine === 'mustache') {
-      try {
-        const mustacheResult = await this.renderWithMustache(template, variables)
-        if (mustacheResult !== null) {
-          return mustacheResult
-        }
-      } catch (error) {
-        this.logger.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.', error)
-      }
-    }
-
-    // Fallback to simple variable replacement
-    return this.simpleVariableReplacement(template, variables, options)
-  }
-
-  private async renderWithMustache(template: string, variables: Record<string, any>): Promise<null | string> {
-    try {
-      const mustacheModule = await import('mustache')
-      const Mustache = mustacheModule.default || mustacheModule
-      return Mustache.render(template, variables)
-    } catch (error) {
+  /**
+   * Resolves which configured layout (if any) applies to a template.
+   *
+   * Precedence: the template's own `layout` field wins, falling back to the
+   * plugin's `defaultLayout` when the template leaves it at "default"/unset.
+   * The "none" value explicitly opts out, even when a `defaultLayout` exists.
+   * Returns `null` when no layout applies, in which case the body renders
+   * exactly as it did before layouts existed (full back-compat).
+   */
+  private resolveLayout(template: BaseEmailTemplateDocument): EmailLayout | null {
+    const layouts = this.config.layouts
+    if (!layouts) {
       return null
     }
+
+    const templateChoice = template.layout
+
+    // 'none' is an explicit opt-out that overrides any configured defaultLayout.
+    if (templateChoice === 'none') {
+      return null
+    }
+
+    // A named choice other than the "use default" sentinel selects directly;
+    // anything else (the 'default' sentinel, null, undefined) defers to
+    // defaultLayout.
+    const layoutName =
+      templateChoice && templateChoice !== 'default' ? templateChoice : this.config.defaultLayout
+
+    if (!layoutName) {
+      return null
+    }
+
+    const layout = layouts[layoutName]
+    if (!layout) {
+      this.logger.warn(`Email layout '${layoutName}' is not configured. Sending without a layout.`)
+      return null
+    }
+
+    return layout
   }
 
   /**
@@ -326,21 +416,6 @@ export class MailingService implements IMailingService {
    */
   private sanitizeDisplayName(name: string): string {
     return sanitizeDisplayName(name, true) // escapeQuotes = true for email headers
-  }
-
-  private simpleVariableReplacement(
-    template: string,
-    variables: Record<string, any>,
-    options: { escapeHtml?: boolean } = {}
-  ): string {
-    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-      const value = variables[key]
-      if (value === undefined) {return match}
-      const str = String(value)
-      // The simple engine has no escaping syntax, so HTML-escape substituted
-      // values when rendering into the HTML body to avoid markup injection.
-      return options.escapeHtml ? escapeHtml(str) : str
-    })
   }
 
   async processEmailItem(emailId: string, expectedStatus: 'failed' | 'pending' = 'pending'): Promise<void> {
@@ -508,8 +583,9 @@ export class MailingService implements IMailingService {
   async renderTemplateDocument(template: BaseEmailTemplateDocument, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }> {
     this.ensureInitialized()
 
+    const adapter = await this.getEngineAdapter()
     const emailContent = await this.renderEmailTemplate(template, variables)
-    const subject = await this.renderTemplateString(template.subject || '', variables)
+    const subject = await adapter.render(template.subject || '', variables)
 
     return {
       html: emailContent.html,

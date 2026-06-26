@@ -3,24 +3,55 @@ import type { Payload } from 'payload'
 import { createContextLogger } from './logger.js'
 
 /**
- * Finds existing processing jobs for an email
+ * Upper bound on how many recent `process-email` jobs are scanned when looking
+ * for an existing job for an email. The email id is stored in the `input` JSON
+ * column, whose nested path is not filterable on every adapter, so matching
+ * happens in JS over a bounded result set rather than loading the entire
+ * (potentially large) jobs backlog into memory.
+ *
+ * This is safe because the lookup is only a best-effort de-duplication hint —
+ * the real double-send guard is the atomic `pending` -> `processing` claim at
+ * process time (see MailingService.processEmailItem), not this check. A
+ * duplicate job is queued near-simultaneously with the original, so it is among
+ * the most recent jobs; and Payload's `deleteJobOnComplete` removes finished
+ * jobs, keeping the live set small. Sorting newest-first means the relevant jobs
+ * are always within this window.
+ */
+const MAX_RECENT_JOBS_SCANNED = 100
+
+/**
+ * Finds existing `process-email` jobs queued for a given email.
+ *
+ * The default payload-jobs collection identifies the task in the top-level
+ * `taskSlug` field (not `task` — that is only the argument name passed to
+ * `queue()`), so the query filters on `taskSlug`. The email id lives inside the
+ * `input` JSON column, whose nested path (`input.emailId`) is not filterable on
+ * every database adapter — notably SQLite returns no matches — so it is matched
+ * in JS over the most recent {@link MAX_RECENT_JOBS_SCANNED} jobs.
  */
 export async function findExistingJobs(
   payload: Payload,
   emailId: number | string
 ): Promise<{ docs: any[], totalDocs: number }> {
-  return await payload.find({
+  const normalizedEmailId = String(emailId)
+
+  const result = await payload.find({
     collection: 'payload-jobs',
-    limit: 10,
+    depth: 0,
+    limit: MAX_RECENT_JOBS_SCANNED,
+    sort: '-createdAt',
     where: {
-      'input.emailId': {
-        equals: String(emailId),
-      },
-      task: {
+      taskSlug: {
         equals: 'process-email',
       },
     },
   })
+
+  const docs = result.docs.filter(
+    (job: any) => String(job?.input?.emailId) === normalizedEmailId
+  )
+
+  return { docs, totalDocs: docs.length }
 }
 
 /**
