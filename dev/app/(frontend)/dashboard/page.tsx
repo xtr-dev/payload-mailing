@@ -139,6 +139,20 @@ export default function HomePage() {
             >
               🧪 Test Interface
             </Link>
+            <Link
+              href="/sent-emails"
+              style={{
+                backgroundColor: '#8b5cf6',
+                color: 'white',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontWeight: '500',
+                transition: 'background-color 0.2s'
+              }}
+            >
+              📬 Sent Emails
+            </Link>
           </div>
         </div>
 
