@@ -161,6 +161,25 @@ Escaping is applied to the **HTML body only**. The plain-text body and the
 subject line keep variable values verbatim, so characters like `&` are not
 turned into entities for recipients.
 
+### Required variables
+
+A template can declare the variables it expects in the **Variables** field on the
+template (each entry has a name, a Required toggle, and an optional description).
+When you send a template, every variable marked **Required** must be supplied with
+a non-empty value (`undefined`, `null`, and `''` all count as missing; `0` and
+`false` are accepted). If any are missing, the send is **rejected before the email
+is queued** with an error naming the missing variables:
+
+```
+Missing required template variable(s) for template "welcome-email": firstName, siteName
+```
+
+This prevents emails from going out with unrendered `{{ placeholders }}` or blank
+values. Templates that declare no variables (or none marked required) accept any
+input, so this is fully opt-in. Validation runs only when **sending**; the
+in-admin preview and direct `renderTemplate` calls are not constrained, so you can
+still preview a draft with partial sample data.
+
 ## Layouts
 
 Layouts let you define a reusable wrapper (header, footer, branding, container
