@@ -126,6 +126,11 @@ export const TemplatePreview: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputKey])
 
+  // Abort any in-flight preview request when the component unmounts, so a fetch
+  // started just before unmount neither lingers nor calls state setters on a
+  // gone component.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
   return (
     <div style={{ marginTop: '1.5rem' }}>
       <div style={{ alignItems: 'center', display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>

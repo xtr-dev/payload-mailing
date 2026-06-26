@@ -40,7 +40,14 @@ export interface TemplateEngineAdapter {
 export type RenderErrorLogger = (message: string, error: unknown) => void
 
 /** The slice of the `mustache` package this module depends on. */
-export type MustacheModule = { render(template: string, variables: Record<string, any>): string }
+export type MustacheModule = {
+  render(
+    template: string,
+    variables: Record<string, any>,
+    partials?: Record<string, string>,
+    config?: { escape?: (value: string) => string },
+  ): string
+}
 
 // Matches a `content` output tag in any supported engine syntax: Mustache raw
 // `{{{ content }}}`, the double-brace `{{ content }}`, and the Liquid/Mustache
@@ -158,6 +165,12 @@ export class LiquidEngineAdapter extends ModeBasedAdapter {
 const SENTINEL_CHAR = '\x01'
 const CONTENT_SENTINEL = `${SENTINEL_CHAR}LAYOUT_CONTENT${SENTINEL_CHAR}`
 
+// Identity escape function used to turn Mustache's built-in `{{ }}` HTML escaping
+// OFF for a single render. Layout variables are pre-escaped in JS instead, so the
+// escaping behaviour matches the mode-based engines exactly and `{{{ }}}` is not a
+// raw opt-out for layout variables.
+const NO_ESCAPE = (value: string): string => value
+
 /** Removes every sentinel marker character from a variables structure. */
 function stripSentinel(value: any): any {
   if (typeof value === 'string') {
@@ -177,12 +190,14 @@ function stripSentinel(value: any): any {
 }
 
 /**
- * Mustache adapter. Mustache always HTML-escapes `{{ }}` output and offers no
- * per-render escape toggle, so the mode-based layout strategy would
- * double-escape the body. Instead the content slot is replaced with a
- * control-char sentinel BEFORE Mustache runs, Mustache escapes the remaining
- * variables natively, and the already-rendered body is spliced into the
- * sentinel position afterward.
+ * Mustache adapter. Mustache always HTML-escapes `{{ }}` output, so the body
+ * render uses that native escaping. Layout composition cannot, however: the
+ * content slot must be injected raw while the layout's own variables must be
+ * escaped exactly once, with no `{{{ }}}` raw opt-out (matching the mode-based
+ * engines). So `composeLayout` replaces the content slot with a control-char
+ * sentinel BEFORE Mustache runs, pre-escapes the remaining variables in JS,
+ * renders with Mustache's native escaping turned OFF, and splices the
+ * already-rendered body into the sentinel position afterward.
  */
 export class MustacheEngineAdapter implements TemplateEngineAdapter {
   constructor(
@@ -195,7 +210,7 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
     layout: string,
     content: string,
     variables: Record<string, any>,
-    _escapeVariables: boolean,
+    escapeVariables: boolean,
   ): Promise<string> {
     try {
       // Strip the sentinel marker from the layout source first, then insert our
@@ -203,19 +218,26 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
       // one we put there, never a stray copy from the developer-authored layout.
       const layoutWithSlot = layout.split(SENTINEL_CHAR).join('').replace(CONTENT_SLOT, CONTENT_SENTINEL)
 
-      // Strip the sentinel marker from every variable value too. Mustache
-      // escapes HTML metacharacters but NOT control characters, so a value
-      // containing the marker would otherwise survive escaping and forge a
-      // second content slot — splicing the body into an attacker-chosen spot.
-      const safeVariables = stripSentinel(variables)
+      // Pre-escape the layout's own variables in JS (HTML layouts only; plain
+      // text emits them verbatim) and strip the sentinel marker from every
+      // value. Stripping is essential: HTML escaping leaves control characters
+      // untouched, so a value containing the marker would otherwise survive and
+      // forge a second content slot — splicing the body into an attacker-chosen
+      // spot.
+      const safeVariables = stripSentinel(escapeVariables ? deepEscape(variables) : variables)
 
-      const rendered = this.mustache.render(layoutWithSlot, safeVariables)
+      // Render with Mustache's `{{ }}` escaping disabled so the pre-escaped
+      // values pass through exactly once, regardless of whether the layout uses
+      // `{{ x }}` or `{{{ x }}}`. This mirrors the mode-based strategy and means
+      // layout variables have no raw opt-out, which is correct for values that
+      // may be user-controlled.
+      const rendered = this.mustache.render(layoutWithSlot, safeVariables, undefined, { escape: NO_ESCAPE })
       // String#split/join (not String#replace) so a `$`-sequence in the body is
       // inserted literally rather than interpreted as a replacement pattern.
       return rendered.split(CONTENT_SENTINEL).join(content)
     } catch (error) {
       this.onError('Mustache template rendering error:', error)
-      return this.fallback.composeLayout(layout, content, variables, _escapeVariables)
+      return this.fallback.composeLayout(layout, content, variables, escapeVariables)
     }
   }
 

@@ -221,12 +221,15 @@ template bodies, regardless of which engine you use:
 
 - **`content` is injected verbatim.** The body was already escaped during its
   own render pass, so it is never escaped again — no double-encoding.
-- **A layout's own variables (e.g. `{{ siteName }}`) are HTML-escaped** in the
-  HTML layout, so untrusted values surfaced in a header or footer cannot inject
-  markup. The plain-text layout emits them verbatim. Opt a variable back into
-  raw HTML the same way you would in a body: `{{ name | raw }}` (LiquidJS) or
-  `{{{ name }}}` (Mustache).
-- **Mustache** users may write the slot as either `{{ content }}` or
+- **A layout's own variables (e.g. `{{ siteName }}`) are always HTML-escaped**
+  in the HTML layout — with no opt-out, on every engine — so untrusted values
+  surfaced in a header or footer cannot inject markup. (The plain-text layout
+  emits them verbatim.) `{{ name | raw }}` in LiquidJS and `{{{ name }}}` in
+  Mustache do **not** unescape a layout variable: it is escaped before the
+  engine runs, so the raw syntax just emits the already-escaped text. If you
+  need static HTML in a layout (e.g. a styled footer or nav bar), embed it
+  directly in the layout template string rather than passing it as a variable.
+- **Mustache** users may write the `content` slot as either `{{ content }}` or
   `{{{ content }}}` — both inject the body raw. (Mustache normally escapes
   `{{ }}` output; the plugin handles the `content` slot so it is never
   double-escaped either way.)

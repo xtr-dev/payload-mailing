@@ -179,6 +179,19 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
     expect(html).not.toContain('<script>')
   })
 
+  test('triple-brace {{{ siteName }}} is NOT a raw opt-out for layout variables', async () => {
+    // Layout variables are escaped before Mustache runs and rendered with native
+    // escaping disabled, so {{{ }}} cannot resurrect raw HTML — matching the
+    // mode-based engines, where layout variables have no opt-out either.
+    const svc = makeService(mustacheConfig('<header>{{{ siteName }}}</header><main>{{{ content }}}</main>'))
+    const { html } = await svc.renderTemplateDocument(
+      template('Body', 'hi'),
+      { siteName: '<script>x</script>' },
+    )
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).not.toContain('<script>')
+  })
+
   test('a variable cannot forge the internal content sentinel (injection guard)', async () => {
     const svc = makeService(mustacheConfig('<header>{{ siteName }}</header><main>{{{ content }}}</main>'))
     // A value crafted to look like the internal slot marker must be neutralised,
