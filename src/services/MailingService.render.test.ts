@@ -127,4 +127,69 @@ describe('renderTemplateDocument — layout composition', () => {
     expect(html).not.toContain('ACME')
     expect(text).toContain('Plain')
   })
+
+  test('non-content layout variables are HTML-escaped (no XSS via layout vars)', async () => {
+    const svc = makeService({
+      defaultLayout: 'branded',
+      layouts: { branded: { html: '<header>{{ siteName }}</header><main>{{ content }}</main>' } },
+    })
+    const { html } = await svc.renderTemplateDocument(
+      template('Body', 'hi'),
+      { siteName: '<script>evil()</script>' },
+    )
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).not.toContain('<script>')
+  })
+})
+
+// Mustache always HTML-escapes `{{ }}` output and has no per-render escape
+// toggle, so layout composition uses a sentinel-splice strategy instead of the
+// pre-escape strategy the mode-based engines use.
+describe('renderTemplateDocument — Mustache layout composition', () => {
+  const mustacheConfig = (layoutHtml: string) => ({
+    defaultLayout: 'branded',
+    layouts: { branded: { html: layoutHtml } },
+    templateEngine: 'mustache',
+  })
+
+  test('content slot is injected raw with triple-brace {{{ content }}} (no double-escape)', async () => {
+    const svc = makeService(mustacheConfig('<main>{{{ content }}}</main>'))
+    const { html } = await svc.renderTemplateDocument(template('Hi {{ name }}', 'hi'), { name: XSS })
+    expect(html).toContain('<main>')
+    // The body was escaped once by its own render pass; the layout wrap must not
+    // re-escape it (which would produce `&amp;lt;`).
+    expect(html).toContain('&lt;img')
+    expect(html).not.toContain('&amp;lt;')
+  })
+
+  test('content slot also works with double-brace {{ content }}', async () => {
+    const svc = makeService(mustacheConfig('<main>{{ content }}</main>'))
+    const { html } = await svc.renderTemplateDocument(template('Hi {{ name }}', 'hi'), { name: XSS })
+    expect(html).toContain('&lt;img')
+    expect(html).not.toContain('&amp;lt;')
+  })
+
+  test('non-content layout variables are escaped by Mustache', async () => {
+    const svc = makeService(mustacheConfig('<header>{{ siteName }}</header><main>{{{ content }}}</main>'))
+    const { html } = await svc.renderTemplateDocument(
+      template('Body', 'hi'),
+      { siteName: '<script>x</script>' },
+    )
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).not.toContain('<script>')
+  })
+
+  test('a variable cannot forge the internal content sentinel (injection guard)', async () => {
+    const svc = makeService(mustacheConfig('<header>{{ siteName }}</header><main>{{{ content }}}</main>'))
+    // A value crafted to look like the internal slot marker must be neutralised,
+    // never treated as a second content slot that the body gets spliced into.
+    const { html } = await svc.renderTemplateDocument(
+      template('REAL_BODY', 'hi'),
+      { siteName: '\x01LAYOUT_CONTENT\x01' },
+    )
+    // The body appears exactly once, at the genuine content slot.
+    expect(html.split('REAL_BODY').length - 1).toBe(1)
+    // The sentinel marker character never leaks into the rendered output.
+    expect(html).not.toContain('\x01')
+  })
 })

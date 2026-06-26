@@ -207,13 +207,29 @@ Each layout must contain a `{{ content }}` slot where the rendered body is
 injected. Layout strings run through the **same template engine** as templates,
 so they can use the same variables and filters. The plugin renders the layout
 with all of your template variables plus a `content` variable equal to the
-already-rendered body. Because the body was already escaped during its own
-render pass, it is injected verbatim (no double-escaping).
+already-rendered body.
 
 - The **HTML** layout wraps the HTML body via its `{{ content }}` slot.
 - The optional **`text`** layout wraps the plain-text body via its own
   `{{ content }}` slot, keeping the text/MIME alternative correct. If a layout
   omits `text`, the plain-text body is sent **unwrapped** (current behavior).
+
+#### Escaping in layouts
+
+The plugin keeps the same escaping guarantees inside layouts as it does in
+template bodies, regardless of which engine you use:
+
+- **`content` is injected verbatim.** The body was already escaped during its
+  own render pass, so it is never escaped again — no double-encoding.
+- **A layout's own variables (e.g. `{{ siteName }}`) are HTML-escaped** in the
+  HTML layout, so untrusted values surfaced in a header or footer cannot inject
+  markup. The plain-text layout emits them verbatim. Opt a variable back into
+  raw HTML the same way you would in a body: `{{ name | raw }}` (LiquidJS) or
+  `{{{ name }}}` (Mustache).
+- **Mustache** users may write the slot as either `{{ content }}` or
+  `{{{ content }}}` — both inject the body raw. (Mustache normally escapes
+  `{{ }}` output; the plugin handles the `content` slot so it is never
+  double-escaped either way.)
 
 ### Selecting a layout per template
 
