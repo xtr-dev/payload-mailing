@@ -20,6 +20,8 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+## [0.6.0] - 2026-07-26
+
 ### Changed
 
 - **Secure-by-default collection access (breaking).** The `emails` and
