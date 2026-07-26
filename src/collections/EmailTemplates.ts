@@ -2,6 +2,8 @@ import type { CollectionConfig, Field, RichTextField } from 'payload'
 
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
+import { denyAllAccess } from './access.js'
+
 /**
  * Builds the optional `layout` select field. Its options are derived from the
  * layout names configured in plugin options, plus an explicit "None" option so
@@ -72,6 +74,9 @@ export const createEmailTemplatesCollection = (
   enablePreview = false,
 ): CollectionConfig => ({
   slug: 'email-templates',
+  // Deny all access by default; grant explicitly via the plugin's
+  // `collections.templates.access` override. See src/collections/access.ts.
+  access: { ...denyAllAccess },
   admin: {
     defaultColumns: ['name', 'subject', 'updatedAt'],
     group: 'Mailing',
