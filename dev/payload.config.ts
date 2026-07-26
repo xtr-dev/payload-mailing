@@ -123,6 +123,28 @@ export default buildConfig({
         retryDelay: 60000, // 1 minute for dev
         queue: 'default',
 
+        // The mailing collections deny all access by default (see
+        // src/collections/access.ts). Grant access explicitly here so the admin
+        // panel can manage them — restrict to authenticated users in this demo.
+        collections: {
+          emails: {
+            access: {
+              create: ({ req: { user } }) => Boolean(user),
+              delete: ({ req: { user } }) => Boolean(user),
+              read: ({ req: { user } }) => Boolean(user),
+              update: ({ req: { user } }) => Boolean(user),
+            },
+          },
+          templates: {
+            access: {
+              create: ({ req: { user } }) => Boolean(user),
+              delete: ({ req: { user } }) => Boolean(user),
+              read: ({ req: { user } }) => Boolean(user),
+              update: ({ req: { user } }) => Boolean(user),
+            },
+          },
+        },
+
         // Example designed layout. The rendered template body is injected into
         // the `{{ content }}` slot, giving every email a shared branded header
         // and footer. Layout strings run through the same engine as templates,

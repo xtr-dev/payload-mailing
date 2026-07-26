@@ -3,9 +3,13 @@ import type { CollectionConfig } from 'payload'
 import { getMailing, resolveID } from '../utils/helpers.js'
 import { ensureEmailJob } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
+import { denyAllAccess } from './access.js'
 
 const Emails: CollectionConfig = {
   slug: 'emails',
+  // Deny all access by default; grant explicitly via the plugin's
+  // `collections.emails.access` override. See src/collections/access.ts.
+  access: { ...denyAllAccess },
   admin: {
     defaultColumns: ['subject', 'to', 'status', 'jobs', 'scheduledAt', 'sentAt'],
     description: 'Email delivery and status tracking',

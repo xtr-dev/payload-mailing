@@ -20,6 +20,29 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Changed
+
+- **Secure-by-default collection access (breaking).** The `emails` and
+  `email-templates` collections now **deny every operation by default** instead
+  of inheriting Payload's built-in default (which grants access to any
+  authenticated user). This prevents accidentally exposing email content,
+  recipients, and templates in apps that have non-admin/front-end users. The
+  plugin's own sending, scheduling, and rendering are unaffected — they run
+  through Payload's Local API, which bypasses access control. **Action
+  required:** grant the access your app needs via the plugin's
+  `collections.emails.access` / `collections.templates.access` overrides. Your
+  `access` functions are merged on top of the deny-all defaults, so any
+  operation you don't override stays denied. See the new **Access Control**
+  section in the README.
+
+### Docs
+
+- Rewrote the README to be shorter and focused on essential usage, added an
+  **Access Control** section, and corrected stale references (a non-existent
+  `onReady` option, an `attemptCount` field, and a `sendTemplateEmailTask` /
+  `send-template-email` job task that the plugin does not expose — its
+  processing job is registered automatically).
+
 ## [0.5.0] - 2026-06-26
 
 ### Added
