@@ -84,9 +84,12 @@ jobs:
         uses: pnpm/action-setup@v4
 
       # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 ships npm 10.x.
+      # Pin to the 11.x line: npm@latest is now 12.x, which requires Node >= 22
+      # and fails with EBADENGINE on this Node 20 runner. npm 11.x still supports
+      # OIDC trusted publishing and stays compatible with Node 20 (^20.17.0).
       - name: Update npm for trusted publishing
         if: steps.decide.outputs.publish == 'true'
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install dependencies
         if: steps.decide.outputs.publish == 'true'
