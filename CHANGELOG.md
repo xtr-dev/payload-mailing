@@ -45,6 +45,17 @@ To cut a release: move your `## [Unreleased]` notes under a new
   `send-template-email` job task that the plugin does not expose — its
   processing job is registered automatically).
 
+### Security
+
+- Removed the unused `nodemailer` dependency and the `@types/nodemailer`
+  dev dependency. The plugin sends through Payload's configured email
+  adapter (`payload.email.sendEmail`) and never imported nodemailer, so
+  dropping them clears their advisories and removes the transitively
+  pulled `@aws-sdk/client-ses` type subtree.
+- Bumped the optional `liquidjs` dependency to `^10.27.0`, patching the
+  path-traversal (GHSA-8gc5-j5rx-235r) and `renderFile`/`parseFile`
+  root-bypass (GHSA-gh4j-gqv2-49f6) advisories.
+
 ## [0.5.0] - 2026-06-26
 
 ### Added
