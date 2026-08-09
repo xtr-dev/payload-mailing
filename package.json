@@ -53,6 +53,7 @@
   "author": "XTR Development",
   "license": "MIT",
   "peerDependencies": {
+    "@payloadcms/richtext-lexical": "^3.37.0",
     "@payloadcms/ui": "^3.37.0",
     "@xtr-dev/payload-automation": "^0.0.40",
     "payload": "^3.37.0",

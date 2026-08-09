@@ -10,8 +10,12 @@ job-queue processing, all through Payload collections you already know.
 ## Install
 
 ```bash
-pnpm add @xtr-dev/payload-mailing
+pnpm add @xtr-dev/payload-mailing @payloadcms/richtext-lexical
 ```
+
+`@payloadcms/richtext-lexical` is a required peer dependency: the templates
+collection uses it as the default rich-text editor. If your app already uses
+the Lexical editor (Payload's default), you have it installed already.
 
 ## Quick Start
 
