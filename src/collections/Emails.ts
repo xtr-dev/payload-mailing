@@ -280,7 +280,14 @@ const Emails: CollectionConfig = {
           // 1. The jobs field has filterOptions that dynamically queries jobs by emailId
           // 2. Updating the relationship in afterChange causes transaction isolation issues
           //    (the new job isn't committed yet, so the relationship validation fails)
+          //
+          // The queue name comes through the request context: sendEmail writes
+          // its per-send `queue` option there because this hook — not sendEmail —
+          // is what queues the job on the normal (non-processImmediately) path.
+          // Absent a context value (admin UI edits, direct payload.create calls),
+          // ensureEmailJob falls back to the plugin-level queue config.
           const { jobIds } = await ensureEmailJob(req.payload, doc.id, {
+            queueName: (req.context as { emailQueueName?: string } | undefined)?.emailQueueName,
             scheduledAt: doc.scheduledAt,
           })
 
