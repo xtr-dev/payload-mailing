@@ -22,6 +22,9 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Changed
 
+- **Removed the unused optional `react-dom` peer dependency.** The package does
+  not import `react-dom`, so consumers no longer need to install or resolve it.
+
 - **`@payloadcms/richtext-lexical` is now a required peerDependency.** It was
   already loaded at runtime (the templates collection uses `lexicalEditor` as
   its default editor) but was only declared in devDependencies, so a clean
