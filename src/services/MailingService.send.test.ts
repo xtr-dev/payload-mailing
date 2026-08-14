@@ -120,7 +120,7 @@ describe('processEmailItem — failure walks the attempt budget', () => {
     expect(finalCall.data.status).toBe('pending')
     expect(finalCall.data.error).toBe('smtp down')
 
-    const attemptsUpdate = payload.update.mock.calls.find((call) => call[0].data.attempts !== undefined)
+    const attemptsUpdate = payload.update.mock.calls.find((call: any[]) => call[0].data.attempts !== undefined)
     expect(attemptsUpdate[0].data.attempts).toBe(1)
   })
 
