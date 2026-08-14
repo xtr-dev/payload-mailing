@@ -20,6 +20,18 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Changed
+
+- **`@payloadcms/richtext-lexical` is now a required peerDependency.** It was
+  already loaded at runtime (the templates collection uses `lexicalEditor` as
+  its default editor) but was only declared in devDependencies, so a clean
+  install without it failed with `ERR_MODULE_NOT_FOUND`. If your project
+  already has `@payloadcms/richtext-lexical` installed (most Payload apps do,
+  since it's Payload's default rich text editor), this changes nothing. If it
+  doesn't, npm's strict peer-dependency resolution (or pnpm without
+  `auto-install-peers`) will now warn or error on install until you add it —
+  see the updated install line in the README.
+
 ## [0.6.0] - 2026-07-26
 
 ### Changed
