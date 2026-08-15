@@ -22,6 +22,11 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Changed
 
+- **`@xtr-dev/payload-automation` is no longer declared as a peer dependency.**
+  The optional integration shown in `ScheduleEmailTask` is structural and does
+  not import or require payload-automation at build time or runtime. Consumers
+  that use that example should install payload-automation directly.
+
 - **`@payloadcms/richtext-lexical` is now a required peerDependency.** It was
   already loaded at runtime (the templates collection uses `lexicalEditor` as
   its default editor) but was only declared in devDependencies, so a clean
