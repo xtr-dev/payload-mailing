@@ -12,6 +12,12 @@ describe('parseAndValidateEmails', () => {
     expect(parseAndValidateEmails(['a@b.com', 'c@d.com'])).toEqual(['a@b.com', 'c@d.com'])
   })
 
+  test('does not re-split an array entry that contains a comma', () => {
+    // If array entries were joined and re-split on ',', this would silently become
+    // two valid recipients (a@b.com, c@d.com) instead of one invalid candidate.
+    expect(() => parseAndValidateEmails(['a@b.com,c@d.com'])).toThrow(/a@b\.com,c@d\.com/)
+  })
+
   test('returns undefined for null or undefined input rather than an empty array', () => {
     expect(parseAndValidateEmails(null)).toBeUndefined()
     expect(parseAndValidateEmails(undefined)).toBeUndefined()
