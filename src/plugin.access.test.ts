@@ -53,3 +53,30 @@ describe('collection access defaults', () => {
     expect(call(emails.access!.delete)).toBe(false)
   })
 })
+
+describe('collection slug collisions', () => {
+  it('replaces a colliding host collection and preserves unrelated collections', () => {
+    const hostEmails = {
+      slug: 'emails',
+      access: {
+        read: () => true,
+      },
+      fields: [],
+    }
+    const unrelated = {
+      slug: 'unrelated',
+      fields: [],
+    }
+
+    const result = mailingPlugin({})({
+      collections: [hostEmails, unrelated],
+    } as unknown as Config)
+    const collections = result.collections || []
+    const emails = collections.filter((collection) => collection.slug === 'emails')
+
+    expect(emails).toHaveLength(1)
+    expect(emails[0]).not.toBe(hostEmails)
+    expect(call(emails[0].access!.read)).toBe(false)
+    expect(collections).toContain(unrelated)
+  })
+})
