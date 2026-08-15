@@ -75,6 +75,45 @@ describe('renderTemplateDocument — variable escaping (simple engine)', () => {
   })
 })
 
+// Mustache HTML-escapes `{{ }}` by default; MustacheEngineAdapter.render must
+// override that (via NO_ESCAPE) to satisfy the TemplateEngineAdapter contract
+// that subject and plain-text output are verbatim, same as the other engines.
+describe('renderTemplateDocument — variable escaping (mustache engine)', () => {
+  test('HTML body escapes a variable containing markup', async () => {
+    const svc = makeService({ templateEngine: 'mustache' })
+    const { html } = await svc.renderTemplateDocument(
+      template('Hello, {{ name }}!', 'hi'),
+      { name: XSS },
+    )
+    // Mustache's native escaping also encodes `=` (as `&#x3D;`), unlike the
+    // other engines' escapeHtml — assert only on the part every engine agrees
+    // on: the raw tag must not survive.
+    expect(html).toContain('&lt;img')
+    expect(html).not.toContain('<img src=x')
+  })
+
+  test('subject does NOT HTML-escape (keeps & and markup verbatim)', async () => {
+    const svc = makeService({ templateEngine: 'mustache' })
+    const { subject } = await svc.renderTemplateDocument(
+      template('body', '{{ name }} & Co'),
+      { name: XSS },
+    )
+    expect(subject).toBe('<img src=x onerror=alert(1)> & Co')
+    expect(subject).not.toContain('&amp;')
+    expect(subject).not.toContain('&lt;')
+  })
+
+  test('plain-text body does NOT HTML-escape', async () => {
+    const svc = makeService({ templateEngine: 'mustache' })
+    const { text } = await svc.renderTemplateDocument(
+      template('Hello, {{ name }}!', 'hi'),
+      { name: 'Tom & Jerry' },
+    )
+    expect(text).toContain('Tom & Jerry')
+    expect(text).not.toContain('&amp;')
+  })
+})
+
 // This is the exact render path the in-admin preview endpoint invokes
 // (renderTemplateDocument with draft content + selected layout + sample
 // variables), so these also cover the layout composition added in Part 1.
