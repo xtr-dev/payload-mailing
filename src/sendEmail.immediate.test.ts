@@ -5,7 +5,7 @@ import { sendEmail } from './sendEmail.js'
 const emailData = {
   html: '<p>Hello</p>',
   subject: 'Hello',
-  to: 'person@example.com',
+  to: ['person@example.com'],
 }
 
 const createPayload = () => {
