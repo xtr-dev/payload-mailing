@@ -155,6 +155,8 @@ due emails per call, highest priority first). Emails track a `status` of
 | `adminPreview` | Live in-admin render preview; `true` by default. Set `false` to skip it (and the `payload generate:importmap` step). |
 | `collections` | Rename (`'slug'`) or override (`{ access, fields, … }`) the emails/templates collections. |
 | `beforeSend` | `(options, email) => options` hook to mutate the send just before delivery. |
+| `richTextEditor` | Custom Lexical editor config for the templates collection's `content` field, passed through as `RichTextField['editor']`. |
+| `initOrder` | `'before'` (default) sets up `payload.mailing` before the host app's own `onInit` runs; `'after'` runs the host's `onInit` first. |
 
 ## API
 
