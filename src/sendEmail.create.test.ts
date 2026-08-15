@@ -154,6 +154,65 @@ describe('sendEmail -> payload.create', () => {
     expect(create.mock.calls[0][0].data.scheduledAt).toBe('2026-02-02T00:00:00.000Z')
   })
 
+  describe('email header normalization', () => {
+    test('normalizes string and array recipients before create', async () => {
+      const create = vi.fn().mockResolvedValue({ id: 'email-1' })
+      const payload = makeStubPayload({ create })
+
+      await sendEmail(payload, {
+        data: {
+          bcc: ['audit@example.com', 'archive@example.com'],
+          cc: 'copy@example.com, second@example.com',
+          from: 'sender@example.com',
+          html: '<p>hi</p>',
+          replyTo: 'reply@example.com',
+          subject: 'Hi',
+          to: 'first@example.com, second@example.com',
+        },
+      })
+
+      expect(create.mock.calls[0][0].data).toMatchObject({
+        bcc: ['audit@example.com', 'archive@example.com'],
+        cc: ['copy@example.com', 'second@example.com'],
+        from: 'sender@example.com',
+        replyTo: 'reply@example.com',
+        to: ['first@example.com', 'second@example.com'],
+      })
+    })
+
+    test('rejects an address containing a header-injection newline before create', async () => {
+      const create = vi.fn()
+      const payload = makeStubPayload({ create })
+
+      await expect(
+        sendEmail(payload, {
+          data: {
+            html: '<p>hi</p>',
+            subject: 'Hi',
+            to: 'recipient@example.com\r\nBcc: attacker@example.com',
+          },
+        }),
+      ).rejects.toThrow(/Invalid email addresses/)
+      expect(create).not.toHaveBeenCalled()
+    })
+
+    test('strips newlines from fromName while retaining a quoted display name', async () => {
+      const create = vi.fn().mockResolvedValue({ id: 'email-1' })
+      const payload = makeStubPayload({ create })
+
+      await sendEmail(payload, {
+        data: {
+          fromName: '  "Support"\r\nBcc: attacker@example.com  ',
+          html: '<p>hi</p>',
+          subject: 'Hi',
+          to: 'recipient@example.com',
+        },
+      })
+
+      expect(create.mock.calls[0][0].data.fromName).toBe('"Support"  Bcc: attacker@example.com')
+    })
+  })
+
   describe('collection slug resolution', () => {
     test('options.collectionSlug wins over the configured collection', async () => {
       const create = vi.fn().mockResolvedValue({ id: 'email-1' })
