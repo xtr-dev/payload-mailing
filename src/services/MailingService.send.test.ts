@@ -104,6 +104,34 @@ describe('processEmailItem — success', () => {
     expect(finalCall.data.error).toBeNull()
     expect(new Date(finalCall.data.sentAt).toISOString()).toBe(finalCall.data.sentAt)
   })
+
+  test('to/cc/bcc/replyTo/subject/html/text reach the adapter exactly as stored on the email', async () => {
+    const payload = stubPayload()
+    payload.update.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.findByID.mockResolvedValue(
+      baseEmail({
+        bcc: ['bcc@example.com'],
+        cc: ['cc@example.com'],
+        html: '<p>body</p>',
+        replyTo: 'reply@example.com',
+        subject: 'Subject line',
+        text: 'plain body',
+        to: ['user@example.com', 'second@example.com'],
+      }),
+    )
+    const svc = makeService(payload)
+
+    await svc.processEmailItem('1', 'pending')
+
+    const sent = payload.email.sendEmail.mock.calls[0][0]
+    expect(sent.to).toEqual(['user@example.com', 'second@example.com'])
+    expect(sent.cc).toEqual(['cc@example.com'])
+    expect(sent.bcc).toEqual(['bcc@example.com'])
+    expect(sent.replyTo).toBe('reply@example.com')
+    expect(sent.subject).toBe('Subject line')
+    expect(sent.html).toBe('<p>body</p>')
+    expect(sent.text).toBe('plain body')
+  })
 })
 
 describe('processEmailItem — failure walks the attempt budget', () => {
