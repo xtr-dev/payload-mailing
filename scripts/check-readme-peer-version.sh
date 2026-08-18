@@ -16,7 +16,7 @@ pkg="${2:-package.json}"
 [ -f "$readme" ] || { echo "::error::$readme not found"; exit 1; }
 [ -f "$pkg" ] || { echo "::error::$pkg not found"; exit 1; }
 
-PEER_VERSION="$(node -p "require('./$pkg').peerDependencies && require('./$pkg').peerDependencies.payload || ''")"
+PEER_VERSION="$(node -p "const p = require(require('path').resolve('$pkg')); (p.peerDependencies && p.peerDependencies.payload) || ''")"
 if [ -z "$PEER_VERSION" ]; then
   echo "::error::$pkg has no peerDependencies.payload to check the README against."
   exit 1
