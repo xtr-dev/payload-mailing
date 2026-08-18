@@ -20,6 +20,17 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Fixed
+
+- **`sendEmail` no longer sends with zero recipients.** A `to` value that is a
+  whitespace/comma-only string (e.g. `" , "`) or an empty array passed the
+  `"to" is required` check (it's truthy before normalization) and then
+  collapsed to an empty list during recipient parsing, so the email was
+  created with no recipients instead of being rejected. `sendEmail` now
+  re-checks `to` after normalization and throws the same "required" error.
+
+
+
 ## [0.6.0] - 2026-07-26
 
 ### Changed

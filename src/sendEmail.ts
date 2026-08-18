@@ -87,6 +87,16 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
+
+  // parseAndValidateEmails silently collapses a whitespace/comma-only string (e.g.
+  // " , ") to an empty array rather than throwing, since it has no invalid-looking
+  // candidates to reject. The `!emailData.to` check above already ran against the
+  // raw (still-truthy) string, so re-check non-emptiness here, after normalization,
+  // or a caller-supplied garbage `to` reaches payload.create with zero recipients.
+  if (!emailData.to || (emailData.to as string[]).length === 0) {
+    throw new Error('Field "to" is required for sending emails')
+  }
+
   if (emailData.cc) {
     emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }
