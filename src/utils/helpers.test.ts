@@ -19,11 +19,14 @@ describe('parseAndValidateEmails', () => {
 
   test('passes an array through without re-splitting entries on comma', () => {
     // A single array entry that happens to contain a comma is the caller's
-    // already-parsed value and must not be exploded into two addresses.
-    expect(parseAndValidateEmails(['a@example.com', 'b@example.com'])).toEqual([
-      'a@example.com',
-      'b@example.com',
-    ])
+    // already-parsed value and must not be exploded into two addresses. If it
+    // were split, 'a@example.com' and 'not-split@example.com' would both be
+    // valid individually and the bug would pass silently; asserting on the
+    // combined string being rejected as one invalid address is what actually
+    // distinguishes "not split" from "split".
+    expect(() => parseAndValidateEmails(['a@example.com,not-split@example.com'])).toThrow(
+      'a@example.com,not-split@example.com',
+    )
   })
 
   test('rejects a malformed address', () => {
