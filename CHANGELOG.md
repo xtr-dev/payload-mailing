@@ -29,8 +29,6 @@ To cut a release: move your `## [Unreleased]` notes under a new
   created with no recipients instead of being rejected. `sendEmail` now
   re-checks `to` after normalization and throws the same "required" error.
 
-
-
 ## [0.6.0] - 2026-07-26
 
 ### Changed
