@@ -101,6 +101,7 @@ export default buildConfig({
     email: testEmailAdapter,
     onInit: async (payload) => {
       await seed(payload)
+      await seedUser(payload)
     },
     jobs: {
       jobsCollectionOverrides: c => {
