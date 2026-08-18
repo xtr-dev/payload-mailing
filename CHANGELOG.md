@@ -20,6 +20,17 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Fixed
+
+- **README's Requirements line understated the PayloadCMS floor.** It read
+  `PayloadCMS ^3.0.0` while `package.json`'s `payload` peerDependency has
+  required `^3.37.0` since the collection-access rewrite — installing at the
+  README-advertised floor would hit peer-resolution warnings or failures.
+  Corrected the README line to `^3.37.0`, and added
+  `scripts/check-readme-peer-version.sh` (run in CI) so the two can't drift
+  apart silently again; this exact line already drifted once before without
+  anything catching it.
+
 ### Changed
 
 - **`@payloadcms/richtext-lexical` is now a required peerDependency.** It was
