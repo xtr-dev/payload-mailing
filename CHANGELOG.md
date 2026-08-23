@@ -22,12 +22,38 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Fixed
 
+- **README's Requirements line understated the PayloadCMS floor.** It read
+  `PayloadCMS ^3.0.0` while `package.json`'s `payload` peerDependency has
+  required `^3.37.0` since the collection-access rewrite — installing at the
+  README-advertised floor would hit peer-resolution warnings or failures.
+  Corrected the README line to `^3.37.0`, and added
+  `scripts/check-readme-peer-version.sh` (run in CI) so the two can't drift
+  apart silently again; this exact line already drifted once before without
+  anything catching it.
+
 - **`sendEmail` no longer sends with zero recipients.** A `to` value that is a
   whitespace/comma-only string (e.g. `" , "`) or an empty array passed the
   `"to" is required` check (it's truthy before normalization) and then
   collapsed to an empty list during recipient parsing, so the email was
   created with no recipients instead of being rejected. `sendEmail` now
   re-checks `to` after normalization and throws the same "required" error.
+
+### Changed
+
+- **`@xtr-dev/payload-automation` is no longer declared as a peer dependency.**
+  The optional integration shown in `ScheduleEmailTask` is structural and does
+  not import or require payload-automation at build time or runtime. Consumers
+  that use that example should install payload-automation directly.
+
+- **`@payloadcms/richtext-lexical` is now a required peerDependency.** It was
+  already loaded at runtime (the templates collection uses `lexicalEditor` as
+  its default editor) but was only declared in devDependencies, so a clean
+  install without it failed with `ERR_MODULE_NOT_FOUND`. If your project
+  already has `@payloadcms/richtext-lexical` installed (most Payload apps do,
+  since it's Payload's default rich text editor), this changes nothing. If it
+  doesn't, npm's strict peer-dependency resolution (or pnpm without
+  `auto-install-peers`) will now warn or error on install until you add it —
+  see the updated install line in the README.
 
 ## [0.6.0] - 2026-07-26
 
