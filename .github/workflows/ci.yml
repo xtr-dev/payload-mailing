@@ -28,6 +28,9 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
+      - name: Check README PayloadCMS floor matches package.json peerDependency
+        run: bash scripts/check-readme-peer-version.sh
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
