@@ -533,7 +533,7 @@ export class MailingService implements IMailingService {
     const { docs: pendingEmails } = await this.payload.find({
       collection: this.emailsCollection,
       limit: 50,
-      sort: 'priority,-createdAt',
+      sort: 'priority,createdAt',
       where: {
         and: [
           {
