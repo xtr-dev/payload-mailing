@@ -1,0 +1,11 @@
+# This repo is not itself a pnpm workspace, but pnpm's install walks up from
+# cwd looking for the *nearest* pnpm-workspace.yaml, with no way to stop it
+# via .npmrc (pnpm's `ignore-workspace` is a CLI-only flag, never read from
+# config). When checked out nested under another repo's workspace (e.g. as a
+# worktree under wandel-private/src/dashboard's pnpm-workspace.yaml), pnpm
+# adopts that ancestor's workspace root and `install --frozen-lockfile`
+# reports "Scope: all N workspace projects" and silently skips this
+# package's own lockfile. Declaring this file here makes pnpm stop its
+# upward search at this directory instead.
+packages:
+  - .
