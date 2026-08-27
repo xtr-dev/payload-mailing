@@ -17,6 +17,11 @@ describe('processAllEmails', () => {
   test('calls processEmails before retryFailedEmails on the success path', async () => {
     const calls: string[] = []
     const processEmails = vi.fn().mockImplementation(async () => {
+      // Delay needed so a Promise.all([processEmails(), retryFailedEmails()])
+      // regression would let retryFailedEmails's push land first; without a
+      // real gap both mocks push synchronously and preserve source order
+      // regardless of whether the caller awaits between them.
+      await new Promise((resolve) => setTimeout(resolve, 10))
       calls.push('processEmails')
     })
     const retryFailedEmails = vi.fn().mockImplementation(async () => {
