@@ -223,4 +223,14 @@ const directEmail = await sendEmail(payload, {
     text: 'Hello World'
   }
 })
+
+// Route a single send onto a specific queue (overrides the plugin's queue option)
+const urgentEmail = await sendEmail(payload, {
+  data: {
+    to: 'user@example.com',
+    subject: 'Password Reset',
+    html: '<h1>Reset your password</h1>'
+  },
+  queue: 'high'
+})
 ```

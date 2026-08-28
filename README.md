@@ -97,7 +97,9 @@ await sendEmail(payload, {
 ```
 
 Emails are queued and sent in the background (see [Jobs](#jobs)). Pass
-`processImmediately: true` to send synchronously.
+`processImmediately: true` to send synchronously, or `queue` to route a single
+send's job onto a named queue (e.g. `'high'`) instead of the plugin's `queue`
+option.
 
 ## Templates
 
@@ -148,7 +150,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | --- | --- |
 | `defaultFrom` / `defaultFromName` | Default sender for emails that don't set one. |
 | `retryAttempts` / `retryDelay` | Retry count and delay (ms) for failed sends. |
-| `queue` | Job queue name (default `'default'`). |
+| `queue` | Job queue name (default `'default'`). A single `sendEmail` call can override it with its own `queue` option. |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |
 | `layouts` / `defaultLayout` | Named layout wrappers and the default one. |
