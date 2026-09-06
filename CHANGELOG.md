@@ -22,6 +22,14 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Fixed
 
+- **`sendEmail`'s `options.queue` override is now honored.** It was declared
+  and documented as a per-send queue name override, but nothing read it: the
+  `processImmediately` fallback queued the job without it, and the normal
+  path's `Emails` `afterChange` hook (which queues the job in the common
+  case) has no access to `SendEmailOptions` at all. Both paths now forward it
+  through, so a send that sets `queue` actually lands its job on that queue
+  instead of silently falling back to the configured default.
+
 - **README's Requirements line understated the PayloadCMS floor.** It read
   `PayloadCMS ^3.0.0` while `package.json`'s `payload` peerDependency has
   required `^3.37.0` since the collection-access rewrite — installing at the
