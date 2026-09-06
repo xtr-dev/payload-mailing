@@ -100,8 +100,7 @@ export interface Config {
   };
   jobs: {
     tasks: {
-      'process-emails': ProcessEmailsTask;
-      'send-email': TaskSendEmail;
+      'process-email': TaskProcessEmail;
       inline: {
         input: unknown;
         output: unknown;
@@ -196,11 +195,11 @@ export interface EmailTemplate {
    */
   slug: string;
   /**
-   * Email subject line. You can use Handlebars variables like {{firstName}} or {{siteName}}.
+   * Email subject line. You can use Liquid variables like {{ firstName }} or {{ siteName }}.
    */
   subject: string;
   /**
-   * Email content with rich text formatting. Supports Handlebars variables like {{firstName}} and helpers like {{formatDate createdAt "long"}}. Content is converted to HTML and plain text automatically.
+   * Email content with rich text formatting. Supports Liquid variables like {{ firstName }} and filters like {{ createdAt | formatDate: "long" }}. Content is converted to HTML and plain text automatically. Set templateEngine to "mustache" or "simple" in the plugin config for alternative syntaxes.
    */
   content: {
     root: {
@@ -217,6 +216,42 @@ export interface EmailTemplate {
     };
     [k: string]: unknown;
   };
+  /**
+   * Declare the variables this template expects. Variables marked Required must be supplied with a non-empty value when sending, otherwise the send is rejected before any email is queued. Leave empty to accept any variables.
+   */
+  variables?:
+    | {
+        /**
+         * Variable name as referenced in the template, e.g. firstName (without the {{ }}).
+         */
+        name: string;
+        /**
+         * Reject sends that omit this variable or pass an empty value.
+         */
+        required?: boolean | null;
+        /**
+         * Optional note describing what this variable is for.
+         */
+        description?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Reusable layout to wrap this template body in. The rendered content is injected into the layout's {{ content }} slot. Choose "None" to send the body without a layout. When left at "Use default", the plugin's defaultLayout (if configured) is applied.
+   */
+  layout?: ('default' | 'none' | 'branded') | null;
+  /**
+   * Sample variables used to render the live preview below (e.g. {"firstName": "Ada"}). Only used for previewing — not stored on sent emails.
+   */
+  sampleVariables?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -232,6 +267,10 @@ export interface Email {
    * Email template used (optional if custom content provided)
    */
   template?: (number | null) | EmailTemplate;
+  /**
+   * Slug of the email template (auto-populated from template relationship)
+   */
+  templateSlug?: string | null;
   /**
    * Recipient email addresses
    */
@@ -308,6 +347,10 @@ export interface Email {
    * Email priority (1=highest, 10=lowest)
    */
   priority?: number | null;
+  /**
+   * Processing jobs associated with this email
+   */
+  jobs?: (number | PayloadJob)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -363,7 +406,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'process-emails' | 'send-email';
+        taskSlug: 'inline' | 'process-email';
         taskID: string;
         input?:
           | {
@@ -396,7 +439,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'process-emails' | 'send-email') | null;
+  taskSlug?: ('inline' | 'process-email') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -534,6 +577,16 @@ export interface EmailTemplatesSelect<T extends boolean = true> {
   slug?: T;
   subject?: T;
   content?: T;
+  variables?:
+    | T
+    | {
+        name?: T;
+        required?: T;
+        description?: T;
+        id?: T;
+      };
+  layout?: T;
+  sampleVariables?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -543,6 +596,7 @@ export interface EmailTemplatesSelect<T extends boolean = true> {
  */
 export interface EmailsSelect<T extends boolean = true> {
   template?: T;
+  templateSlug?: T;
   to?: T;
   cc?: T;
   bcc?: T;
@@ -560,6 +614,7 @@ export interface EmailsSelect<T extends boolean = true> {
   lastAttemptAt?: T;
   error?: T;
   priority?: T;
+  jobs?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -628,85 +683,19 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "ProcessEmailsTask".
+ * via the `definition` "TaskProcess-email".
  */
-export interface ProcessEmailsTask {
-  input?: unknown;
-  output?: unknown;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "TaskSend-email".
- */
-export interface TaskSendEmail {
+export interface TaskProcessEmail {
   input: {
     /**
-     * Process and send the email immediately instead of waiting for the queue processor
+     * The ID of the email to process and send
      */
-    processImmediately?: boolean | null;
-    /**
-     * Use a template (leave empty for direct email)
-     */
-    templateSlug?: string | null;
-    /**
-     * JSON object with variables for template rendering
-     */
-    variables?:
-      | {
-          [k: string]: unknown;
-        }
-      | unknown[]
-      | string
-      | number
-      | boolean
-      | null;
-    /**
-     * Email subject (required if not using template)
-     */
-    subject?: string | null;
-    /**
-     * HTML email content (required if not using template)
-     */
-    html?: string | null;
-    /**
-     * Plain text email content (optional)
-     */
-    text?: string | null;
-    /**
-     * Comma-separated list of email addresses
-     */
-    to: string;
-    /**
-     * Optional comma-separated list of CC email addresses
-     */
-    cc?: string | null;
-    /**
-     * Optional comma-separated list of BCC email addresses
-     */
-    bcc?: string | null;
-    /**
-     * Optional sender email address (uses default if not provided)
-     */
-    from?: string | null;
-    /**
-     * Optional sender display name (e.g., "John Doe")
-     */
-    fromName?: string | null;
-    /**
-     * Optional reply-to email address
-     */
-    replyTo?: string | null;
-    /**
-     * Optional date/time to schedule email for future delivery
-     */
-    scheduledAt?: string | null;
-    /**
-     * Email priority (1 = highest, 10 = lowest)
-     */
-    priority?: number | null;
+    emailId: string;
   };
   output: {
-    id?: string | null;
+    success?: boolean | null;
+    emailId?: string | null;
+    status?: string | null;
   };
 }
 /**
