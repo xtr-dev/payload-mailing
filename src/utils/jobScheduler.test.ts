@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 
-import { findExistingJobs } from './jobScheduler.js'
+import { ensureEmailJob, findExistingJobs } from './jobScheduler.js'
 
 describe('findExistingJobs', () => {
   test('queries payload-jobs by taskSlug (not the invalid "task" field)', async () => {
@@ -44,5 +44,40 @@ describe('findExistingJobs', () => {
     expect((await findExistingJobs({ find } as never, 42)).totalDocs).toBe(1)
     expect((await findExistingJobs({ find } as never, '42')).totalDocs).toBe(1)
     expect((await findExistingJobs({ find } as never, 7)).totalDocs).toBe(0)
+  })
+})
+
+describe('ensureEmailJob queue resolution', () => {
+  const makePayload = (configQueue?: string) => ({
+    find: vi.fn().mockResolvedValue({ docs: [] }),
+    jobs: { queue: vi.fn().mockResolvedValue({ id: 'job-1' }) },
+    mailing: configQueue ? { config: { queue: configQueue } } : undefined,
+  })
+
+  test('a per-call queueName overrides the plugin config queue', async () => {
+    const payload = makePayload('plugin-queue')
+    await ensureEmailJob(payload as never, 1, { queueName: 'high' })
+
+    expect(payload.jobs.queue).toHaveBeenCalledWith(
+      expect.objectContaining({ queue: 'high' })
+    )
+  })
+
+  test('falls back to the plugin config queue when no queueName is given', async () => {
+    const payload = makePayload('plugin-queue')
+    await ensureEmailJob(payload as never, 1)
+
+    expect(payload.jobs.queue).toHaveBeenCalledWith(
+      expect.objectContaining({ queue: 'plugin-queue' })
+    )
+  })
+
+  test('falls back to "default" when neither queueName nor config queue is set', async () => {
+    const payload = makePayload()
+    await ensureEmailJob(payload as never, 1)
+
+    expect(payload.jobs.queue).toHaveBeenCalledWith(
+      expect.objectContaining({ queue: 'default' })
+    )
   })
 })
