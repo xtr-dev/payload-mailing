@@ -171,7 +171,7 @@ custom fields.
 
 ## Requirements
 
-PayloadCMS ^3.0.0 · Node.js ^18.20.2 || >=20.9.0
+PayloadCMS ^3.37.0 · Node.js ^18.20.2 || >=20.9.0
 
 ## Contributing
 
