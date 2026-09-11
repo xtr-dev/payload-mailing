@@ -31,6 +31,13 @@ To cut a release: move your `## [Unreleased]` notes under a new
   apart silently again; this exact line already drifted once before without
   anything catching it.
 
+- **`sendEmail` no longer sends with zero recipients.** A `to` value that is a
+  whitespace/comma-only string (e.g. `" , "`) or an empty array passed the
+  `"to" is required` check (it's truthy before normalization) and then
+  collapsed to an empty list during recipient parsing, so the email was
+  created with no recipients instead of being rejected. `sendEmail` now
+  re-checks `to` after normalization and throws the same "required" error.
+
 ### Changed
 
 - **`@xtr-dev/payload-automation` is no longer declared as a peer dependency.**
