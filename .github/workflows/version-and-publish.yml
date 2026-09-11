@@ -99,6 +99,10 @@ jobs:
         if: steps.decide.outputs.publish == 'true'
         run: pnpm test
 
+      - name: Run integration tests
+        if: steps.decide.outputs.publish == 'true'
+        run: pnpm test:int
+
       - name: Run build
         if: steps.decide.outputs.publish == 'true'
         run: pnpm build
