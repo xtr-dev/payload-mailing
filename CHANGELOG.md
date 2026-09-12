@@ -39,6 +39,9 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Changed
 
+- **Removed the unused optional `react-dom` peer dependency.** The package does
+  not import `react-dom`, so consumers no longer need to install or resolve it.
+
 - **`@xtr-dev/payload-automation` is no longer declared as a peer dependency.**
   The optional integration shown in `ScheduleEmailTask` is structural and does
   not import or require payload-automation at build time or runtime. Consumers
