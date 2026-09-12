@@ -54,6 +54,16 @@ To cut a release: move your `## [Unreleased]` notes under a new
   `auto-install-peers`) will now warn or error on install until you add it —
   see the updated install line in the README.
 
+### Fixed
+
+- **`templateEngine: 'mustache'` no longer HTML-escapes the subject and
+  plain-text body.** The README documents subject/text as verbatim, and every
+  other engine already honored that, but Mustache's adapter passed variables
+  straight to `mustache.render()` with no escape override, so Mustache's
+  default `{{ }}` escaping stayed on — a variable like `"Q&A"` came out as
+  `"Q&amp;A"` in the subject line and plain-text body. HTML body rendering is
+  unaffected.
+
 ## [0.6.0] - 2026-07-26
 
 ### Changed
