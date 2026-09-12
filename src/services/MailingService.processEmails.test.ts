@@ -13,7 +13,7 @@ describe('processEmails', () => {
     expect(find.mock.calls[0][0]).toMatchObject({
       collection: 'emails',
       limit: 50,
-      sort: 'priority,createdAt',
+      sort: ['priority', 'createdAt'],
     })
   })
 })

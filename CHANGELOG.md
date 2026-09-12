@@ -31,6 +31,12 @@ To cut a release: move your `## [Unreleased]` notes under a new
   apart silently again; this exact line already drifted once before without
   anything catching it.
 
+- **`processEmails` now orders equal-priority emails oldest-first.** The Local
+  API `find` used a comma-separated sort string (`priority,createdAt`), which
+  Payload only splits on REST. Local API treats the string as one field, so
+  Mongo fell back to `-createdAt` and a 50-email run starved older rows. The
+  query now passes `['priority', 'createdAt']`.
+
 ### Changed
 
 - **`@xtr-dev/payload-automation` is no longer declared as a peer dependency.**

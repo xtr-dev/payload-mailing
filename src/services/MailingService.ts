@@ -533,7 +533,8 @@ export class MailingService implements IMailingService {
     const { docs: pendingEmails } = await this.payload.find({
       collection: this.emailsCollection,
       limit: 50,
-      sort: 'priority,createdAt',
+      // Local API multi-field sort is an array; a comma string is one field name.
+      sort: ['priority', 'createdAt'],
       where: {
         and: [
           {
