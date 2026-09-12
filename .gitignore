@@ -7,3 +7,5 @@ dist/
 /dev/dev.db
 dev.db
 tsconfig.tsbuildinfo
+/test-results/
+/playwright-report/
