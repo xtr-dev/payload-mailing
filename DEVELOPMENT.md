@@ -152,7 +152,7 @@ When you start the dev server, look for these messages:
 The plugin source is in `src/` directory:
 - `src/plugin.ts` - Main plugin configuration
 - `src/collections/` - Email templates and outbox collections
-- `src/services/` - Mailing service with Handlebars processing
+- `src/services/` - Mailing service with LiquidJS, Mustache, and simple template processing
 - `src/jobs/` - Background job processing
 - `src/utils/` - Helper functions for developers
 
