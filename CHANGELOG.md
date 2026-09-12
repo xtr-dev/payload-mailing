@@ -54,6 +54,18 @@ To cut a release: move your `## [Unreleased]` notes under a new
   `auto-install-peers`) will now warn or error on install until you add it —
   see the updated install line in the README.
 
+### Fixed
+
+- **`SendEmailOptions.data` now types the input shape, not the stored one.**
+  `to`, `cc`, `bcc`, `from`, and `replyTo` previously inherited
+  `BaseEmailDocument`'s stored shape (`to: string[]`, `from: null | string`,
+  etc.), so the scalar-string form shown in `sendEmail`'s own JSDoc example
+  (`data: { to: 'user@example.com' }`) failed to typecheck under `strict`.
+  `sendEmail` already accepted and normalized `string | string[]` for all five
+  fields at runtime via `parseAndValidateEmails`; the type now matches that
+  contract. Callers using the documented scalar-string form no longer need a
+  cast, and `BaseEmailDocument` (the stored shape) is unchanged.
+
 ## [0.6.0] - 2026-07-26
 
 ### Changed
