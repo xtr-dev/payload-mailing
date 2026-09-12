@@ -119,7 +119,6 @@ export default buildConfig({
     plugins: [
       mailingPlugin({
         defaultFrom: 'noreply@test.com',
-        initOrder: 'after',
         retryAttempts: 3,
         retryDelay: 60000, // 1 minute for dev
         queue: 'default',
