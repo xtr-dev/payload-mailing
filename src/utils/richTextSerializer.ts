@@ -17,7 +17,8 @@ interface SerializedLexicalNode {
 }
 
 /**
- * Escapes HTML-significant characters to prevent HTML injection in serialized output.
+ * Escapes HTML-significant characters (`& < > " '`) to prevent HTML injection in
+ * serialized output, including inside single- or double-quoted attributes.
  * Exported so the rendering pipeline can reuse the exact same escaping when it
  * substitutes template variables into the HTML body (see MailingService).
  */
@@ -27,6 +28,7 @@ export function escapeHtml(input: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 /**

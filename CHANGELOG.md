@@ -24,7 +24,8 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 - **`escapeHtml` and `safeUrl` are exported** from the package entry, so hosts
   that send direct (non-template) HTML can use the same escaping as the
-  rich-text serializer.
+  rich-text serializer. `escapeHtml` now also escapes `'` (as `&#39;`), so its
+  output is safe inside single-quoted attributes too.
 
 ### Fixed
 

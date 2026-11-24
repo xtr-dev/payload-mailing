@@ -13,6 +13,9 @@ const { previewTemplateHandler } = await import('./previewTemplate.js')
 
 const render = vi.fn(() => Promise.resolve({ html: '<p>x</p>', subject: 's', text: 'x' }))
 
+// Payload's logger API as used by createContextLogger (child() + level methods).
+const stubLogger = { child: () => stubLogger, error: vi.fn(), info: vi.fn(), warn: vi.fn() }
+
 const makeReq = (opts: {
   access?: Record<string, (args: { req: PayloadRequest }) => unknown>
   templatesSlug?: string
@@ -23,7 +26,7 @@ const makeReq = (opts: {
     data: { content: {}, subject: 's', variables: {} },
     payload: {
       collections: { [slug]: { config: { access: opts.access || {} } } },
-      logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      logger: stubLogger,
       mailing: { collections: { templates: slug }, service: { renderTemplateDocument: render } },
     },
     user: opts.user,
@@ -66,5 +69,19 @@ describe('previewTemplateHandler access', () => {
       makeReq({ access: { create: () => Promise.resolve(true) }, templatesSlug: 'my-templates', user: { id: 1 } }),
     )
     expect(res.status).toBe(200)
+  })
+
+  test('answers 403 when the access function throws', async () => {
+    const res = await previewTemplateHandler(
+      makeReq({
+        access: {
+          update: () => {
+            throw new Error('access blew up')
+          },
+        },
+        user: { id: 1 },
+      }),
+    )
+    expect(res.status).toBe(403)
   })
 })

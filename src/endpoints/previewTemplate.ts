@@ -65,7 +65,15 @@ export const previewTemplateHandler: PayloadHandler = async (
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!(await canEditTemplates(req))) {
+  // A host access function that throws is treated as a denial, so the endpoint
+  // always answers with JSON instead of an unhandled error.
+  let allowed = false
+  try {
+    allowed = await canEditTemplates(req)
+  } catch (error) {
+    createContextLogger(req.payload, 'PREVIEW').error('Template access check failed:', error)
+  }
+  if (!allowed) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 

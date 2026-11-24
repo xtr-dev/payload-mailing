@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
+import { escapeHtml as entryEscapeHtml, safeUrl as entrySafeUrl } from '../index.js'
 import {
   escapeHtml,
   safeUrl,
@@ -18,6 +19,10 @@ const linkNode = (url: string, text: string) => ({
 const state = (...children: any[]) => ({ root: { children } }) as any
 
 describe('escapeHtml', () => {
+  test('escapes single quotes so values are safe in single-quoted attributes', () => {
+    expect(escapeHtml("it's")).toBe('it&#39;s')
+  })
+
   test('escapes the five HTML-significant characters', () => {
     expect(escapeHtml('<b>Tom & "Jerry"</b>')).toBe(
       '&lt;b&gt;Tom &amp; &quot;Jerry&quot;&lt;/b&gt;',
@@ -110,9 +115,8 @@ describe('serializeRichTextToText', () => {
 })
 
 describe('package exports', () => {
-  test('escapeHtml and safeUrl are exported from the package entry', async () => {
-    const entry = await import('../index.js')
-    expect(entry.escapeHtml).toBe(escapeHtml)
-    expect(entry.safeUrl).toBe(safeUrl)
+  test('escapeHtml and safeUrl are exported from the package entry', () => {
+    expect(entryEscapeHtml).toBe(escapeHtml)
+    expect(entrySafeUrl).toBe(safeUrl)
   })
 })
