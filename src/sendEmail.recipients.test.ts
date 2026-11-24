@@ -7,7 +7,7 @@ import { sendEmail } from './sendEmail.js'
 // the target collection. No database or job queue is exercised here — these
 // tests are about what sendEmail hands to payload.create, not persistence.
 const buildPayload = () => {
-  const create = vi.fn(async ({ data }: any) => ({ id: 'email-1', ...data }))
+  const create = vi.fn(({ data }: any) => Promise.resolve({ id: 'email-1', ...data }))
   const payload: any = {
     create,
     mailing: { collections: { emails: 'emails', templates: 'email-templates' } },
