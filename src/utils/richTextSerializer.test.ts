@@ -108,3 +108,11 @@ describe('serializeRichTextToText', () => {
     expect(text).not.toContain('&amp;')
   })
 })
+
+describe('package exports', () => {
+  test('escapeHtml and safeUrl are exported from the package entry', async () => {
+    const entry = await import('../index.js')
+    expect(entry.escapeHtml).toBe(escapeHtml)
+    expect(entry.safeUrl).toBe(safeUrl)
+  })
+})

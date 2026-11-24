@@ -20,7 +20,19 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Added
+
+- **`escapeHtml` and `safeUrl` are exported** from the package entry, so hosts
+  that send direct (non-template) HTML can use the same escaping as the
+  rich-text serializer.
+
 ### Fixed
+
+- **The template preview endpoint now checks template access.**
+  `POST /api/mailing/preview-template` only checked that a user was logged in.
+  It now also requires the user to pass the templates collection's `update` or
+  `create` access (the access needed to edit a template) and answers `403`
+  otherwise. Anyone who can edit templates in the admin keeps the preview.
 
 - **README's Requirements line understated the PayloadCMS floor.** It read
   `PayloadCMS ^3.0.0` while `package.json`'s `payload` peerDependency has

@@ -17,6 +17,35 @@ interface PreviewRequestBody {
   variables?: Record<string, unknown>
 }
 
+type AccessFn = (args: { req: PayloadRequest }) => unknown
+
+/**
+ * Returns true when the request passes the templates collection's `update` or
+ * `create` access — the operations an editor needs to work on a template, and
+ * therefore to preview one. A query-constraint result (a `Where` object) counts
+ * as allowed: the user may edit at least some templates, and the preview only
+ * renders the draft they send, not a stored document. The collection's slug is
+ * read from the mailing context so renamed collections are respected.
+ */
+async function canEditTemplates(req: PayloadRequest): Promise<boolean> {
+  const mailing = (req.payload as unknown as { mailing?: { collections?: { templates?: string } } }).mailing
+  const slug = mailing?.collections?.templates || 'email-templates'
+  const collection = (req.payload.collections as Record<string, { config?: { access?: Record<string, unknown> } } | undefined>)[slug]
+  const access = collection?.config?.access
+
+  if (!access) {
+    return false
+  }
+
+  for (const operation of ['update', 'create']) {
+    const fn = access[operation]
+    if (typeof fn === 'function' && (await (fn as AccessFn)({ req }))) {
+      return true
+    }
+  }
+  return false
+}
+
 /**
  * Renders a draft template (the unsaved editor content + sample variables) and
  * returns `{ html, subject, text }` for the in-admin preview component. The
@@ -30,9 +59,14 @@ export const previewTemplateHandler: PayloadHandler = async (
   req: PayloadRequest,
 ): Promise<Response> => {
   // Previews can render arbitrary template content, so restrict the endpoint to
-  // authenticated admin users — the same audience that can edit templates.
+  // the same audience that can edit templates: a logged-in user who passes the
+  // templates collection's own update (or create) access.
   if (!req.user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (!(await canEditTemplates(req))) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Populate req.data from the JSON request body.
