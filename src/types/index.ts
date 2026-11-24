@@ -1,5 +1,7 @@
 import type { CollectionConfig, Payload,RichTextField, SendEmailOptions } from 'payload'
 
+import type { InternalLinkResolver } from '../utils/richTextSerializer.js'
+
 // Payload ID type (string or number)
 export type PayloadID = number | string
 
@@ -151,6 +153,15 @@ export interface MailingPluginConfig {
    */
   locale?: string
   queue?: string
+  /**
+   * Turns an internal rich-text link (a link to another Payload document, made
+   * with the editor's "internal link" option) into an absolute URL for the
+   * email. Receives the link's `fields`; `fields.doc` holds `relationTo` and
+   * `value` (the linked document when populated, otherwise its ID). Return
+   * `undefined`/`null` to render the link text without a link. Without this
+   * hook, internal links render as plain text.
+   */
+  resolveInternalLink?: InternalLinkResolver
   retryAttempts?: number
   retryDelay?: number
   richTextEditor?: RichTextField['editor']

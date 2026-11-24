@@ -539,3 +539,40 @@ describe('formatDate / formatCurrency under strictTemplates', () => {
     expect(html).toContain('Total:')
   })
 })
+
+describe('renderTemplateDocument — Payload 3 links in the HTML body', () => {
+  const linkTemplate = (text: string, fields: Record<string, unknown>) =>
+    ({
+      content: {
+        root: { children: [{ type: 'paragraph', children: [{ type: 'link', children: [{ type: 'text', text }], fields }] }] },
+      },
+      subject: 's',
+    }) as any
+
+  test('a Liquid tag in the link text renders; the href uses fields.url', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      linkTemplate('{% if n > 5 %}Hi {{ name }}{% endif %}', { url: 'https://x.test/?a="b"' }),
+      { name: '<i>Ann</i>', n: 7 },
+    )
+    expect(html).toBe('<p><a href="https://x.test/?a=&quot;b&quot;">Hi &lt;i&gt;Ann&lt;/i&gt;</a></p>')
+  })
+
+  test('when the body does not parse, the escaped fallback keeps the link (fields.url)', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      linkTemplate('{{ <img onerror=x> }}', { url: 'https://x.test' }),
+      {},
+    )
+    expect(html).toBe('<p><a href="https://x.test">{{ &lt;img onerror=x&gt; }}</a></p>')
+  })
+
+  test('the escaped fallback also resolves internal links', async () => {
+    const svc = makeService({ resolveInternalLink: () => '/pages/1' })
+    const { html } = await svc.renderTemplateDocument(
+      linkTemplate('{{ <img onerror=x> }}', { doc: { relationTo: 'pages', value: '1' }, linkType: 'internal' }),
+      {},
+    )
+    expect(html).toBe('<p><a href="/pages/1">{{ &lt;img onerror=x&gt; }}</a></p>')
+  })
+})

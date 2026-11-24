@@ -382,12 +382,15 @@ export class MailingService implements IMailingService {
     // own template tags unescaped so expressions like `{% if n > 5 %}` parse;
     // the fully escaped serialization is what an adapter falls back to when the
     // body does not parse, so markup inside a broken tag is never sent raw.
+    // Both HTML variants render links the same way (fields.url, autolink,
+    // resolveInternalLink).
+    const serializeOptions = { resolveInternalLink: this.config.resolveInternalLink }
     const templateSyntax = adapter.templateSyntax || 'none'
-    const escapedHtml = serializeRichTextToHTML(template.content)
+    const escapedHtml = serializeRichTextToHTML(template.content, serializeOptions)
     let html = templateSyntax === 'none'
       ? escapedHtml
-      : serializeRichTextToHTML(template.content, { templateSyntax })
-    let text = serializeRichTextToText(template.content)
+      : serializeRichTextToHTML(template.content, { ...serializeOptions, templateSyntax })
+    let text = serializeRichTextToText(template.content, serializeOptions)
 
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters

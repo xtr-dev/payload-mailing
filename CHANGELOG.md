@@ -47,6 +47,14 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Fixed
 
+- **Rich-text links made in the Payload 3 editor kept no URL.** The serializer
+  read `node.url` / `node.newTab`, but Payload 3's Lexical link nodes store them
+  under `node.fields`, so admin-made links rendered as `href="#"` (and ` ()` in
+  the text part). It now reads `fields.url` / `fields.newTab` (falling back to
+  the old flat shape), renders `autolink` nodes as links, and resolves internal
+  links through the new `resolveInternalLink` option. A link with no usable
+  target keeps its text but no longer becomes a dead `#` link.
+
 - **Liquid comparisons with `<` / `>` broke the HTML body.** Text nodes were
   escaped before Liquid parsed the HTML body, so `{% if n > 5 %}` reached the
   engine as `{% if n &gt; 5 %}`, failed to parse, and the HTML part fell back

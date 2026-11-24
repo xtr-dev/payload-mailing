@@ -162,6 +162,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | `adminPreview` | Live in-admin render preview; `true` by default. Set `false` to skip it (and the `payload generate:importmap` step). |
 | `collections` | Rename (`'slug'`) or override (`{ access, fields, … }`) the emails/templates collections. |
 | `beforeSend` | `(options, email) => options` hook to mutate the send just before delivery. |
+| `resolveInternalLink` | `(fields) => url` for rich-text links to other documents (`fields.doc.relationTo` / `fields.doc.value`). Without it, internal links render as plain text. |
 
 ## API
 
