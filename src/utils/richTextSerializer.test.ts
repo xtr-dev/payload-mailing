@@ -171,4 +171,12 @@ describe('Payload 3 link nodes (url under node.fields)', () => {
     expect(serializeRichTextToHTML(content)).toBe('<p>About</p>')
     expect(serializeRichTextToText(content)).not.toContain('()')
   })
+
+  test('a resolver returning a javascript: URL still yields href="#"', () => {
+    const content = state(
+      paragraph(payloadLink('link', { doc: { relationTo: 'pages', value: '1' }, linkType: 'internal' }, 'About')),
+    )
+    const html = serializeRichTextToHTML(content, { resolveInternalLink: () => 'javascript:alert(1)' })
+    expect(html).toBe('<p><a href="#">About</a></p>')
+  })
 })
