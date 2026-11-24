@@ -70,7 +70,7 @@ describe('serializeRichTextToHTML', () => {
       state(paragraph(textNode('<script>alert(1)</script> & "quotes"'))),
     )
     expect(html).toBe(
-      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;</p>',
+      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; "quotes"</p>',
     )
   })
 

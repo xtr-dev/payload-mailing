@@ -32,6 +32,21 @@ export function escapeHtml(input: string): string {
 }
 
 /**
+ * Escapes text that becomes element content (not an attribute value): only
+ * `&`, `<` and `>` need escaping there. Quotes are left alone on purpose: the
+ * serialized HTML body is template source that LiquidJS parses afterwards,
+ * and escaped quotes would break quoted arguments such as
+ * `{{ d | formatDate: "long" }}` or `{% if s == 'paid' %}`. Values substituted
+ * by the template engine are still escaped by the engine itself.
+ */
+function escapeTextContent(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
  * Allow-lists safe URL schemes (http, https, mailto) plus relative/anchor URLs,
  * escapes the result, and returns '#' for anything else (e.g. javascript:).
  */
@@ -114,7 +129,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode): string {
     }
 
     case 'text': {
-      let text = escapeHtml(node.text || '')
+      let text = escapeTextContent(node.text || '')
 
       // Apply text formatting using proper nesting order
       if (node.format) {

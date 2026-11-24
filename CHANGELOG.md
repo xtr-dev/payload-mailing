@@ -29,6 +29,13 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Fixed
 
+- **Quoted Liquid arguments broke the HTML body.** Rich-text text nodes were
+  escaped with the attribute escaper before Liquid parsed the HTML body, so
+  `"` became `&quot;` and `{{ d | formatDate: "long" }}` failed to parse; the
+  HTML part then fell back to the simple renderer and recipients got raw tags.
+  Text nodes now only escape `& < >`; values substituted by the engine are
+  still escaped as before.
+
 - **The template preview endpoint now checks template access.**
   `POST /api/mailing/preview-template` only checked that a user was logged in.
   It now also requires the user to pass the templates collection's `update` or
