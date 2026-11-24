@@ -120,3 +120,32 @@ describe('package exports', () => {
     expect(entrySafeUrl).toBe(safeUrl)
   })
 })
+
+describe('serializeRichTextToHTML — template tags in text nodes', () => {
+  test('leaves complete tags verbatim and escapes the text around them', () => {
+    const html = serializeRichTextToHTML(
+      state(paragraph(textNode('a<b {% if n > 5 %}x{% endif %} {{- n | minus: 1 -}} c&d'))),
+      { templateSyntax: 'liquid' },
+    )
+    expect(html).toBe('<p>a&lt;b {% if n > 5 %}x{% endif %} {{- n | minus: 1 -}} c&amp;d</p>')
+  })
+
+  test('a tag split across differently formatted text nodes is escaped (documented limitation)', () => {
+    // format 1 = bold. The split puts <strong> inside the tag, which no engine
+    // can parse; the fragments are escaped like ordinary text.
+    const html = serializeRichTextToHTML(
+      state(paragraph(textNode('{% if n '), textNode('> 5 %}', 1), textNode('x{% endif %}'))),
+      { templateSyntax: 'liquid' },
+    )
+    expect(html).toBe('<p>{% if n <strong>&gt; 5 %}</strong>x{% endif %}</p>')
+  })
+
+  test('passthrough depends on the engine syntax', () => {
+    const content = state(paragraph(textNode('{% if n > 5 %} {{ n > 5 }}')))
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'liquid' })).toBe('<p>{% if n > 5 %} {{ n > 5 }}</p>')
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'mustache' })).toBe(
+      '<p>{% if n &gt; 5 %} {{ n > 5 }}</p>',
+    )
+    expect(serializeRichTextToHTML(content)).toBe('<p>{% if n &gt; 5 %} {{ n &gt; 5 }}</p>')
+  })
+})

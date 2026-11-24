@@ -340,14 +340,21 @@ export class MailingService implements IMailingService {
 
     const adapter = await this.getEngineAdapter()
 
-    // Serialize richtext to HTML and text
-    let html = serializeRichTextToHTML(template.content)
+    // Serialize richtext to HTML and text. The HTML body leaves the engine's
+    // own template tags unescaped so expressions like `{% if n > 5 %}` parse;
+    // the fully escaped serialization is what an adapter falls back to when the
+    // body does not parse, so markup inside a broken tag is never sent raw.
+    const templateSyntax = adapter.templateSyntax || 'none'
+    const escapedHtml = serializeRichTextToHTML(template.content)
+    let html = templateSyntax === 'none'
+      ? escapedHtml
+      : serializeRichTextToHTML(template.content, { templateSyntax })
     let text = serializeRichTextToText(template.content)
 
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters
     // like `&` verbatim, otherwise recipients see literal entities (`&amp;`).
-    html = await adapter.renderHtml(html, variables)
+    html = await adapter.renderHtml(html, variables, escapedHtml)
     text = await adapter.render(text, variables)
 
     // Wrap the rendered body in the resolved layout, if any. The body is the
