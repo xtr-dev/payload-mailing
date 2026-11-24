@@ -21,6 +21,7 @@ import {
   LiquidEngineAdapter,
   MustacheEngineAdapter,
   SimpleEngineAdapter,
+  TemplateRenderError,
 } from './templateEngines.js'
 
 export class MailingService implements IMailingService {
@@ -167,6 +168,7 @@ export class MailingService implements IMailingService {
         this.customAdapter = new CustomRendererAdapter(
           this.config.templateRenderer,
           (message, error) => this.logger.error(message, error),
+          this.config.strictTemplates === true,
         )
       }
       return this.customAdapter
@@ -183,11 +185,16 @@ export class MailingService implements IMailingService {
             this.liquidEscaped,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.liquidAdapter
       }
-      // LiquidJS failed to load; fall back to the simple replacer.
+      // LiquidJS failed to load; fall back to the simple replacer, unless strict
+      // mode asks for failures instead of degraded output.
+      if (this.config.strictTemplates) {
+        throw new TemplateRenderError('LiquidJS', new Error('the liquidjs package could not be loaded'))
+      }
       return this.simpleAdapter
     }
 
@@ -199,11 +206,16 @@ export class MailingService implements IMailingService {
             mustache,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.mustacheAdapter
       }
-      // Mustache failed to load; fall back to the simple replacer.
+      // Mustache failed to load; fall back to the simple replacer, unless strict
+      // mode asks for failures instead of degraded output.
+      if (this.config.strictTemplates) {
+        throw new TemplateRenderError('Mustache', new Error('the mustache package could not be loaded'))
+      }
       return this.simpleAdapter
     }
 
@@ -267,8 +279,11 @@ export class MailingService implements IMailingService {
       // and subjects), while `liquidEscaped` HTML-escapes every `{{ output }}`
       // so untrusted variables cannot inject markup into the HTML body. Authors
       // opt back into raw HTML per-variable with the `| raw` filter.
-      this.liquid = new LiquidEngine()
-      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape' })
+      // In strict mode an unknown filter is an error too, instead of being
+      // silently skipped (liquidjs' default).
+      const strictFilters = this.config.strictTemplates === true
+      this.liquid = new LiquidEngine({ strictFilters })
+      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape', strictFilters })
 
       this.registerLiquidFilters(this.liquid)
       this.registerLiquidFilters(this.liquidEscaped)
@@ -363,14 +378,21 @@ export class MailingService implements IMailingService {
 
     const adapter = await this.getEngineAdapter()
 
-    // Serialize richtext to HTML and text
-    let html = serializeRichTextToHTML(template.content)
+    // Serialize richtext to HTML and text. The HTML body leaves the engine's
+    // own template tags unescaped so expressions like `{% if n > 5 %}` parse;
+    // the fully escaped serialization is what an adapter falls back to when the
+    // body does not parse, so markup inside a broken tag is never sent raw.
+    const templateSyntax = adapter.templateSyntax || 'none'
+    const escapedHtml = serializeRichTextToHTML(template.content)
+    let html = templateSyntax === 'none'
+      ? escapedHtml
+      : serializeRichTextToHTML(template.content, { templateSyntax })
     let text = serializeRichTextToText(template.content)
 
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters
     // like `&` verbatim, otherwise recipients see literal entities (`&amp;`).
-    html = await adapter.renderHtml(html, variables)
+    html = await adapter.renderHtml(html, variables, escapedHtml)
     text = await adapter.render(text, variables)
 
     // Wrap the rendered body in the resolved layout, if any. The body is the

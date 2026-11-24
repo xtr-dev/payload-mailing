@@ -156,6 +156,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | `queue` | Job queue name (default `'default'`). |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |
+| `strictTemplates` | `true` makes a template parse/render error throw a `TemplateRenderError` (so `sendEmail` rejects) instead of falling back to plain `{{ name }}` substitution. Default `false`. |
 | `layouts` / `defaultLayout` | Named layout wrappers and the default one. |
 | `locale` / `currency` / `timeZone` | Defaults for the `formatDate` / `formatCurrency` filters (otherwise en-US / USD / server time zone). |
 | `adminPreview` | Live in-admin render preview; `true` by default. Set `false` to skip it (and the `payload generate:importmap` step). |
@@ -171,6 +172,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | `processEmails(payload)` | Process up to 50 due-pending emails. |
 | `retryFailedEmails(payload)` | Re-queue failed emails. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
+| `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 
 `sendEmail<Email>(…)` is generic over your generated `Email` type for type-safe
 custom fields.

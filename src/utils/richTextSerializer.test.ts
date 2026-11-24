@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
+import { escapeHtml as entryEscapeHtml, safeUrl as entrySafeUrl } from '../index.js'
 import {
   escapeHtml,
   safeUrl,
@@ -18,6 +19,10 @@ const linkNode = (url: string, text: string) => ({
 const state = (...children: any[]) => ({ root: { children } }) as any
 
 describe('escapeHtml', () => {
+  test('escapes single quotes so values are safe in single-quoted attributes', () => {
+    expect(escapeHtml("it's")).toBe('it&#39;s')
+  })
+
   test('escapes the five HTML-significant characters', () => {
     expect(escapeHtml('<b>Tom & "Jerry"</b>')).toBe(
       '&lt;b&gt;Tom &amp; &quot;Jerry&quot;&lt;/b&gt;',
@@ -65,7 +70,7 @@ describe('serializeRichTextToHTML', () => {
       state(paragraph(textNode('<script>alert(1)</script> & "quotes"'))),
     )
     expect(html).toBe(
-      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;</p>',
+      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; "quotes"</p>',
     )
   })
 
@@ -106,5 +111,41 @@ describe('serializeRichTextToText', () => {
     const text = serializeRichTextToText(state(paragraph(textNode('Tom & <Jerry>'))))
     expect(text).toContain('Tom & <Jerry>')
     expect(text).not.toContain('&amp;')
+  })
+})
+
+describe('package exports', () => {
+  test('escapeHtml and safeUrl are exported from the package entry', () => {
+    expect(entryEscapeHtml).toBe(escapeHtml)
+    expect(entrySafeUrl).toBe(safeUrl)
+  })
+})
+
+describe('serializeRichTextToHTML — template tags in text nodes', () => {
+  test('leaves complete tags verbatim and escapes the text around them', () => {
+    const html = serializeRichTextToHTML(
+      state(paragraph(textNode('a<b {% if n > 5 %}x{% endif %} {{- n | minus: 1 -}} c&d'))),
+      { templateSyntax: 'liquid' },
+    )
+    expect(html).toBe('<p>a&lt;b {% if n > 5 %}x{% endif %} {{- n | minus: 1 -}} c&amp;d</p>')
+  })
+
+  test('a tag split across differently formatted text nodes is escaped (documented limitation)', () => {
+    // format 1 = bold. The split puts <strong> inside the tag, which no engine
+    // can parse; the fragments are escaped like ordinary text.
+    const html = serializeRichTextToHTML(
+      state(paragraph(textNode('{% if n '), textNode('> 5 %}', 1), textNode('x{% endif %}'))),
+      { templateSyntax: 'liquid' },
+    )
+    expect(html).toBe('<p>{% if n <strong>&gt; 5 %}</strong>x{% endif %}</p>')
+  })
+
+  test('passthrough depends on the engine syntax', () => {
+    const content = state(paragraph(textNode('{% if n > 5 %} {{ n > 5 }}')))
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'liquid' })).toBe('<p>{% if n > 5 %} {{ n > 5 }}</p>')
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'mustache' })).toBe(
+      '<p>{% if n &gt; 5 %} {{ n > 5 }}</p>',
+    )
+    expect(serializeRichTextToHTML(content)).toBe('<p>{% if n &gt; 5 %} {{ n &gt; 5 }}</p>')
   })
 })
