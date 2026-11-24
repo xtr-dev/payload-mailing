@@ -20,6 +20,7 @@ import {
   LiquidEngineAdapter,
   MustacheEngineAdapter,
   SimpleEngineAdapter,
+  TemplateRenderError,
 } from './templateEngines.js'
 
 export class MailingService implements IMailingService {
@@ -166,6 +167,7 @@ export class MailingService implements IMailingService {
         this.customAdapter = new CustomRendererAdapter(
           this.config.templateRenderer,
           (message, error) => this.logger.error(message, error),
+          this.config.strictTemplates === true,
         )
       }
       return this.customAdapter
@@ -182,11 +184,16 @@ export class MailingService implements IMailingService {
             this.liquidEscaped,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.liquidAdapter
       }
-      // LiquidJS failed to load; fall back to the simple replacer.
+      // LiquidJS failed to load; fall back to the simple replacer, unless strict
+      // mode asks for failures instead of degraded output.
+      if (this.config.strictTemplates) {
+        throw new TemplateRenderError('LiquidJS', new Error('the liquidjs package could not be loaded'))
+      }
       return this.simpleAdapter
     }
 
@@ -198,11 +205,16 @@ export class MailingService implements IMailingService {
             mustache,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.mustacheAdapter
       }
-      // Mustache failed to load; fall back to the simple replacer.
+      // Mustache failed to load; fall back to the simple replacer, unless strict
+      // mode asks for failures instead of degraded output.
+      if (this.config.strictTemplates) {
+        throw new TemplateRenderError('Mustache', new Error('the mustache package could not be loaded'))
+      }
       return this.simpleAdapter
     }
 
@@ -266,8 +278,11 @@ export class MailingService implements IMailingService {
       // and subjects), while `liquidEscaped` HTML-escapes every `{{ output }}`
       // so untrusted variables cannot inject markup into the HTML body. Authors
       // opt back into raw HTML per-variable with the `| raw` filter.
-      this.liquid = new LiquidEngine()
-      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape' })
+      // In strict mode an unknown filter is an error too, instead of being
+      // silently skipped (liquidjs' default).
+      const strictFilters = this.config.strictTemplates === true
+      this.liquid = new LiquidEngine({ strictFilters })
+      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape', strictFilters })
 
       this.registerLiquidFilters(this.liquid)
       this.registerLiquidFilters(this.liquidEscaped)

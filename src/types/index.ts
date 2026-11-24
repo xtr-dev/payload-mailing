@@ -141,6 +141,17 @@ export interface MailingPluginConfig {
   retryAttempts?: number
   retryDelay?: number
   richTextEditor?: RichTextField['editor']
+  /**
+   * When `true`, a template that fails to parse or render (a Liquid syntax
+   * error, an unknown Liquid filter, a throwing `templateRenderer`, …) throws a
+   * `TemplateRenderError` instead of silently falling back to plain `{{ name }}`
+   * substitution. It also throws when the configured engine package
+   * (`liquidjs` / `mustache`) cannot be loaded, instead of using the simple
+   * replacer. Unknown Liquid filters are only an error in strict mode. `sendEmail` then rejects and nothing is queued, and the admin
+   * preview shows the error. Defaults to `false` (log and fall back), which is
+   * the behaviour of earlier releases.
+   */
+  strictTemplates?: boolean
   templateEngine?: TemplateEngine
   templateRenderer?: TemplateRendererHook
 }

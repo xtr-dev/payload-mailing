@@ -22,6 +22,15 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Added
 
+- **`strictTemplates` option.** By default a template that fails to parse or
+  render (e.g. an unclosed `{% if %}`) is logged and sent through the naive
+  `{{ name }}` replacer, so raw Liquid tags can reach recipients. With
+  `strictTemplates: true` the Liquid, Mustache and custom-renderer adapters
+  throw a new exported `TemplateRenderError` instead: `sendEmail` rejects before
+  anything is queued and the admin preview shows the error. Strict mode also
+  makes unknown Liquid filters an error (liquidjs `strictFilters`) and throws
+  when the configured `liquidjs` / `mustache` package cannot be loaded. The
+  default is unchanged.
 - **`escapeHtml` and `safeUrl` are exported** from the package entry, so hosts
   that send direct (non-template) HTML can use the same escaping as the
   rich-text serializer. `escapeHtml` now also escapes `'` (as `&#39;`), so its

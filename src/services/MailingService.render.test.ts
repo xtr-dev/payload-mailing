@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { MailingService } from './MailingService.js'
+import { MustacheEngineAdapter, SimpleEngineAdapter, TemplateRenderError } from './templateEngines.js'
 
 // A stub Payload that satisfies the service's initialization checks. The render
 // tests call `renderTemplateDocument` with a pre-built template document, so no
@@ -207,6 +208,67 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
   })
 })
 
+describe('renderTemplateDocument — template errors and strictTemplates', () => {
+  // An unclosed block tag is a Liquid parse error.
+  const BROKEN = 'Hi {{name}} {% if vip %}VIP'
+
+  test('default (non-strict) falls back to simple substitution, as before', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template(BROKEN, 'hi'), { name: 'Ann' })
+    expect(html).toContain('Hi Ann')
+    expect(html).toContain('{% if vip %}')
+  })
+
+  test('strictTemplates throws a TemplateRenderError on a Liquid parse error', async () => {
+    const svc = makeService({ strictTemplates: true })
+    const render = svc.renderTemplateDocument(template(BROKEN, 'hi'), { name: 'Ann' })
+    await expect(render).rejects.toBeInstanceOf(TemplateRenderError)
+    await expect(render).rejects.toThrow(/LiquidJS template rendering failed/)
+  })
+
+  test('strictTemplates also throws for a broken subject', async () => {
+    const svc = makeService({ strictTemplates: true })
+    await expect(
+      svc.renderTemplateDocument(template('body', '{% if x %}open'), {}),
+    ).rejects.toBeInstanceOf(TemplateRenderError)
+  })
+
+  test('strictTemplates leaves valid templates unaffected', async () => {
+    const svc = makeService({ strictTemplates: true })
+    const { html, subject } = await svc.renderTemplateDocument(
+      template('{% if vip %}VIP {% endif %}{{ name }}', 'Hi {{ name }}'),
+      { name: 'Ann', vip: true },
+    )
+    expect(html).toBe('<p>VIP Ann</p>')
+    expect(subject).toBe('Hi Ann')
+  })
+
+  test('strictTemplates throws when a custom templateRenderer throws', async () => {
+    const svc = makeService({
+      strictTemplates: true,
+      templateRenderer: () => {
+        throw new Error('boom')
+      },
+    })
+    await expect(svc.renderTemplateDocument(template('x', 'y'), {})).rejects.toThrow(
+      /Custom template rendering failed: boom/,
+    )
+  })
+
+  test('strictTemplates makes an unknown Liquid filter an error', async () => {
+    const svc = makeService({ strictTemplates: true })
+    await expect(
+      svc.renderTemplateDocument(template('{{ name | noSuchFilter }}', 's'), { name: 'Ann' }),
+    ).rejects.toBeInstanceOf(TemplateRenderError)
+  })
+
+  test('without strictTemplates an unknown Liquid filter is still ignored', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template('{{ name | noSuchFilter }}', 's'), { name: 'Ann' })
+    expect(html).toBe('<p>Ann</p>')
+  })
+})
+
 describe('renderTemplateDocument — quoted Liquid arguments in a rich-text HTML body', () => {
   test('single- and double-quoted arguments render in the HTML body (no fallback)', async () => {
     const svc = makeService()
@@ -322,5 +384,58 @@ describe('renderTemplateDocument — markup inside tags that do not parse is esc
     const svc = makeService({ templateEngine: 'mustache' })
     const { html } = await svc.renderTemplateDocument(template('{% x > 1 %} {{ n }}', 's'), { n: 7 })
     expect(html).toBe('<p>{% x &gt; 1 %} 7</p>')
+  })
+})
+
+describe('renderTemplateDocument — strictTemplates with the engine-aware HTML body', () => {
+  const MARKUP_IN_BROKEN_TAG = '{{ <img onerror=x> }}'
+
+  test.each(['liquidjs', 'mustache'] as const)(
+    '%s: strict mode throws on an unparseable tag containing markup (no fallback)',
+    async (templateEngine) => {
+      const source = templateEngine === 'mustache' ? '{{#items}}<img onerror=x>' : MARKUP_IN_BROKEN_TAG
+      const svc = makeService({ strictTemplates: true, templateEngine })
+      await expect(svc.renderTemplateDocument(template(source, 's'), {})).rejects.toBeInstanceOf(
+        TemplateRenderError,
+      )
+    },
+  )
+
+  test('non-strict: the same input falls back to the fully escaped body', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template(MARKUP_IN_BROKEN_TAG, 's'), {})
+    expect(html).not.toContain('<img')
+    expect(html).toContain('&lt;img onerror=x&gt;')
+  })
+
+  test.each([
+    [`{% if s == 'paid' %}PAID{% endif %}`, 'PAID'],
+    [`{{ m | default: "x" }}`, 'x'],
+    ['{% if n > 5 %}big{% endif %}', 'big'],
+    ['{% if n < 5 %}small{% else %}not small{% endif %}', 'not small'],
+  ])('strict mode renders %s in the HTML body', async (source, expected) => {
+    const svc = makeService({ strictTemplates: true })
+    const { html } = await svc.renderTemplateDocument(template(source, 's'), { n: 7, s: 'paid' })
+    expect(html).toBe(`<p>${expected}</p>`)
+  })
+})
+
+describe('MustacheEngineAdapter.renderHtml — strict mode', () => {
+  const throwingMustache = {
+    render: () => {
+      throw new Error('unclosed section')
+    },
+  }
+
+  test('strict: throws instead of rendering the escaped fallback', async () => {
+    const adapter = new MustacheEngineAdapter(throwingMustache, new SimpleEngineAdapter(), () => {}, true)
+    await expect(adapter.renderHtml('{{#a}}<img>', {}, '{{#a}}&lt;img&gt;')).rejects.toBeInstanceOf(
+      TemplateRenderError,
+    )
+  })
+
+  test('non-strict: renders the escaped fallback', async () => {
+    const adapter = new MustacheEngineAdapter(throwingMustache, new SimpleEngineAdapter(), () => {})
+    await expect(adapter.renderHtml('{{#a}}<img>', {}, '{{#a}}&lt;img&gt;')).resolves.toBe('{{#a}}&lt;img&gt;')
   })
 })
