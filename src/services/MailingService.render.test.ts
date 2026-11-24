@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
+import { perPart } from '../utils/perPart.js'
 import { MailingService } from './MailingService.js'
 import { MustacheEngineAdapter, SimpleEngineAdapter, TemplateRenderError } from './templateEngines.js'
 
@@ -205,6 +206,50 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
     expect(html.split('REAL_BODY').length - 1).toBe(1)
     // The sentinel marker character never leaks into the rendered output.
     expect(html).not.toContain('\x01')
+  })
+})
+
+describe('renderTemplateDocument — perPart() variables', () => {
+  const button = perPart({
+    html: '<a href="https://example.com">Log in</a>',
+    text: 'Log in: https://example.com',
+  })
+
+  test('HTML body gets the html value, text body and subject get the text value', async () => {
+    const svc = makeService()
+    const { html, subject, text } = await svc.renderTemplateDocument(
+      template('Hi! {{ button | raw }}', 'Re: {{ button }}'),
+      { button },
+    )
+    expect(html).toBe('<p>Hi! <a href="https://example.com">Log in</a></p>')
+    expect(text).toContain('Hi! Log in: https://example.com')
+    expect(text).not.toContain('<a')
+    expect(subject).toBe('Re: Log in: https://example.com')
+  })
+
+  test('the html value is still escaped without | raw', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template('{{ button }}', 's'), { button })
+    expect(html).toContain('&lt;a href=')
+  })
+
+  test('layouts receive the per-part value for their own part', async () => {
+    const svc = makeService({
+      defaultLayout: 'base',
+      layouts: { base: { html: '<div>{{ footer }}{{ content }}</div>', text: '{{ footer }}\n{{ content }}' } },
+    })
+    const footer = perPart({ html: 'HTML-FOOTER', text: 'TEXT-FOOTER' })
+    const { html, text } = await svc.renderTemplateDocument(template('body', 's'), { footer })
+    expect(html).toContain('HTML-FOOTER')
+    expect(html).not.toContain('TEXT-FOOTER')
+    expect(text).toContain('TEXT-FOOTER')
+    expect(text).not.toContain('HTML-FOOTER')
+  })
+
+  test('works with the simple engine too', async () => {
+    const svc = makeService({ templateEngine: 'simple' })
+    const { text } = await svc.renderTemplateDocument(template('{{button}}', 's'), { button })
+    expect(text).toContain('Log in: https://example.com')
   })
 })
 
@@ -574,5 +619,58 @@ describe('renderTemplateDocument — Payload 3 links in the HTML body', () => {
       {},
     )
     expect(html).toBe('<p><a href="/pages/1">{{ &lt;img onerror=x&gt; }}</a></p>')
+  })
+})
+
+describe('renderTemplateDocument — perPart() with strictTemplates, the escaped fallback and filters', () => {
+  const button = perPart({
+    html: '<a href="https://example.com">Log in</a>',
+    text: 'Log in: https://example.com',
+  })
+
+  test('strictTemplates: each part, the layout and the subject get their own value', async () => {
+    const svc = makeService({
+      defaultLayout: 'base',
+      layouts: { base: { html: '<div>{{ footer }}{{ content }}</div>', text: '{{ footer }}|{{ content }}' } },
+      strictTemplates: true,
+    })
+    const footer = perPart({ html: 'HTML-FOOTER', text: 'TEXT-FOOTER' })
+    const { html, subject, text } = await svc.renderTemplateDocument(
+      template(`{% if s == 'x' %}{{ button | raw }}{% endif %}`, 'Re: {{ button }}'),
+      { button, footer, s: 'x' },
+    )
+    expect(html).toBe('<div>HTML-FOOTER<p><a href="https://example.com">Log in</a></p></div>')
+    expect(text).toContain('TEXT-FOOTER|Log in: https://example.com')
+    expect(subject).toBe('Re: Log in: https://example.com')
+  })
+
+  test('strictTemplates: a broken body still throws with perPart variables', async () => {
+    const svc = makeService({ strictTemplates: true })
+    await expect(
+      svc.renderTemplateDocument(template('{{ button }} {% if x %}', 's'), { button }),
+    ).rejects.toBeInstanceOf(TemplateRenderError)
+  })
+
+  test('the escaped fallback body uses the html value (escaped), the text body the text value', async () => {
+    const svc = makeService()
+    const value = perPart({ html: '<b>H</b>', text: 'T' })
+    // `{{ <img onerror=x> }}` does not parse, so the HTML part falls back to the
+    // fully escaped serialization rendered by the simple replacer.
+    const { html } = await svc.renderTemplateDocument(template('{{value}} {{ <img onerror=x> }}', 's'), { value })
+    expect(html).toBe('<p>&lt;b&gt;H&lt;/b&gt; {{ &lt;img onerror=x&gt; }}</p>')
+    expect(html).not.toContain('T ')
+  })
+
+  test('formatCurrency gets the per-part value', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL', strictTemplates: true })
+    const amount = perPart({ html: 12.5, text: 99 })
+    const { html, text } = await svc.renderTemplateDocument(
+      template('{{ amount | formatCurrency }}', 'Total {{ amount | formatCurrency }}'),
+      { amount },
+    )
+    const fmt = (n: number) => new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(n)
+    expect(html).toBe(`<p>${fmt(12.5)}</p>`)
+    expect(text).toContain(fmt(99))
+    expect(text).not.toContain(fmt(12.5))
   })
 })

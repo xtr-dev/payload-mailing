@@ -37,6 +37,9 @@ export {
 // Job scheduling utilities
 export { ensureEmailJob, findExistingJobs, updateEmailJobRelationship } from './utils/jobScheduler.js'
 
+// Per-part (HTML vs. plain-text) template variable values
+export { type EmailPart, isPerPartValue, perPart, type PerPartValue } from './utils/perPart.js'
+
 export type {
   InternalLinkResolver,
   RichTextSerializeOptions,
@@ -45,3 +48,4 @@ export type {
 
 // HTML helpers used by the rich-text serializer, for hosts building direct HTML
 export { escapeHtml, safeUrl } from './utils/richTextSerializer.js'
+

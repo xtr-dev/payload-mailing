@@ -22,6 +22,13 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Added
 
+- **`perPart({ html, text })` for template variables.** Both MIME parts used to
+  be rendered with the same variables, so a variable holding HTML (used with
+  `| raw`) showed up as tags in the plain-text part. A variable made with the
+  new exported `perPart()` helper resolves to its `html` value in the HTML body
+  and HTML layout, and to its `text` value in the text body, text layout and
+  subject. It works at any depth and is stored as a plain `{ html, text }`
+  object. Plain objects with `html`/`text` keys are not affected.
 - **`locale`, `currency` and `timeZone` options for the date and money
   filters.** `formatDate` and `formatCurrency` were hardcoded to `en-US` and
   `USD`. The new plugin options set their defaults, and both filters accept the
