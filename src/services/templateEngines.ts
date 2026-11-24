@@ -1,5 +1,7 @@
 import type { Liquid } from 'liquidjs'
 
+import type { TemplateTagSyntax } from '../utils/richTextSerializer.js'
+
 import { escapeHtml } from '../utils/richTextSerializer.js'
 
 /**
@@ -33,8 +35,19 @@ export interface TemplateEngineAdapter {
   ): Promise<string>
   /** Renders a template, emitting substituted values verbatim (no escaping). */
   render(template: string, variables: Record<string, any>): Promise<string>
-  /** Renders a template into HTML, HTML-escaping substituted values. */
-  renderHtml(template: string, variables: Record<string, any>): Promise<string>
+  /**
+   * Renders a template into HTML, HTML-escaping substituted values. When the
+   * template fails to render and the adapter falls back to the simple
+   * replacer, `fallbackTemplate` (if given) is used instead of `template` —
+   * the rich-text body passes a fully escaped serialization here so template
+   * tags that failed to parse are never sent with their contents unescaped.
+   */
+  renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string>
+  /**
+   * Which template tags the rich-text serializer may leave unescaped for this
+   * engine. Defaults to `'none'` (escape everything).
+   */
+  readonly templateSyntax?: TemplateTagSyntax
 }
 
 export type RenderErrorLogger = (message: string, error: unknown) => void
@@ -106,7 +119,7 @@ abstract class ModeBasedAdapter implements TemplateEngineAdapter {
   }
 
   abstract render(template: string, variables: Record<string, any>): Promise<string>
-  abstract renderHtml(template: string, variables: Record<string, any>): Promise<string>
+  abstract renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string>
 }
 
 /**
@@ -144,6 +157,8 @@ export class SimpleEngineAdapter extends ModeBasedAdapter {
  * `strict` is set, in which case it throws a {@link TemplateRenderError}.
  */
 export class LiquidEngineAdapter extends ModeBasedAdapter {
+  readonly templateSyntax: TemplateTagSyntax = 'liquid'
+
   constructor(
     private liquid: Liquid,
     private liquidEscaped: Liquid,
@@ -164,13 +179,13 @@ export class LiquidEngineAdapter extends ModeBasedAdapter {
     }
   }
 
-  async renderHtml(template: string, variables: Record<string, any>): Promise<string> {
+  async renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string> {
     try {
       return await this.liquidEscaped.parseAndRender(template, variables)
     } catch (error) {
       if (this.strict) {throw new TemplateRenderError('LiquidJS', error)}
       this.onError('LiquidJS template rendering error:', error)
-      return this.fallback.renderHtml(template, variables)
+      return this.fallback.renderHtml(fallbackTemplate ?? template, variables)
     }
   }
 }
@@ -220,6 +235,8 @@ function stripSentinel(value: any): any {
  * a {@link TemplateRenderError} is thrown.
  */
 export class MustacheEngineAdapter implements TemplateEngineAdapter {
+  readonly templateSyntax: TemplateTagSyntax = 'mustache'
+
   constructor(
     private mustache: MustacheModule,
     private fallback: TemplateEngineAdapter,
@@ -273,10 +290,18 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
     }
   }
 
-  async renderHtml(template: string, variables: Record<string, any>): Promise<string> {
+  async renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string> {
     // Mustache always escapes `{{ }}` output, so HTML and verbatim rendering are
-    // identical; the distinction only matters for the mode-based engines.
-    return this.render(template, variables)
+    // identical; the distinction only matters for the mode-based engines. The
+    // fallback, however, must be the escaping one, on the fully escaped body.
+    // In strict mode there is no fallback at all.
+    try {
+      return this.mustache.render(template, variables)
+    } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('Mustache', error)}
+      this.onError('Mustache template rendering error:', error)
+      return this.fallback.renderHtml(fallbackTemplate ?? template, variables)
+    }
   }
 }
 

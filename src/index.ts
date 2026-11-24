@@ -36,3 +36,6 @@ export {
 
 // Job scheduling utilities
 export { ensureEmailJob, findExistingJobs, updateEmailJobRelationship } from './utils/jobScheduler.js'
+
+// HTML helpers used by the rich-text serializer, for hosts building direct HTML
+export { escapeHtml, safeUrl } from './utils/richTextSerializer.js'

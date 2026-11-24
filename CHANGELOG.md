@@ -31,8 +31,38 @@ To cut a release: move your `## [Unreleased]` notes under a new
   makes unknown Liquid filters an error (liquidjs `strictFilters`) and throws
   when the configured `liquidjs` / `mustache` package cannot be loaded. The
   default is unchanged.
+- **`escapeHtml` and `safeUrl` are exported** from the package entry, so hosts
+  that send direct (non-template) HTML can use the same escaping as the
+  rich-text serializer. `escapeHtml` now also escapes `'` (as `&#39;`), so its
+  output is safe inside single-quoted attributes too.
 
 ### Fixed
+
+- **Liquid comparisons with `<` / `>` broke the HTML body.** Text nodes were
+  escaped before Liquid parsed the HTML body, so `{% if n > 5 %}` reached the
+  engine as `{% if n &gt; 5 %}`, failed to parse, and the HTML part fell back
+  to the simple renderer (raw tags sent). Complete `{% … %}` / `{{ … }}` tags
+  inside a text node are now left verbatim for the engine that understands
+  them (Liquid: `{% %}` and `{{ }}`; Mustache: `{{ }}`; simple engine and
+  custom renderers: none). Text around them is still escaped and output values
+  are still escaped by the engine. When the body does not parse, the fallback
+  renders a fully escaped body, so markup inside a broken tag is never sent
+  raw. A tag split across
+  differently formatted text runs is not recognised (it would contain
+  formatting markup and could not parse anyway).
+
+- **Quoted Liquid arguments broke the HTML body.** Rich-text text nodes were
+  escaped with the attribute escaper before Liquid parsed the HTML body, so
+  `"` became `&quot;` and `{{ d | formatDate: "long" }}` failed to parse; the
+  HTML part then fell back to the simple renderer and recipients got raw tags.
+  Text nodes now only escape `& < >`; values substituted by the engine are
+  still escaped as before.
+
+- **The template preview endpoint now checks template access.**
+  `POST /api/mailing/preview-template` only checked that a user was logged in.
+  It now also requires the user to pass the templates collection's `update` or
+  `create` access (the access needed to edit a template) and answers `403`
+  otherwise. Anyone who can edit templates in the admin keeps the preview.
 
 - **README's Requirements line understated the PayloadCMS floor.** It read
   `PayloadCMS ^3.0.0` while `package.json`'s `payload` peerDependency has
