@@ -1,5 +1,7 @@
 import type { CollectionConfig, Payload,RichTextField, SendEmailOptions } from 'payload'
 
+import type { InternalLinkResolver } from '../utils/richTextSerializer.js'
+
 // Payload ID type (string or number)
 export type PayloadID = number | string
 
@@ -117,6 +119,11 @@ export interface MailingPluginConfig {
     emails?: Partial<CollectionConfig> | string
     templates?: Partial<CollectionConfig> | string
   }
+  /**
+   * Default currency (ISO 4217 code, e.g. `'EUR'`) for the `formatCurrency`
+   * Liquid filter when a template does not pass one. Defaults to `'USD'`.
+   */
+  currency?: string
   defaultFrom?: string
   defaultFromName?: string
   /**
@@ -137,12 +144,45 @@ export interface MailingPluginConfig {
    * future release for editor-managed layouts.
    */
   layouts?: { [name: string]: EmailLayout }
+  /**
+   * BCP 47 locale (e.g. `'nl-NL'`) used by the `formatDate` and
+   * `formatCurrency` Liquid filters. A template can still pass its own locale
+   * as the last filter argument. When unset, the filters behave as in earlier
+   * releases: the runtime's locale for `formatDate` (`'en-US'` for its "long"
+   * format) and `'en-US'` for `formatCurrency`.
+   */
+  locale?: string
   queue?: string
+  /**
+   * Turns an internal rich-text link (a link to another Payload document, made
+   * with the editor's "internal link" option) into an absolute URL for the
+   * email. Receives the link's `fields`; `fields.doc` holds `relationTo` and
+   * `value` (the linked document when populated, otherwise its ID). Return
+   * `undefined`/`null` to render the link text without a link. Without this
+   * hook, internal links render as plain text.
+   */
+  resolveInternalLink?: InternalLinkResolver
   retryAttempts?: number
   retryDelay?: number
   richTextEditor?: RichTextField['editor']
+  /**
+   * When `true`, a template that fails to parse or render (a Liquid syntax
+   * error, an unknown Liquid filter, a throwing `templateRenderer`, …) throws a
+   * `TemplateRenderError` instead of silently falling back to plain `{{ name }}`
+   * substitution. It also throws when the configured engine package
+   * (`liquidjs` / `mustache`) cannot be loaded, instead of using the simple
+   * replacer. Unknown Liquid filters are only an error in strict mode. `sendEmail` then rejects and nothing is queued, and the admin
+   * preview shows the error. Defaults to `false` (log and fall back), which is
+   * the behaviour of earlier releases.
+   */
+  strictTemplates?: boolean
   templateEngine?: TemplateEngine
   templateRenderer?: TemplateRendererHook
+  /**
+   * IANA time zone (e.g. `'Europe/Amsterdam'`) for the `formatDate` Liquid
+   * filter. When unset, dates are shown in the server's time zone.
+   */
+  timeZone?: string
 }
 
 export interface QueuedEmail {

@@ -281,6 +281,9 @@ const Emails: CollectionConfig = {
           // 2. Updating the relationship in afterChange causes transaction isolation issues
           //    (the new job isn't committed yet, so the relationship validation fails)
           const { jobIds } = await ensureEmailJob(req.payload, doc.id, {
+            // sendEmail supplies a per-send queue override through the create
+            // context. Direct creates retain ensureEmailJob's config fallback.
+            queueName: (req.context as { emailQueueName?: string } | undefined)?.emailQueueName,
             scheduledAt: doc.scheduledAt,
           })
 
