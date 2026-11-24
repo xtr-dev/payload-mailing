@@ -27,8 +27,10 @@ To cut a release: move your `## [Unreleased]` notes under a new
   `{{ name }}` replacer, so raw Liquid tags can reach recipients. With
   `strictTemplates: true` the Liquid, Mustache and custom-renderer adapters
   throw a new exported `TemplateRenderError` instead: `sendEmail` rejects before
-  anything is queued and the admin preview shows the error. The default is
-  unchanged.
+  anything is queued and the admin preview shows the error. Strict mode also
+  makes unknown Liquid filters an error (liquidjs `strictFilters`) and throws
+  when the configured `liquidjs` / `mustache` package cannot be loaded. The
+  default is unchanged.
 
 ### Fixed
 

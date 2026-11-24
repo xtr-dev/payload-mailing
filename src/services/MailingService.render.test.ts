@@ -254,4 +254,17 @@ describe('renderTemplateDocument — template errors and strictTemplates', () =>
       /Custom template rendering failed: boom/,
     )
   })
+
+  test('strictTemplates makes an unknown Liquid filter an error', async () => {
+    const svc = makeService({ strictTemplates: true })
+    await expect(
+      svc.renderTemplateDocument(template('{{ name | noSuchFilter }}', 's'), { name: 'Ann' }),
+    ).rejects.toBeInstanceOf(TemplateRenderError)
+  })
+
+  test('without strictTemplates an unknown Liquid filter is still ignored', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template('{{ name | noSuchFilter }}', 's'), { name: 'Ann' })
+    expect(html).toBe('<p>Ann</p>')
+  })
 })
