@@ -35,3 +35,6 @@ export {
 
 // Job scheduling utilities
 export { ensureEmailJob, findExistingJobs, updateEmailJobRelationship } from './utils/jobScheduler.js'
+
+// Per-part (HTML vs. plain-text) template variable values
+export { type EmailPart, isPerPartValue, perPart, type PerPartValue } from './utils/perPart.js'

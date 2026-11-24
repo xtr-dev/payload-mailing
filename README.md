@@ -110,6 +110,10 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   `simple`, or supply `templateRenderer: (tpl, vars) => string` for your own.
 - **Escaping** — HTML-body variables are HTML-escaped by default (opt out with
   LiquidJS `{{ x | raw }}` / Mustache `{{{ x }}}`); subject and text are verbatim.
+- **HTML vs. text values** — wrap a variable in `perPart({ html, text })` to give
+  the HTML body one value and the plain-text body (and subject) another, e.g. a
+  link button as markup in HTML and as `Log in: https://…` in text. The HTML
+  value is still escaped unless you use `| raw` / `{{{ }}}`.
 - **Required variables** — mark declared variables Required and a send missing
   one is rejected *before it's queued*. Opt-in; declare nothing to skip checks.
 

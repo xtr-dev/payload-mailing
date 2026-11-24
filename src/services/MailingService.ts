@@ -14,6 +14,7 @@ import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js
 
 import { sanitizeDisplayName } from '../utils/helpers.js'
 import { createContextLogger } from '../utils/logger.js'
+import { resolvePartVariables } from '../utils/perPart.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
 import {
   CustomRendererAdapter,
@@ -344,11 +345,16 @@ export class MailingService implements IMailingService {
     let html = serializeRichTextToHTML(template.content)
     let text = serializeRichTextToText(template.content)
 
+    // Variables made with perPart() carry a separate value for each MIME part,
+    // so markup meant for the HTML body never shows up in the text body.
+    const htmlVariables = resolvePartVariables(variables, 'html')
+    const textVariables = resolvePartVariables(variables, 'text')
+
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters
     // like `&` verbatim, otherwise recipients see literal entities (`&amp;`).
-    html = await adapter.renderHtml(html, variables)
-    text = await adapter.render(text, variables)
+    html = await adapter.renderHtml(html, htmlVariables)
+    text = await adapter.render(text, textVariables)
 
     // Wrap the rendered body in the resolved layout, if any. The body is the
     // `content` slot and is injected verbatim — it was already escaped during
@@ -357,12 +363,12 @@ export class MailingService implements IMailingService {
     // applies that split according to its own escaping model.
     const layout = this.resolveLayout(template)
     if (layout) {
-      html = await adapter.composeLayout(layout.html, html, variables, true)
+      html = await adapter.composeLayout(layout.html, html, htmlVariables, true)
 
       // Only wrap plain text when the layout defines a text variant; otherwise
       // keep the unwrapped body so the text/MIME alternative matches today's output.
       if (layout.text) {
-        text = await adapter.composeLayout(layout.text, text, variables, false)
+        text = await adapter.composeLayout(layout.text, text, textVariables, false)
       }
     }
 
@@ -586,7 +592,8 @@ export class MailingService implements IMailingService {
 
     const adapter = await this.getEngineAdapter()
     const emailContent = await this.renderEmailTemplate(template, variables)
-    const subject = await adapter.render(template.subject || '', variables)
+    // The subject is plain text, so it uses the text value of perPart() variables.
+    const subject = await adapter.render(template.subject || '', resolvePartVariables(variables, 'text'))
 
     return {
       html: emailContent.html,

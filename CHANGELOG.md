@@ -20,6 +20,16 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Added
+
+- **`perPart({ html, text })` for template variables.** Both MIME parts used to
+  be rendered with the same variables, so a variable holding HTML (used with
+  `| raw`) showed up as tags in the plain-text part. A variable made with the
+  new exported `perPart()` helper resolves to its `html` value in the HTML body
+  and HTML layout, and to its `text` value in the text body, text layout and
+  subject. It works at any depth and is stored as a plain `{ html, text }`
+  object. Plain objects with `html`/`text` keys are not affected.
+
 ### Fixed
 
 - **README's Requirements line understated the PayloadCMS floor.** It read
