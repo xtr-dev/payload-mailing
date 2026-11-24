@@ -166,6 +166,7 @@ export class MailingService implements IMailingService {
         this.customAdapter = new CustomRendererAdapter(
           this.config.templateRenderer,
           (message, error) => this.logger.error(message, error),
+          this.config.strictTemplates === true,
         )
       }
       return this.customAdapter
@@ -182,6 +183,7 @@ export class MailingService implements IMailingService {
             this.liquidEscaped,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.liquidAdapter
@@ -198,6 +200,7 @@ export class MailingService implements IMailingService {
             mustache,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.mustacheAdapter

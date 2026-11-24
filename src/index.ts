@@ -16,6 +16,7 @@ export { default as sendEmailDefault } from './sendEmail.js'
 
 // Services
 export { MailingService } from './services/MailingService.js'
+export { TemplateRenderError } from './services/templateEngines.js'
 // Types
 export * from './types/index.js'
 

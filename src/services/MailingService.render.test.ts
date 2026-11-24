@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { MailingService } from './MailingService.js'
+import { TemplateRenderError } from './templateEngines.js'
 
 // A stub Payload that satisfies the service's initialization checks. The render
 // tests call `renderTemplateDocument` with a pre-built template document, so no
@@ -204,5 +205,53 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
     expect(html.split('REAL_BODY').length - 1).toBe(1)
     // The sentinel marker character never leaks into the rendered output.
     expect(html).not.toContain('\x01')
+  })
+})
+
+describe('renderTemplateDocument — template errors and strictTemplates', () => {
+  // An unclosed block tag is a Liquid parse error.
+  const BROKEN = 'Hi {{name}} {% if vip %}VIP'
+
+  test('default (non-strict) falls back to simple substitution, as before', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template(BROKEN, 'hi'), { name: 'Ann' })
+    expect(html).toContain('Hi Ann')
+    expect(html).toContain('{% if vip %}')
+  })
+
+  test('strictTemplates throws a TemplateRenderError on a Liquid parse error', async () => {
+    const svc = makeService({ strictTemplates: true })
+    const render = svc.renderTemplateDocument(template(BROKEN, 'hi'), { name: 'Ann' })
+    await expect(render).rejects.toBeInstanceOf(TemplateRenderError)
+    await expect(render).rejects.toThrow(/LiquidJS template rendering failed/)
+  })
+
+  test('strictTemplates also throws for a broken subject', async () => {
+    const svc = makeService({ strictTemplates: true })
+    await expect(
+      svc.renderTemplateDocument(template('body', '{% if x %}open'), {}),
+    ).rejects.toBeInstanceOf(TemplateRenderError)
+  })
+
+  test('strictTemplates leaves valid templates unaffected', async () => {
+    const svc = makeService({ strictTemplates: true })
+    const { html, subject } = await svc.renderTemplateDocument(
+      template('{% if vip %}VIP {% endif %}{{ name }}', 'Hi {{ name }}'),
+      { name: 'Ann', vip: true },
+    )
+    expect(html).toBe('<p>VIP Ann</p>')
+    expect(subject).toBe('Hi Ann')
+  })
+
+  test('strictTemplates throws when a custom templateRenderer throws', async () => {
+    const svc = makeService({
+      strictTemplates: true,
+      templateRenderer: () => {
+        throw new Error('boom')
+      },
+    })
+    await expect(svc.renderTemplateDocument(template('x', 'y'), {})).rejects.toThrow(
+      /Custom template rendering failed: boom/,
+    )
   })
 })

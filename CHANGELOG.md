@@ -20,6 +20,16 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Added
+
+- **`strictTemplates` option.** By default a template that fails to parse or
+  render (e.g. an unclosed `{% if %}`) is logged and sent through the naive
+  `{{ name }}` replacer, so raw Liquid tags can reach recipients. With
+  `strictTemplates: true` the Liquid, Mustache and custom-renderer adapters
+  throw a new exported `TemplateRenderError` instead: `sendEmail` rejects before
+  anything is queued and the admin preview shows the error. The default is
+  unchanged.
+
 ### Fixed
 
 - **README's Requirements line understated the PayloadCMS floor.** It read
