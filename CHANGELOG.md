@@ -22,6 +22,15 @@ To cut a release: move your `## [Unreleased]` notes under a new
 
 ### Added
 
+- **`locale`, `currency` and `timeZone` options for the date and money
+  filters.** `formatDate` and `formatCurrency` were hardcoded to `en-US` and
+  `USD`. The new plugin options set their defaults, and both filters accept the
+  locale (and `formatCurrency` the currency) as an extra argument, e.g.
+  `{{ total | formatCurrency: "EUR", "nl-NL" }}`. Without the options the
+  output is unchanged. An invalid `locale`, `currency` or `timeZone` option makes the
+  plugin throw a clear error at startup. An invalid locale or currency passed
+  as a filter argument falls back to the configured defaults instead of failing
+  the render.
 - **`strictTemplates` option.** By default a template that fails to parse or
   render (e.g. an unclosed `{% if %}`) is logged and sent through the naive
   `{{ name }}` replacer, so raw Liquid tags can reach recipients. With

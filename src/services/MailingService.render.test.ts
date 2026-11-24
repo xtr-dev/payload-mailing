@@ -208,6 +208,66 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
   })
 })
 
+describe('renderTemplateDocument — formatDate / formatCurrency locale options', () => {
+  // Noon UTC so the calendar date is the same in every common time zone.
+  const date = '2026-03-05T12:00:00.000Z'
+
+  test('without options the output is unchanged (en-US long date, USD)', async () => {
+    const svc = makeService()
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }} | {{ n | formatCurrency }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    expect(text).toContain('March 5, 2026 | $12.50')
+  })
+
+  test('locale and currency options apply to both filters', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL' })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }} | {{ n | formatCurrency }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    const expectedMoney = new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(12.5)
+    expect(text).toContain(`5 maart 2026 | ${expectedMoney}`)
+  })
+
+  test('a filter argument overrides the configured locale and currency', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL' })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long", "en-GB" }} | {{ n | formatCurrency: "USD", "en-US" }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    expect(text).toContain('5 March 2026 | $12.50')
+  })
+
+  test('timeZone shifts the rendered date', async () => {
+    const lateUtc = '2026-03-05T23:30:00.000Z'
+    const svc = makeService({ locale: 'en-US', timeZone: 'Asia/Tokyo' })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }}', 's'),
+      { d: lateUtc },
+    )
+    expect(text).toContain('March 6, 2026')
+  })
+})
+
+describe('formatDate / formatCurrency with a bad filter argument', () => {
+  test('an invalid locale or currency argument falls back to the configured defaults', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL' })
+    const { text } = await svc.renderTemplateDocument(
+      template(
+        '{% if true %}ok{% endif %} {{ d | formatDate: "long", "en_US" }} | {{ n | formatCurrency: "EURO", "xx_YY" }}',
+        's',
+      ),
+      { d: '2026-03-05T12:00:00.000Z', n: 12.5 },
+    )
+    const expectedMoney = new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(12.5)
+    // The block tag rendered, so the template did not fall back to the simple replacer.
+    expect(text).toContain(`ok 5 maart 2026 | ${expectedMoney}`)
+    expect(text).not.toContain('{%')
+  })
+})
+
 describe('renderTemplateDocument — template errors and strictTemplates', () => {
   // An unclosed block tag is a Liquid parse error.
   const BROKEN = 'Hi {{name}} {% if vip %}VIP'
@@ -437,5 +497,45 @@ describe('MustacheEngineAdapter.renderHtml — strict mode', () => {
   test('non-strict: renders the escaped fallback', async () => {
     const adapter = new MustacheEngineAdapter(throwingMustache, new SimpleEngineAdapter(), () => {})
     await expect(adapter.renderHtml('{{#a}}<img>', {}, '{{#a}}&lt;img&gt;')).resolves.toBe('{{#a}}&lt;img&gt;')
+  })
+})
+
+describe('formatDate / formatCurrency under strictTemplates', () => {
+  const date = '2026-03-05T12:00:00.000Z'
+
+  test('registered filters are not unknown filters under strictFilters', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL', strictTemplates: true })
+    const { html, text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }} | {{ n | formatCurrency }} | {{ w | capitalize }}', 's'),
+      { d: date, n: 12.5, w: 'ann' },
+    )
+    const expectedMoney = new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(12.5)
+    expect(text).toContain(`5 maart 2026 | ${expectedMoney} | Ann`)
+    expect(html).toContain('5 maart 2026')
+  })
+
+  test('a bad filter argument still falls back to the defaults in strict mode', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL', strictTemplates: true })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long", "en_US" }} | {{ n | formatCurrency: "EURO", "xx_YY" }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    const expectedMoney = new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(12.5)
+    expect(text).toContain(`5 maart 2026 | ${expectedMoney}`)
+  })
+
+  // MailingService built directly skips the plugin-init validation, so an
+  // invalid default currency makes the filter's own fallback throw a RangeError.
+  test('a RangeError that escapes a filter is a TemplateRenderError in strict mode', async () => {
+    const svc = makeService({ currency: 'EURO', strictTemplates: true })
+    const render = svc.renderTemplateDocument(template('{{ n | formatCurrency }}', 's'), { n: 1 })
+    await expect(render).rejects.toBeInstanceOf(TemplateRenderError)
+    await expect(render).rejects.toMatchObject({ cause: expect.anything() })
+  })
+
+  test('without strictTemplates the same template still renders', async () => {
+    const svc = makeService({ currency: 'EURO' })
+    const { html } = await svc.renderTemplateDocument(template('Total: {{ n | formatCurrency }}', 's'), { n: 1 })
+    expect(html).toContain('Total:')
   })
 })

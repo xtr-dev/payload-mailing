@@ -12,6 +12,7 @@ import type {
 } from '../types/index.js'
 import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js'
 
+import { withIntlFallback } from '../utils/formatOptions.js'
 import { sanitizeDisplayName } from '../utils/helpers.js'
 import { createContextLogger } from '../utils/logger.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
@@ -316,30 +317,52 @@ export class MailingService implements IMailingService {
   /**
    * Registers the built-in template filters (equivalent to Handlebars helpers)
    * on a LiquidJS engine instance.
+   *
+   * `formatDate` and `formatCurrency` use the plugin's `locale`, `currency` and
+   * `timeZone` options; a template can override the locale (and currency) per
+   * call through an extra filter argument. Without those options the output is
+   * the same as in earlier releases (runtime locale for "short" and the default
+   * format, en-US for "long", USD for currency).
    */
   private registerLiquidFilters(engine: Liquid): void {
-    engine.registerFilter('formatDate', (date: any, format?: string) => {
-      if (!date) {return ''}
-      const d = new Date(date)
+    const { currency: defaultCurrency = 'USD', locale: defaultLocale, timeZone } = this.config
+    const zone = timeZone ? { timeZone } : {}
+
+    const formatDate = (d: Date, format: string | undefined, locale: string | undefined): string => {
       if (format === 'short') {
-        return d.toLocaleDateString()
+        return d.toLocaleDateString(locale, zone)
       }
       if (format === 'long') {
-        return d.toLocaleDateString('en-US', {
+        return d.toLocaleDateString(locale || 'en-US', {
           day: 'numeric',
           month: 'long',
-          year: 'numeric'
+          year: 'numeric',
+          ...zone,
         })
       }
-      return d.toLocaleString()
+      return d.toLocaleString(locale, zone)
+    }
+
+    // A bad locale or currency passed as a filter argument falls back to the
+    // configured defaults (validated at plugin init) instead of failing the
+    // whole render, which would send the template through the simple replacer.
+    engine.registerFilter('formatDate', (date: any, format?: string, locale?: string) => {
+      if (!date) {return ''}
+      const d = new Date(date)
+      return withIntlFallback(
+        () => formatDate(d, format, locale || defaultLocale),
+        () => formatDate(d, format, defaultLocale),
+      )
     })
 
-    engine.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
+    engine.registerFilter('formatCurrency', (amount: any, currency?: string, locale?: string) => {
       if (typeof amount !== 'number') {return amount}
-      return new Intl.NumberFormat('en-US', {
-        currency,
-        style: 'currency'
-      }).format(amount)
+      const format = (useLocale: string, useCurrency: string) =>
+        new Intl.NumberFormat(useLocale, { currency: useCurrency, style: 'currency' }).format(amount)
+      return withIntlFallback(
+        () => format(locale || defaultLocale || 'en-US', currency || defaultCurrency),
+        () => format(defaultLocale || 'en-US', defaultCurrency),
+      )
     })
 
     engine.registerFilter('capitalize', (str: any) => {
