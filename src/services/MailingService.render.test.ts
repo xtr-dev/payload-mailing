@@ -249,3 +249,20 @@ describe('renderTemplateDocument — formatDate / formatCurrency locale options'
     expect(text).toContain('March 6, 2026')
   })
 })
+
+describe('formatDate / formatCurrency with a bad filter argument', () => {
+  test('an invalid locale or currency argument falls back to the configured defaults', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL' })
+    const { text } = await svc.renderTemplateDocument(
+      template(
+        '{% if true %}ok{% endif %} {{ d | formatDate: "long", "en_US" }} | {{ n | formatCurrency: "EURO", "xx_YY" }}',
+        's',
+      ),
+      { d: '2026-03-05T12:00:00.000Z', n: 12.5 },
+    )
+    const expectedMoney = new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(12.5)
+    // The block tag rendered, so the template did not fall back to the simple replacer.
+    expect(text).toContain(`ok 5 maart 2026 | ${expectedMoney}`)
+    expect(text).not.toContain('{%')
+  })
+})

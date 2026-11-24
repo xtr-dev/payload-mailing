@@ -27,7 +27,10 @@ To cut a release: move your `## [Unreleased]` notes under a new
   `USD`. The new plugin options set their defaults, and both filters accept the
   locale (and `formatCurrency` the currency) as an extra argument, e.g.
   `{{ total | formatCurrency: "EUR", "nl-NL" }}`. Without the options the
-  output is unchanged.
+  output is unchanged. An invalid `locale`, `currency` or `timeZone` option makes the
+  plugin throw a clear error at startup. An invalid locale or currency passed
+  as a filter argument falls back to the configured defaults instead of failing
+  the render.
 
 ### Fixed
 
