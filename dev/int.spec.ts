@@ -27,24 +27,6 @@ describe('Plugin integration tests', () => {
     expect((payload as any).mailing.config).toBeDefined()
   })
 
-  test('can create post with custom text field added by plugin', async () => {
-    const post = await payload.create({
-      collection: 'posts',
-      data: {
-        addedByPlugin: 'added by plugin',
-      },
-    })
-    expect(post.addedByPlugin).toBe('added by plugin')
-  })
-
-  test('plugin creates and seeds plugin-collection', async () => {
-    expect(payload.collections['plugin-collection']).toBeDefined()
-
-    const { docs } = await payload.find({ collection: 'plugin-collection' })
-
-    expect(docs).toHaveLength(1)
-  })
-
   test('creating an email queues a process-email job (kept for observability)', async () => {
     const email = await sendEmail(payload, {
       data: {

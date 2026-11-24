@@ -124,11 +124,11 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   // runs synchronously within this call and writes the IDs of the job(s) it
   // queues onto this same object (Payload assigns `req.context` to the object we
   // pass here by reference), letting us run the job below without polling for it.
-  // `queueName` travels the same way in the other direction: it carries the
-  // caller's `options.queue` override into the hook, which has no access to
-  // `SendEmailOptions` since it only receives the standard collection hook args.
-  const createContext: { emailJobIds?: (number | string)[], queueName?: string } = {
-    queueName: options.queue,
+  // The afterChange hook queues ordinary sends, so carry the per-send queue
+  // override through the same context object it uses to hand back job IDs.
+  const createContext: { emailJobIds?: (number | string)[], emailQueueName?: string } = {}
+  if (options.queue) {
+    createContext.emailQueueName = options.queue
   }
 
   const email = await payload.create({

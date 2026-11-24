@@ -39,7 +39,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:int": "vitest"
+    "test:int": "vitest run --config vitest.int.config.ts"
   },
   "keywords": [
     "payloadcms",

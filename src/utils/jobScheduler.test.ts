@@ -1,6 +1,36 @@
 import { describe, expect, test, vi } from 'vitest'
 
-import { ensureEmailJob, findExistingJobs } from './jobScheduler.js'
+import {
+  ensureEmailJob,
+  findExistingJobs,
+  updateEmailJobRelationship,
+} from './jobScheduler.js'
+
+function createPayload(options?: {
+  find?: ReturnType<typeof vi.fn>
+  queue?: ReturnType<typeof vi.fn>
+  queueName?: string
+}) {
+  const logger = {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  }
+
+  return {
+    find: options?.find ?? vi.fn().mockResolvedValue({ docs: [] }),
+    jobs: {
+      queue: options?.queue ?? vi.fn().mockResolvedValue({ id: 'job-1' }),
+    },
+    logger: {
+      child: vi.fn().mockReturnValue(logger),
+    },
+    mailing: options?.queueName
+      ? { config: { queue: options.queueName } }
+      : undefined,
+  }
+}
 
 describe('findExistingJobs', () => {
   test('queries payload-jobs by taskSlug (not the invalid "task" field)', async () => {
@@ -48,113 +78,118 @@ describe('findExistingJobs', () => {
 })
 
 describe('ensureEmailJob', () => {
-  test('queues a new job when the pre-check finds nothing', async () => {
-    const find = vi.fn().mockResolvedValue({ docs: [] })
-    const queue = vi.fn().mockResolvedValue({ id: 123 })
-    const payload = { find, jobs: { queue } } as never
+  test('returns existing jobs without queueing a duplicate', async () => {
+    const find = vi.fn().mockResolvedValue({
+      docs: [
+        { id: 'job-1', input: { emailId: '42' } },
+        { id: 2, input: { emailId: 42 } },
+      ],
+    })
+    const payload = createPayload({ find })
 
-    const result = await ensureEmailJob(payload, 5)
+    await expect(ensureEmailJob(payload as never, 42)).resolves.toEqual({
+      created: false,
+      jobIds: ['job-1', 2],
+    })
+    expect(payload.jobs.queue).not.toHaveBeenCalled()
+  })
 
-    expect(queue).toHaveBeenCalledTimes(1)
-    expect(queue).toHaveBeenCalledWith({
-      input: { emailId: '5' },
+  test('queues one process-email job with a string email id', async () => {
+    const payload = createPayload()
+
+    await expect(ensureEmailJob(payload as never, 42)).resolves.toEqual({
+      created: true,
+      jobIds: ['job-1'],
+    })
+    expect(payload.jobs.queue).toHaveBeenCalledOnce()
+    expect(payload.jobs.queue).toHaveBeenCalledWith({
+      input: { emailId: '42' },
       queue: 'default',
       task: 'process-email',
       waitUntil: undefined,
     })
-    expect(result).toEqual({ created: true, jobIds: [123] })
   })
 
-  describe('queue name resolution', () => {
-    test('uses payload.mailing.config.queue when options.queueName is not given', async () => {
-      const find = vi.fn().mockResolvedValue({ docs: [] })
-      const queue = vi.fn().mockResolvedValue({ id: 1 })
-      const payload = {
-        find,
-        jobs: { queue },
-        mailing: { config: { queue: 'emails-queue' } },
-      } as never
+  test.each([
+    { configured: 'configured', expected: 'explicit', option: 'explicit' },
+    { configured: 'configured', expected: 'configured', option: undefined },
+    { configured: undefined, expected: 'default', option: undefined },
+  ])('uses queue precedence for $expected', async ({ configured, expected, option }) => {
+    const payload = createPayload({ queueName: configured })
 
-      await ensureEmailJob(payload, 1)
+    await ensureEmailJob(payload as never, 'email-1', { queueName: option })
 
-      expect(queue.mock.calls[0][0].queue).toBe('emails-queue')
+    expect(payload.jobs.queue).toHaveBeenCalledWith(
+      expect.objectContaining({ queue: expected })
+    )
+  })
+
+  test('converts scheduledAt to waitUntil and leaves an omitted value undefined', async () => {
+    const scheduledPayload = createPayload()
+    const unscheduledPayload = createPayload()
+
+    await ensureEmailJob(scheduledPayload as never, 1, {
+      scheduledAt: '2026-01-01T00:00:00Z',
     })
+    await ensureEmailJob(unscheduledPayload as never, 2)
 
-    test('falls back to "default" when neither options.queueName nor payload.mailing.config.queue is set', async () => {
-      const find = vi.fn().mockResolvedValue({ docs: [] })
-      const queue = vi.fn().mockResolvedValue({ id: 1 })
-      const payload = { find, jobs: { queue } } as never
-
-      await ensureEmailJob(payload, 1)
-
-      expect(queue.mock.calls[0][0].queue).toBe('default')
-    })
-
-    test('options.queueName wins over both payload.mailing.config.queue and the default', async () => {
-      const find = vi.fn().mockResolvedValue({ docs: [] })
-      const queue = vi.fn().mockResolvedValue({ id: 1 })
-      const payload = {
-        find,
-        jobs: { queue },
-        mailing: { config: { queue: 'emails-queue' } },
-      } as never
-
-      await ensureEmailJob(payload, 1, { queueName: 'priority-queue' })
-
-      expect(queue.mock.calls[0][0].queue).toBe('priority-queue')
-    })
+    expect(scheduledPayload.jobs.queue.mock.calls[0][0].waitUntil).toEqual(
+      new Date('2026-01-01T00:00:00Z')
+    )
+    expect(unscheduledPayload.jobs.queue.mock.calls[0][0].waitUntil).toBeUndefined()
   })
 
-  test('returns the pre-existing job without queueing a new one when the pre-check finds a match', async () => {
-    const find = vi.fn().mockResolvedValue({
-      docs: [{ id: 7, input: { emailId: '5' }, taskSlug: 'process-email' }],
-    })
-    const queue = vi.fn()
-    const payload = { find, jobs: { queue } } as never
-
-    const result = await ensureEmailJob(payload, 5)
-
-    expect(queue).not.toHaveBeenCalled()
-    expect(result).toEqual({ created: false, jobIds: [7] })
-  })
-
-  test('swallows a queue() error and returns the job a concurrent caller created in the meantime', async () => {
-    const find = vi
-      .fn()
-      // pre-check, before queue(): nothing found yet
-      .mockResolvedValueOnce({ docs: [] })
-      // re-check after queue() throws: a concurrent call won the race
-      .mockResolvedValueOnce({
-        docs: [{ id: 9, input: { emailId: '5' }, taskSlug: 'process-email' }],
-      })
-    const queue = vi.fn().mockRejectedValue(new Error('unique constraint violation'))
-    const payload = { find, jobs: { queue } } as never
-
-    const result = await ensureEmailJob(payload, 5)
-
-    expect(queue).toHaveBeenCalledTimes(1)
-    expect(find).toHaveBeenCalledTimes(2)
-    expect(result).toEqual({ created: false, jobIds: [9] })
-  })
-
-  test('propagates the error when queue() fails and the race re-check also finds nothing', async () => {
-    const find = vi.fn().mockResolvedValue({ docs: [] })
-    const queue = vi.fn().mockRejectedValue(new Error('db unavailable'))
-    const payload = { find, jobs: { queue } } as never
-
-    const promise = ensureEmailJob(payload, 5)
-
-    await expect(promise).rejects.toThrow('Failed to create job for email 5')
-    await expect(promise).rejects.toThrow('db unavailable')
-  })
-
-  test('throws synchronously, without querying or queueing, when payload.jobs is not configured', async () => {
+  test('returns a concurrently created job when queueing fails', async () => {
     const find = vi.fn()
-    const payload = { find } as never
+      .mockResolvedValueOnce({ docs: [] })
+      .mockResolvedValueOnce({ docs: [{ id: 'racing-job', input: { emailId: '7' } }] })
+    const queue = vi.fn().mockRejectedValue(new Error('unique conflict'))
+    const payload = createPayload({ find, queue })
 
-    await expect(ensureEmailJob(payload, 5)).rejects.toThrow(
-      'PayloadCMS jobs not configured - cannot create email job'
+    await expect(ensureEmailJob(payload as never, 7)).resolves.toEqual({
+      created: false,
+      jobIds: ['racing-job'],
+    })
+    expect(find).toHaveBeenCalledTimes(2)
+  })
+
+  test('reports the original queue error when the retry finds no job', async () => {
+    const find = vi.fn().mockResolvedValue({ docs: [] })
+    const queue = vi.fn().mockRejectedValue(new Error('queue unavailable'))
+    const payload = createPayload({ find, queue })
+
+    await expect(ensureEmailJob(payload as never, 9)).rejects.toThrow(
+      'Failed to create job for email 9: Error: queue unavailable'
+    )
+    expect(find).toHaveBeenCalledTimes(2)
+  })
+
+  test('fails before querying when Payload jobs are not configured', async () => {
+    const find = vi.fn()
+    const payload = { find }
+
+    await expect(ensureEmailJob(payload as never, 11)).rejects.toThrow(
+      'PayloadCMS jobs not configured'
     )
     expect(find).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateEmailJobRelationship', () => {
+  test('normalizes populated and scalar job ids while preserving existing jobs', async () => {
+    const findByID = vi.fn().mockResolvedValue({ jobs: [{ id: 1 }, '2'] })
+    const update = vi.fn().mockResolvedValue({})
+
+    await updateEmailJobRelationship(
+      { findByID, update } as never,
+      'email-1',
+      [2, 3]
+    )
+
+    expect(update).toHaveBeenCalledWith({
+      id: 'email-1',
+      collection: 'emails',
+      data: { jobs: ['1', '2', '3'] },
+    })
   })
 })
