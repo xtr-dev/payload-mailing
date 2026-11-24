@@ -40,4 +40,12 @@ describe('perPart / resolvePartVariables', () => {
       v: { html: '<b>x</b>', text: 'x' },
     })
   })
+
+  test('does not recurse forever on cyclic variables', () => {
+    const user: Record<string, unknown> = { name: 'Ann', cta: perPart({ html: '<b>go</b>', text: 'go' }) }
+    user.self = user
+    const resolved = resolvePartVariables({ user }, 'text')
+    expect((resolved.user).cta).toBe('go')
+    expect((resolved.user).name).toBe('Ann')
+  })
 })

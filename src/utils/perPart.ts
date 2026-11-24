@@ -47,30 +47,39 @@ export function isPerPartValue(value: unknown): value is PerPartValue {
  * values (dates, class instances, primitives) are passed through untouched.
  */
 export function resolvePartVariables<T>(variables: T, part: EmailPart): T {
-  return resolveValue(variables, part) as T
+  return resolveValue(variables, part, new WeakSet()) as T
 }
 
-function resolveValue(value: unknown, part: EmailPart): unknown {
+// `seen` holds the objects and arrays on the current path. A value that refers
+// back to one of them (a cyclic structure) is returned as-is instead of
+// recursing forever.
+function resolveValue(value: unknown, part: EmailPart, seen: WeakSet<object>): unknown {
   if (isPerPartValue(value)) {
     return value[part]
   }
   if (Array.isArray(value)) {
+    if (seen.has(value)) {return value}
+    seen.add(value)
     let changed = false
     const out = value.map((item) => {
-      const resolved = resolveValue(item, part)
+      const resolved = resolveValue(item, part, seen)
       if (resolved !== item) {changed = true}
       return resolved
     })
+    seen.delete(value)
     return changed ? out : value
   }
   if (isPlainObject(value)) {
+    if (seen.has(value)) {return value}
+    seen.add(value)
     let changed = false
     const out: Record<string, unknown> = {}
     for (const [key, item] of Object.entries(value)) {
-      const resolved = resolveValue(item, part)
+      const resolved = resolveValue(item, part, seen)
       if (resolved !== item) {changed = true}
       out[key] = resolved
     }
+    seen.delete(value)
     return changed ? out : value
   }
   return value
