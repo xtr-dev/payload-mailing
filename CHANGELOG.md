@@ -20,7 +20,27 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Added
+
+- **`escapeHtml` and `safeUrl` are exported** from the package entry, so hosts
+  that send direct (non-template) HTML can use the same escaping as the
+  rich-text serializer. `escapeHtml` now also escapes `'` (as `&#39;`), so its
+  output is safe inside single-quoted attributes too.
+
 ### Fixed
+
+- **Quoted Liquid arguments broke the HTML body.** Rich-text text nodes were
+  escaped with the attribute escaper before Liquid parsed the HTML body, so
+  `"` became `&quot;` and `{{ d | formatDate: "long" }}` failed to parse; the
+  HTML part then fell back to the simple renderer and recipients got raw tags.
+  Text nodes now only escape `& < >`; values substituted by the engine are
+  still escaped as before.
+
+- **The template preview endpoint now checks template access.**
+  `POST /api/mailing/preview-template` only checked that a user was logged in.
+  It now also requires the user to pass the templates collection's `update` or
+  `create` access (the access needed to edit a template) and answers `403`
+  otherwise. Anyone who can edit templates in the admin keeps the preview.
 
 - **README's Requirements line understated the PayloadCMS floor.** It read
   `PayloadCMS ^3.0.0` while `package.json`'s `payload` peerDependency has

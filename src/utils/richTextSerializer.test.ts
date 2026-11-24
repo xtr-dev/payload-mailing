@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
+import { escapeHtml as entryEscapeHtml, safeUrl as entrySafeUrl } from '../index.js'
 import {
   escapeHtml,
   safeUrl,
@@ -18,6 +19,10 @@ const linkNode = (url: string, text: string) => ({
 const state = (...children: any[]) => ({ root: { children } }) as any
 
 describe('escapeHtml', () => {
+  test('escapes single quotes so values are safe in single-quoted attributes', () => {
+    expect(escapeHtml("it's")).toBe('it&#39;s')
+  })
+
   test('escapes the five HTML-significant characters', () => {
     expect(escapeHtml('<b>Tom & "Jerry"</b>')).toBe(
       '&lt;b&gt;Tom &amp; &quot;Jerry&quot;&lt;/b&gt;',
@@ -65,7 +70,7 @@ describe('serializeRichTextToHTML', () => {
       state(paragraph(textNode('<script>alert(1)</script> & "quotes"'))),
     )
     expect(html).toBe(
-      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;</p>',
+      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; "quotes"</p>',
     )
   })
 
@@ -106,5 +111,12 @@ describe('serializeRichTextToText', () => {
     const text = serializeRichTextToText(state(paragraph(textNode('Tom & <Jerry>'))))
     expect(text).toContain('Tom & <Jerry>')
     expect(text).not.toContain('&amp;')
+  })
+})
+
+describe('package exports', () => {
+  test('escapeHtml and safeUrl are exported from the package entry', () => {
+    expect(entryEscapeHtml).toBe(escapeHtml)
+    expect(entrySafeUrl).toBe(safeUrl)
   })
 })

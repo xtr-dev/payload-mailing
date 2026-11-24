@@ -206,3 +206,30 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
     expect(html).not.toContain('\x01')
   })
 })
+
+describe('renderTemplateDocument — quoted Liquid arguments in a rich-text HTML body', () => {
+  test('single- and double-quoted arguments render in the HTML body (no fallback)', async () => {
+    const svc = makeService()
+    const { html, text } = await svc.renderTemplateDocument(
+      template(
+        `{% if s == 'paid' %}PAID{% endif %} {{ n | default: 'x' }} {{ d | date: "%Y" }}`,
+        's',
+      ),
+      { d: '2026-03-05T12:00:00.000Z', s: 'paid' },
+    )
+    expect(html).toBe('<p>PAID x 2026</p>')
+    expect(text).toContain('PAID x 2026')
+  })
+
+  test('substituted values are still HTML-escaped, including quotes', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      template(`{{ v | default: 'x' }}`, 's'),
+      { v: `<b>"it's"</b>` },
+    )
+    expect(html).not.toContain('<b>')
+    expect(html).toContain('&lt;b&gt;')
+    expect(html).not.toContain(`"it's"`)
+  })
+})
+

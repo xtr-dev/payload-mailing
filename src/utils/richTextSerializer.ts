@@ -17,7 +17,8 @@ interface SerializedLexicalNode {
 }
 
 /**
- * Escapes HTML-significant characters to prevent HTML injection in serialized output.
+ * Escapes HTML-significant characters (`& < > " '`) to prevent HTML injection in
+ * serialized output, including inside single- or double-quoted attributes.
  * Exported so the rendering pipeline can reuse the exact same escaping when it
  * substitutes template variables into the HTML body (see MailingService).
  */
@@ -27,6 +28,22 @@ export function escapeHtml(input: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Escapes text that becomes element content (not an attribute value): only
+ * `&`, `<` and `>` need escaping there. Quotes are left alone on purpose: the
+ * serialized HTML body is template source that LiquidJS parses afterwards,
+ * and escaped quotes would break quoted arguments such as
+ * `{{ d | formatDate: "long" }}` or `{% if s == 'paid' %}`. Values substituted
+ * by the template engine are still escaped by the engine itself.
+ */
+function escapeTextContent(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
 /**
@@ -112,7 +129,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode): string {
     }
 
     case 'text': {
-      let text = escapeHtml(node.text || '')
+      let text = escapeTextContent(node.text || '')
 
       // Apply text formatting using proper nesting order
       if (node.format) {

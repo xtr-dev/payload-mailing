@@ -165,6 +165,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | `processEmails(payload)` | Process up to 50 due-pending emails. |
 | `retryFailedEmails(payload)` | Re-queue failed emails. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
+| `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 
 `sendEmail<Email>(…)` is generic over your generated `Email` type for type-safe
 custom fields.
