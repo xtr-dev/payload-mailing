@@ -10,8 +10,12 @@ job-queue processing, all through Payload collections you already know.
 ## Install
 
 ```bash
-pnpm add @xtr-dev/payload-mailing
+pnpm add @xtr-dev/payload-mailing @payloadcms/richtext-lexical
 ```
+
+`@payloadcms/richtext-lexical` is a required peer dependency: the templates
+collection uses it as the default rich-text editor. If your app already uses
+the Lexical editor (Payload's default), you have it installed already.
 
 ## Quick Start
 
@@ -106,6 +110,15 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   `simple`, or supply `templateRenderer: (tpl, vars) => string` for your own.
 - **Escaping** — HTML-body variables are HTML-escaped by default (opt out with
   LiquidJS `{{ x | raw }}` / Mustache `{{{ x }}}`); subject and text are verbatim.
+- **HTML vs. text values** — wrap a variable in `perPart({ html, text })` to give
+  the HTML body one value and the plain-text body (and subject) another, e.g. a
+  link button as markup in HTML and as `Log in: https://…` in text. The HTML
+  value is still escaped unless you use `| raw` / `{{{ }}}`.
+- **Filters** (LiquidJS) — `formatDate` (`"short"`, `"long"` or default),
+  `formatCurrency` and `capitalize`. Set `locale` (e.g. `'nl-NL'`), `currency`
+  (e.g. `'EUR'`) and `timeZone` (e.g. `'Europe/Amsterdam'`) in the plugin
+  config, or override per use: `{{ d | formatDate: "long", "nl-NL" }}`,
+  `{{ total | formatCurrency: "EUR", "nl-NL" }}`.
 - **Required variables** — mark declared variables Required and a send missing
   one is rejected *before it's queued*. Opt-in; declare nothing to skip checks.
 
@@ -147,10 +160,13 @@ due emails per call, highest priority first). Emails track a `status` of
 | `queue` | Job queue name (default `'default'`). |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |
+| `strictTemplates` | `true` makes a template parse/render error throw a `TemplateRenderError` (so `sendEmail` rejects) instead of falling back to plain `{{ name }}` substitution. Default `false`. |
 | `layouts` / `defaultLayout` | Named layout wrappers and the default one. |
+| `locale` / `currency` / `timeZone` | Defaults for the `formatDate` / `formatCurrency` filters (otherwise en-US / USD / server time zone). |
 | `adminPreview` | Live in-admin render preview; `true` by default. Set `false` to skip it (and the `payload generate:importmap` step). |
 | `collections` | Rename (`'slug'`) or override (`{ access, fields, … }`) the emails/templates collections. |
 | `beforeSend` | `(options, email) => options` hook to mutate the send just before delivery. |
+| `resolveInternalLink` | `(fields) => url` for rich-text links to other documents (`fields.doc.relationTo` / `fields.doc.value`). Without it, internal links render as plain text. |
 
 ## API
 
@@ -161,13 +177,14 @@ due emails per call, highest priority first). Emails track a `status` of
 | `processEmails(payload)` | Process up to 50 due-pending emails. |
 | `retryFailedEmails(payload)` | Re-queue failed emails. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
+| `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 
 `sendEmail<Email>(…)` is generic over your generated `Email` type for type-safe
 custom fields.
 
 ## Requirements
 
-PayloadCMS ^3.0.0 · Node.js ^18.20.2 || >=20.9.0
+PayloadCMS ^3.37.0 · Node.js ^18.20.2 || >=20.9.0
 
 ## Contributing
 
