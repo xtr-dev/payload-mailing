@@ -341,8 +341,9 @@ export class MailingService implements IMailingService {
     const adapter = await this.getEngineAdapter()
 
     // Serialize richtext to HTML and text
-    let html = serializeRichTextToHTML(template.content)
-    let text = serializeRichTextToText(template.content)
+    const serializeOptions = { resolveInternalLink: this.config.resolveInternalLink }
+    let html = serializeRichTextToHTML(template.content, serializeOptions)
+    let text = serializeRichTextToText(template.content, serializeOptions)
 
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters

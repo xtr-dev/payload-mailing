@@ -35,3 +35,9 @@ export {
 
 // Job scheduling utilities
 export { ensureEmailJob, findExistingJobs, updateEmailJobRelationship } from './utils/jobScheduler.js'
+
+export type {
+  InternalLinkResolver,
+  RichTextSerializeOptions,
+  SerializedLinkFields,
+} from './utils/richTextSerializer.js'
