@@ -233,3 +233,48 @@ describe('renderTemplateDocument — quoted Liquid arguments in a rich-text HTML
   })
 })
 
+
+describe('renderTemplateDocument — Liquid comparisons in a rich-text HTML body', () => {
+  test.each([
+    ['{% if n > 5 %}big{% endif %}', 'big'],
+    ['{% if n < 5 %}small{% else %}not small{% endif %}', 'not small'],
+    ['{% if n >= 7 %}ge{% endif %}', 'ge'],
+    ['{% if n <= 7 %}le{% endif %}', 'le'],
+    ['{% if n == 7 %}eq{% endif %}', 'eq'],
+    ['{%- if n > 5 -%}trim{%- endif -%}', 'trim'],
+    ['{{- n | plus: 1 -}}', '8'],
+  ])('%s renders in the HTML body', async (source, expected) => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template(source, 's'), { n: 7 })
+    expect(html).toBe(`<p>${expected}</p>`)
+  })
+
+  test('literal <b> typed outside a tag is still escaped', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      template('Use <b>bold</b> {% if n > 5 %}now{% endif %} & go', 's'),
+      { n: 7 },
+    )
+    expect(html).toBe('<p>Use &lt;b&gt;bold&lt;/b&gt; now &amp; go</p>')
+  })
+
+  test('an injection attempt in text around tags stays escaped', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      template('<img src=x onerror=alert(1)>{% if n > 5 %}ok{% endif %}<script>x</script>', 's'),
+      { n: 7 },
+    )
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;ok&lt;script&gt;')
+  })
+
+  test('output values are still escaped', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      template('{% if n > 5 %}{{ v }}{% endif %}', 's'),
+      { n: 7, v: '<img src=x onerror=alert(1)>' },
+    )
+    expect(html).toBe('<p>&lt;img src=x onerror=alert(1)&gt;</p>')
+  })
+})

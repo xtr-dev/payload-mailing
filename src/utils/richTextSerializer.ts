@@ -46,6 +46,35 @@ function escapeTextContent(input: string): string {
     .replace(/>/g, '&gt;')
 }
 
+// A complete template tag inside one text node: a Liquid tag `{% … %}` or an
+// output `{{ … }}`, including the whitespace-control forms `{%- -%}` and
+// `{{- -}}` (the `-` sits inside the delimiters, so it is covered by `[\s\S]*?`).
+const TEMPLATE_TAG = /\{%[\s\S]*?%\}|\{\{[\s\S]*?\}\}/g
+
+/**
+ * Escapes a text node for the HTML body while leaving template tags intact.
+ *
+ * The HTML body is template source that the engine parses after
+ * serialization, so the inside of a tag must reach it verbatim: `{% if n > 5 %}`
+ * becomes invalid Liquid once `>` is turned into `&gt;`. Text outside the tags
+ * is escaped as usual, so literal `<b>` typed in the editor stays text. Output
+ * values are still escaped by the engine at render time.
+ *
+ * Limitation: only tags that sit wholly inside one text node are recognised.
+ * Lexical splits text into separate nodes only where the formatting changes,
+ * and a tag spanning such a split would contain formatting markup (e.g.
+ * `<strong>`) that no engine can parse anyway; its text is escaped as usual.
+ */
+function escapeTextNode(input: string): string {
+  let out = ''
+  let last = 0
+  for (const match of input.matchAll(TEMPLATE_TAG)) {
+    out += escapeTextContent(input.slice(last, match.index)) + match[0]
+    last = match.index + match[0].length
+  }
+  return out + escapeTextContent(input.slice(last))
+}
+
 /**
  * Allow-lists safe URL schemes (http, https, mailto) plus relative/anchor URLs,
  * escapes the result, and returns '#' for anything else (e.g. javascript:).
@@ -129,7 +158,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode): string {
     }
 
     case 'text': {
-      let text = escapeTextContent(node.text || '')
+      let text = escapeTextNode(node.text || '')
 
       // Apply text formatting using proper nesting order
       if (node.format) {
