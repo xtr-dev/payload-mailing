@@ -12,6 +12,7 @@ import type {
 } from '../types/index.js'
 import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js'
 
+import { withIntlFallback } from '../utils/formatOptions.js'
 import { sanitizeDisplayName } from '../utils/helpers.js'
 import { createContextLogger } from '../utils/logger.js'
 import { resolvePartVariables } from '../utils/perPart.js'
@@ -21,6 +22,7 @@ import {
   LiquidEngineAdapter,
   MustacheEngineAdapter,
   SimpleEngineAdapter,
+  TemplateRenderError,
 } from './templateEngines.js'
 
 export class MailingService implements IMailingService {
@@ -167,6 +169,7 @@ export class MailingService implements IMailingService {
         this.customAdapter = new CustomRendererAdapter(
           this.config.templateRenderer,
           (message, error) => this.logger.error(message, error),
+          this.config.strictTemplates === true,
         )
       }
       return this.customAdapter
@@ -183,11 +186,16 @@ export class MailingService implements IMailingService {
             this.liquidEscaped,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.liquidAdapter
       }
-      // LiquidJS failed to load; fall back to the simple replacer.
+      // LiquidJS failed to load; fall back to the simple replacer, unless strict
+      // mode asks for failures instead of degraded output.
+      if (this.config.strictTemplates) {
+        throw new TemplateRenderError('LiquidJS', new Error('the liquidjs package could not be loaded'))
+      }
       return this.simpleAdapter
     }
 
@@ -199,11 +207,16 @@ export class MailingService implements IMailingService {
             mustache,
             this.simpleAdapter,
             (message, error) => this.logger.error(message, error),
+            this.config.strictTemplates === true,
           )
         }
         return this.mustacheAdapter
       }
-      // Mustache failed to load; fall back to the simple replacer.
+      // Mustache failed to load; fall back to the simple replacer, unless strict
+      // mode asks for failures instead of degraded output.
+      if (this.config.strictTemplates) {
+        throw new TemplateRenderError('Mustache', new Error('the mustache package could not be loaded'))
+      }
       return this.simpleAdapter
     }
 
@@ -267,8 +280,11 @@ export class MailingService implements IMailingService {
       // and subjects), while `liquidEscaped` HTML-escapes every `{{ output }}`
       // so untrusted variables cannot inject markup into the HTML body. Authors
       // opt back into raw HTML per-variable with the `| raw` filter.
-      this.liquid = new LiquidEngine()
-      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape' })
+      // In strict mode an unknown filter is an error too, instead of being
+      // silently skipped (liquidjs' default).
+      const strictFilters = this.config.strictTemplates === true
+      this.liquid = new LiquidEngine({ strictFilters })
+      this.liquidEscaped = new LiquidEngine({ outputEscape: 'escape', strictFilters })
 
       this.registerLiquidFilters(this.liquid)
       this.registerLiquidFilters(this.liquidEscaped)
@@ -302,30 +318,52 @@ export class MailingService implements IMailingService {
   /**
    * Registers the built-in template filters (equivalent to Handlebars helpers)
    * on a LiquidJS engine instance.
+   *
+   * `formatDate` and `formatCurrency` use the plugin's `locale`, `currency` and
+   * `timeZone` options; a template can override the locale (and currency) per
+   * call through an extra filter argument. Without those options the output is
+   * the same as in earlier releases (runtime locale for "short" and the default
+   * format, en-US for "long", USD for currency).
    */
   private registerLiquidFilters(engine: Liquid): void {
-    engine.registerFilter('formatDate', (date: any, format?: string) => {
-      if (!date) {return ''}
-      const d = new Date(date)
+    const { currency: defaultCurrency = 'USD', locale: defaultLocale, timeZone } = this.config
+    const zone = timeZone ? { timeZone } : {}
+
+    const formatDate = (d: Date, format: string | undefined, locale: string | undefined): string => {
       if (format === 'short') {
-        return d.toLocaleDateString()
+        return d.toLocaleDateString(locale, zone)
       }
       if (format === 'long') {
-        return d.toLocaleDateString('en-US', {
+        return d.toLocaleDateString(locale || 'en-US', {
           day: 'numeric',
           month: 'long',
-          year: 'numeric'
+          year: 'numeric',
+          ...zone,
         })
       }
-      return d.toLocaleString()
+      return d.toLocaleString(locale, zone)
+    }
+
+    // A bad locale or currency passed as a filter argument falls back to the
+    // configured defaults (validated at plugin init) instead of failing the
+    // whole render, which would send the template through the simple replacer.
+    engine.registerFilter('formatDate', (date: any, format?: string, locale?: string) => {
+      if (!date) {return ''}
+      const d = new Date(date)
+      return withIntlFallback(
+        () => formatDate(d, format, locale || defaultLocale),
+        () => formatDate(d, format, defaultLocale),
+      )
     })
 
-    engine.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
+    engine.registerFilter('formatCurrency', (amount: any, currency?: string, locale?: string) => {
       if (typeof amount !== 'number') {return amount}
-      return new Intl.NumberFormat('en-US', {
-        currency,
-        style: 'currency'
-      }).format(amount)
+      const format = (useLocale: string, useCurrency: string) =>
+        new Intl.NumberFormat(useLocale, { currency: useCurrency, style: 'currency' }).format(amount)
+      return withIntlFallback(
+        () => format(locale || defaultLocale || 'en-US', currency || defaultCurrency),
+        () => format(defaultLocale || 'en-US', defaultCurrency),
+      )
     })
 
     engine.registerFilter('capitalize', (str: any) => {
@@ -341,9 +379,19 @@ export class MailingService implements IMailingService {
 
     const adapter = await this.getEngineAdapter()
 
-    // Serialize richtext to HTML and text
-    let html = serializeRichTextToHTML(template.content)
-    let text = serializeRichTextToText(template.content)
+    // Serialize richtext to HTML and text. The HTML body leaves the engine's
+    // own template tags unescaped so expressions like `{% if n > 5 %}` parse;
+    // the fully escaped serialization is what an adapter falls back to when the
+    // body does not parse, so markup inside a broken tag is never sent raw.
+    // Both HTML variants render links the same way (fields.url, autolink,
+    // resolveInternalLink).
+    const serializeOptions = { resolveInternalLink: this.config.resolveInternalLink }
+    const templateSyntax = adapter.templateSyntax || 'none'
+    const escapedHtml = serializeRichTextToHTML(template.content, serializeOptions)
+    let html = templateSyntax === 'none'
+      ? escapedHtml
+      : serializeRichTextToHTML(template.content, { ...serializeOptions, templateSyntax })
+    let text = serializeRichTextToText(template.content, serializeOptions)
 
     // Variables made with perPart() carry a separate value for each MIME part,
     // so markup meant for the HTML body never shows up in the text body.
@@ -353,7 +401,7 @@ export class MailingService implements IMailingService {
     // Apply template variables to the rendered content. Only the HTML body
     // escapes substituted values — the plain-text body must keep characters
     // like `&` verbatim, otherwise recipients see literal entities (`&amp;`).
-    html = await adapter.renderHtml(html, htmlVariables)
+    html = await adapter.renderHtml(html, htmlVariables, escapedHtml)
     text = await adapter.render(text, textVariables)
 
     // Wrap the rendered body in the resolved layout, if any. The body is the
