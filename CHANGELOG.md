@@ -33,8 +33,12 @@ To cut a release: move your `## [Unreleased]` notes under a new
   escaped before Liquid parsed the HTML body, so `{% if n > 5 %}` reached the
   engine as `{% if n &gt; 5 %}`, failed to parse, and the HTML part fell back
   to the simple renderer (raw tags sent). Complete `{% … %}` / `{{ … }}` tags
-  inside a text node are now left verbatim; text around them is still escaped
-  and output values are still escaped by the engine. A tag split across
+  inside a text node are now left verbatim for the engine that understands
+  them (Liquid: `{% %}` and `{{ }}`; Mustache: `{{ }}`; simple engine and
+  custom renderers: none). Text around them is still escaped and output values
+  are still escaped by the engine. When the body does not parse, the fallback
+  renders a fully escaped body, so markup inside a broken tag is never sent
+  raw. A tag split across
   differently formatted text runs is not recognised (it would contain
   formatting markup and could not parse anyway).
 

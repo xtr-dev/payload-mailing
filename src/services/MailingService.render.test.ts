@@ -277,4 +277,50 @@ describe('renderTemplateDocument — Liquid comparisons in a rich-text HTML body
     )
     expect(html).toBe('<p>&lt;img src=x onerror=alert(1)&gt;</p>')
   })
+
+  test('{% echo %} with a literal is output unescaped (author-controlled, documented)', async () => {
+    // liquidjs does not apply outputEscape to `echo`; this pins that behaviour
+    // so a change in liquidjs or in the passthrough is noticed.
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template('{% echo "<b>x</b>" %}', 's'), {})
+    expect(html).toBe('<p><b>x</b></p>')
+  })
+})
+
+describe('renderTemplateDocument — markup inside tags that do not parse is escaped', () => {
+  const BROKEN = [
+    '{{ <img src=x onerror=alert(1)> }}',
+    '{% <script>alert(1)</script> %}',
+    // An unclosed opener: the non-greedy match runs to the next closer.
+    '{% if n > 5 <img src=x onerror=alert(1)> {{ n }}',
+  ]
+
+  test.each(BROKEN)('liquidjs: %s', async (source) => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template(source, 's'), { n: 7 })
+    expect(html).not.toMatch(/<img|<script/)
+  })
+
+  test.each(BROKEN)('simple engine: %s', async (source) => {
+    const svc = makeService({ templateEngine: 'simple' })
+    const { html } = await svc.renderTemplateDocument(template(source, 's'), { n: 7 })
+    expect(html).not.toMatch(/<img|<script/)
+    expect(html).toContain('&lt;')
+  })
+
+  test.each([
+    ...BROKEN,
+    // Unclosed Mustache section: Mustache throws, the adapter falls back.
+    '{{#items}}<img src=x onerror=alert(1)>',
+  ])('mustache: %s', async (source) => {
+    const svc = makeService({ templateEngine: 'mustache' })
+    const { html } = await svc.renderTemplateDocument(template(source, 's'), { n: 7 })
+    expect(html).not.toMatch(/<img|<script/)
+  })
+
+  test('mustache still evaluates {{ }} and escapes {% %} as text', async () => {
+    const svc = makeService({ templateEngine: 'mustache' })
+    const { html } = await svc.renderTemplateDocument(template('{% x > 1 %} {{ n }}', 's'), { n: 7 })
+    expect(html).toBe('<p>{% x &gt; 1 %} 7</p>')
+  })
 })
