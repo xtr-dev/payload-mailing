@@ -7,10 +7,15 @@ import { createEmailTemplatesCollection } from './collections/EmailTemplates.js'
 import { previewTemplateHandler } from './endpoints/previewTemplate.js'
 import { mailingJobs } from './jobs/index.js'
 import { MailingService } from './services/MailingService.js'
+import { validateFormattingOptions } from './utils/formatOptions.js'
 
 
 export const mailingPlugin = (pluginConfig: MailingPluginConfig) => (config: Config): Config => {
   const queueName = pluginConfig.queue || 'default'
+
+  // Fail fast on an invalid locale/currency/timeZone instead of breaking every
+  // email that uses the formatDate / formatCurrency filters.
+  validateFormattingOptions(pluginConfig)
 
   // Handle templates collection configuration
   const templatesConfig = pluginConfig.collections?.templates

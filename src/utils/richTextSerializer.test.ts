@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import type { SerializedLinkFields } from './richTextSerializer.js'
 
+import { escapeHtml as entryEscapeHtml, safeUrl as entrySafeUrl } from '../index.js'
 import {
   escapeHtml,
   safeUrl,
@@ -20,6 +21,10 @@ const linkNode = (url: string, text: string) => ({
 const state = (...children: any[]) => ({ root: { children } }) as any
 
 describe('escapeHtml', () => {
+  test('escapes single quotes so values are safe in single-quoted attributes', () => {
+    expect(escapeHtml("it's")).toBe('it&#39;s')
+  })
+
   test('escapes the five HTML-significant characters', () => {
     expect(escapeHtml('<b>Tom & "Jerry"</b>')).toBe(
       '&lt;b&gt;Tom &amp; &quot;Jerry&quot;&lt;/b&gt;',
@@ -67,7 +72,7 @@ describe('serializeRichTextToHTML', () => {
       state(paragraph(textNode('<script>alert(1)</script> & "quotes"'))),
     )
     expect(html).toBe(
-      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;</p>',
+      '<p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; "quotes"</p>',
     )
   })
 
@@ -178,5 +183,72 @@ describe('Payload 3 link nodes (url under node.fields)', () => {
     )
     const html = serializeRichTextToHTML(content, { resolveInternalLink: () => 'javascript:alert(1)' })
     expect(html).toBe('<p><a href="#">About</a></p>')
+  })
+})
+
+describe('package exports', () => {
+  test('escapeHtml and safeUrl are exported from the package entry', () => {
+    expect(entryEscapeHtml).toBe(escapeHtml)
+    expect(entrySafeUrl).toBe(safeUrl)
+  })
+})
+
+describe('serializeRichTextToHTML — template tags in text nodes', () => {
+  test('leaves complete tags verbatim and escapes the text around them', () => {
+    const html = serializeRichTextToHTML(
+      state(paragraph(textNode('a<b {% if n > 5 %}x{% endif %} {{- n | minus: 1 -}} c&d'))),
+      { templateSyntax: 'liquid' },
+    )
+    expect(html).toBe('<p>a&lt;b {% if n > 5 %}x{% endif %} {{- n | minus: 1 -}} c&amp;d</p>')
+  })
+
+  test('a tag split across differently formatted text nodes is escaped (documented limitation)', () => {
+    // format 1 = bold. The split puts <strong> inside the tag, which no engine
+    // can parse; the fragments are escaped like ordinary text.
+    const html = serializeRichTextToHTML(
+      state(paragraph(textNode('{% if n '), textNode('> 5 %}', 1), textNode('x{% endif %}'))),
+      { templateSyntax: 'liquid' },
+    )
+    expect(html).toBe('<p>{% if n <strong>&gt; 5 %}</strong>x{% endif %}</p>')
+  })
+
+  test('passthrough depends on the engine syntax', () => {
+    const content = state(paragraph(textNode('{% if n > 5 %} {{ n > 5 }}')))
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'liquid' })).toBe('<p>{% if n > 5 %} {{ n > 5 }}</p>')
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'mustache' })).toBe(
+      '<p>{% if n &gt; 5 %} {{ n > 5 }}</p>',
+    )
+    expect(serializeRichTextToHTML(content)).toBe('<p>{% if n &gt; 5 %} {{ n &gt; 5 }}</p>')
+  })
+})
+
+describe('Payload 3 link nodes with template-tag passthrough', () => {
+  test('a Liquid tag in the link text passes through; the text around it is escaped', () => {
+    const content = state(paragraph(payloadLink('link', { url: 'https://x.test' }, 'Hi {{ name }} & <b>')))
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'liquid' })).toBe(
+      '<p><a href="https://x.test">Hi {{ name }} &amp; &lt;b&gt;</a></p>',
+    )
+  })
+
+  test('a link URL with quotes is escaped in the href in both serializations', () => {
+    const content = state(paragraph(payloadLink('link', { url: `https://x.test/?q="a"&b='c'` }, 'go')))
+    const expected = '<p><a href="https://x.test/?q=&quot;a&quot;&amp;b=&#39;c&#39;">go</a></p>'
+    expect(serializeRichTextToHTML(content, { templateSyntax: 'liquid' })).toBe(expected)
+    expect(serializeRichTextToHTML(content)).toBe(expected)
+  })
+
+  test('the fully escaped serialization renders fields.url, autolink and internal links', () => {
+    const content = state(
+      paragraph(
+        payloadLink('link', { newTab: true, url: 'https://a.test' }, 'A'),
+        payloadLink('autolink', { url: 'https://b.test' }, 'https://b.test'),
+        payloadLink('link', { doc: { relationTo: 'pages', value: '1' }, linkType: 'internal' }, 'C'),
+      ),
+    )
+    const html = serializeRichTextToHTML(content, { resolveInternalLink: () => '/pages/1' })
+    expect(html).toBe(
+      '<p><a href="https://a.test" target="_blank" rel="noopener noreferrer">A</a>' +
+        '<a href="https://b.test">https://b.test</a><a href="/pages/1">C</a></p>',
+    )
   })
 })

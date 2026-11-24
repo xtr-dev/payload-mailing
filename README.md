@@ -110,6 +110,11 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   `simple`, or supply `templateRenderer: (tpl, vars) => string` for your own.
 - **Escaping** — HTML-body variables are HTML-escaped by default (opt out with
   LiquidJS `{{ x | raw }}` / Mustache `{{{ x }}}`); subject and text are verbatim.
+- **Filters** (LiquidJS) — `formatDate` (`"short"`, `"long"` or default),
+  `formatCurrency` and `capitalize`. Set `locale` (e.g. `'nl-NL'`), `currency`
+  (e.g. `'EUR'`) and `timeZone` (e.g. `'Europe/Amsterdam'`) in the plugin
+  config, or override per use: `{{ d | formatDate: "long", "nl-NL" }}`,
+  `{{ total | formatCurrency: "EUR", "nl-NL" }}`.
 - **Required variables** — mark declared variables Required and a send missing
   one is rejected *before it's queued*. Opt-in; declare nothing to skip checks.
 
@@ -151,7 +156,9 @@ due emails per call, highest priority first). Emails track a `status` of
 | `queue` | Job queue name (default `'default'`). |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |
+| `strictTemplates` | `true` makes a template parse/render error throw a `TemplateRenderError` (so `sendEmail` rejects) instead of falling back to plain `{{ name }}` substitution. Default `false`. |
 | `layouts` / `defaultLayout` | Named layout wrappers and the default one. |
+| `locale` / `currency` / `timeZone` | Defaults for the `formatDate` / `formatCurrency` filters (otherwise en-US / USD / server time zone). |
 | `adminPreview` | Live in-admin render preview; `true` by default. Set `false` to skip it (and the `payload generate:importmap` step). |
 | `collections` | Rename (`'slug'`) or override (`{ access, fields, … }`) the emails/templates collections. |
 | `beforeSend` | `(options, email) => options` hook to mutate the send just before delivery. |
@@ -166,6 +173,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | `processEmails(payload)` | Process up to 50 due-pending emails. |
 | `retryFailedEmails(payload)` | Re-queue failed emails. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
+| `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 
 `sendEmail<Email>(…)` is generic over your generated `Email` type for type-safe
 custom fields.

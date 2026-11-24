@@ -44,6 +44,11 @@ export type InternalLinkResolver = (fields: SerializedLinkFields) => null | stri
 
 export interface RichTextSerializeOptions {
   resolveInternalLink?: InternalLinkResolver
+  /**
+   * HTML only: which template tags in text nodes are left unescaped for the
+   * engine (see {@link TemplateTagSyntax}). Defaults to `'none'`.
+   */
+  templateSyntax?: TemplateTagSyntax
 }
 
 /**
@@ -70,7 +75,8 @@ function getLinkTarget(
 }
 
 /**
- * Escapes HTML-significant characters to prevent HTML injection in serialized output.
+ * Escapes HTML-significant characters (`& < > " '`) to prevent HTML injection in
+ * serialized output, including inside single- or double-quoted attributes.
  * Exported so the rendering pipeline can reuse the exact same escaping when it
  * substitutes template variables into the HTML body (see MailingService).
  */
@@ -80,6 +86,72 @@ export function escapeHtml(input: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Escapes text that becomes element content (not an attribute value): only
+ * `&`, `<` and `>` need escaping there. Quotes are left alone on purpose: the
+ * serialized HTML body is template source that LiquidJS parses afterwards,
+ * and escaped quotes would break quoted arguments such as
+ * `{{ d | formatDate: "long" }}` or `{% if s == 'paid' %}`. Values substituted
+ * by the template engine are still escaped by the engine itself.
+ */
+function escapeTextContent(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
+ * Which template tags the serializer leaves unescaped in text nodes, matching
+ * the engine that renders the HTML body afterwards:
+ * - `'liquid'`: Liquid tags `{% … %}` and outputs `{{ … }}`
+ * - `'mustache'`: Mustache tags `{{ … }}` only (`{%` means nothing to Mustache)
+ * - `'none'` (default): no passthrough, every character is escaped
+ */
+export type TemplateTagSyntax = 'liquid' | 'mustache' | 'none'
+
+// One complete tag inside a single text node, matched non-greedily so it ends
+// at the first closer. Whitespace-control forms (`{%- -%}`, `{{- -}}`) are
+// covered because the `-` sits inside the delimiters.
+const TAG_PATTERNS: Record<Exclude<TemplateTagSyntax, 'none'>, RegExp> = {
+  liquid: /\{%[\s\S]*?%\}|\{\{[\s\S]*?\}\}/g,
+  mustache: /\{\{[\s\S]*?\}\}/g,
+}
+
+/**
+ * Escapes a text node for the HTML body while leaving the engine's template
+ * tags intact.
+ *
+ * The HTML body is template source that the engine parses after
+ * serialization, so the inside of a tag must reach it verbatim: `{% if n > 5 %}`
+ * becomes invalid Liquid once `>` is turned into `&gt;`. Text outside the tags
+ * is escaped as usual, so literal `<b>` typed in the editor stays text. Output
+ * values are still escaped by the engine at render time.
+ *
+ * Safety: passed-through tag contents are only safe because the engine parses
+ * them. When a tag does not parse (e.g. `{{ <img onerror=…> }}`), the engine
+ * adapters render a fully escaped serialization (`syntax: 'none'`) instead, so
+ * markup inside a broken tag is never sent raw.
+ *
+ * Limitation: only tags that sit wholly inside one text node are recognised.
+ * Lexical splits text into separate nodes only where the formatting changes,
+ * and a tag spanning such a split would contain formatting markup (e.g.
+ * `<strong>`) that no engine can parse anyway; its text is escaped as usual.
+ */
+function escapeTextNode(input: string, syntax: TemplateTagSyntax): string {
+  if (syntax === 'none') {
+    return escapeTextContent(input)
+  }
+  let out = ''
+  let last = 0
+  for (const match of input.matchAll(TAG_PATTERNS[syntax])) {
+    out += escapeTextContent(input.slice(last, match.index)) + match[0]
+    last = match.index + match[0].length
+  }
+  return out + escapeTextContent(input.slice(last))
 }
 
 /**
@@ -175,7 +247,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode, options: RichTextSeria
     }
 
     case 'text': {
-      let text = escapeHtml(node.text || '')
+      let text = escapeTextNode(node.text || '', options.templateSyntax || 'none')
 
       // Apply text formatting using proper nesting order
       if (node.format) {
