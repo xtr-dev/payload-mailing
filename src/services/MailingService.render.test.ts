@@ -206,3 +206,46 @@ describe('renderTemplateDocument — Mustache layout composition', () => {
     expect(html).not.toContain('\x01')
   })
 })
+
+describe('renderTemplateDocument — formatDate / formatCurrency locale options', () => {
+  // Noon UTC so the calendar date is the same in every common time zone.
+  const date = '2026-03-05T12:00:00.000Z'
+
+  test('without options the output is unchanged (en-US long date, USD)', async () => {
+    const svc = makeService()
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }} | {{ n | formatCurrency }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    expect(text).toContain('March 5, 2026 | $12.50')
+  })
+
+  test('locale and currency options apply to both filters', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL' })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }} | {{ n | formatCurrency }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    const expectedMoney = new Intl.NumberFormat('nl-NL', { currency: 'EUR', style: 'currency' }).format(12.5)
+    expect(text).toContain(`5 maart 2026 | ${expectedMoney}`)
+  })
+
+  test('a filter argument overrides the configured locale and currency', async () => {
+    const svc = makeService({ currency: 'EUR', locale: 'nl-NL' })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long", "en-GB" }} | {{ n | formatCurrency: "USD", "en-US" }}', 's'),
+      { d: date, n: 12.5 },
+    )
+    expect(text).toContain('5 March 2026 | $12.50')
+  })
+
+  test('timeZone shifts the rendered date', async () => {
+    const lateUtc = '2026-03-05T23:30:00.000Z'
+    const svc = makeService({ locale: 'en-US', timeZone: 'Asia/Tokyo' })
+    const { text } = await svc.renderTemplateDocument(
+      template('{{ d | formatDate: "long" }}', 's'),
+      { d: lateUtc },
+    )
+    expect(text).toContain('March 6, 2026')
+  })
+})

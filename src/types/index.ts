@@ -117,6 +117,11 @@ export interface MailingPluginConfig {
     emails?: Partial<CollectionConfig> | string
     templates?: Partial<CollectionConfig> | string
   }
+  /**
+   * Default currency (ISO 4217 code, e.g. `'EUR'`) for the `formatCurrency`
+   * Liquid filter when a template does not pass one. Defaults to `'USD'`.
+   */
+  currency?: string
   defaultFrom?: string
   defaultFromName?: string
   /**
@@ -137,12 +142,25 @@ export interface MailingPluginConfig {
    * future release for editor-managed layouts.
    */
   layouts?: { [name: string]: EmailLayout }
+  /**
+   * BCP 47 locale (e.g. `'nl-NL'`) used by the `formatDate` and
+   * `formatCurrency` Liquid filters. A template can still pass its own locale
+   * as the last filter argument. When unset, the filters behave as in earlier
+   * releases: the runtime's locale for `formatDate` (`'en-US'` for its "long"
+   * format) and `'en-US'` for `formatCurrency`.
+   */
+  locale?: string
   queue?: string
   retryAttempts?: number
   retryDelay?: number
   richTextEditor?: RichTextField['editor']
   templateEngine?: TemplateEngine
   templateRenderer?: TemplateRendererHook
+  /**
+   * IANA time zone (e.g. `'Europe/Amsterdam'`) for the `formatDate` Liquid
+   * filter. When unset, dates are shown in the server's time zone.
+   */
+  timeZone?: string
 }
 
 export interface QueuedEmail {

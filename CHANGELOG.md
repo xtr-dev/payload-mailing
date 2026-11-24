@@ -20,6 +20,15 @@ To cut a release: move your `## [Unreleased]` notes under a new
 <!-- Add notes for the next release here. When you bump the version in
      package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
 
+### Added
+
+- **`locale`, `currency` and `timeZone` options for the date and money
+  filters.** `formatDate` and `formatCurrency` were hardcoded to `en-US` and
+  `USD`. The new plugin options set their defaults, and both filters accept the
+  locale (and `formatCurrency` the currency) as an extra argument, e.g.
+  `{{ total | formatCurrency: "EUR", "nl-NL" }}`. Without the options the
+  output is unchanged.
+
 ### Fixed
 
 - **README's Requirements line understated the PayloadCMS floor.** It read

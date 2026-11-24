@@ -301,28 +301,39 @@ export class MailingService implements IMailingService {
   /**
    * Registers the built-in template filters (equivalent to Handlebars helpers)
    * on a LiquidJS engine instance.
+   *
+   * `formatDate` and `formatCurrency` use the plugin's `locale`, `currency` and
+   * `timeZone` options; a template can override the locale (and currency) per
+   * call through an extra filter argument. Without those options the output is
+   * the same as in earlier releases (runtime locale for "short" and the default
+   * format, en-US for "long", USD for currency).
    */
   private registerLiquidFilters(engine: Liquid): void {
-    engine.registerFilter('formatDate', (date: any, format?: string) => {
+    const { currency: defaultCurrency = 'USD', locale: defaultLocale, timeZone } = this.config
+
+    engine.registerFilter('formatDate', (date: any, format?: string, locale?: string) => {
       if (!date) {return ''}
       const d = new Date(date)
+      const useLocale = locale || defaultLocale
+      const zone = timeZone ? { timeZone } : {}
       if (format === 'short') {
-        return d.toLocaleDateString()
+        return d.toLocaleDateString(useLocale, zone)
       }
       if (format === 'long') {
-        return d.toLocaleDateString('en-US', {
+        return d.toLocaleDateString(useLocale || 'en-US', {
           day: 'numeric',
           month: 'long',
-          year: 'numeric'
+          year: 'numeric',
+          ...zone,
         })
       }
-      return d.toLocaleString()
+      return d.toLocaleString(useLocale, zone)
     })
 
-    engine.registerFilter('formatCurrency', (amount: any, currency = 'USD') => {
+    engine.registerFilter('formatCurrency', (amount: any, currency?: string, locale?: string) => {
       if (typeof amount !== 'number') {return amount}
-      return new Intl.NumberFormat('en-US', {
-        currency,
+      return new Intl.NumberFormat(locale || defaultLocale || 'en-US', {
+        currency: currency || defaultCurrency,
         style: 'currency'
       }).format(amount)
     })
