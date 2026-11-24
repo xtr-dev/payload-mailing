@@ -1,5 +1,7 @@
 import type { Liquid } from 'liquidjs'
 
+import type { TemplateTagSyntax } from '../utils/richTextSerializer.js'
+
 import { escapeHtml } from '../utils/richTextSerializer.js'
 
 /**
@@ -33,11 +35,35 @@ export interface TemplateEngineAdapter {
   ): Promise<string>
   /** Renders a template, emitting substituted values verbatim (no escaping). */
   render(template: string, variables: Record<string, any>): Promise<string>
-  /** Renders a template into HTML, HTML-escaping substituted values. */
-  renderHtml(template: string, variables: Record<string, any>): Promise<string>
+  /**
+   * Renders a template into HTML, HTML-escaping substituted values. When the
+   * template fails to render and the adapter falls back to the simple
+   * replacer, `fallbackTemplate` (if given) is used instead of `template` —
+   * the rich-text body passes a fully escaped serialization here so template
+   * tags that failed to parse are never sent with their contents unescaped.
+   */
+  renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string>
+  /**
+   * Which template tags the rich-text serializer may leave unescaped for this
+   * engine. Defaults to `'none'` (escape everything).
+   */
+  readonly templateSyntax?: TemplateTagSyntax
 }
 
 export type RenderErrorLogger = (message: string, error: unknown) => void
+
+/**
+ * Thrown instead of falling back to the simple replacer when the plugin runs
+ * with `strictTemplates: true` and a template fails to parse or render. The
+ * original engine error is kept as `cause`.
+ */
+export class TemplateRenderError extends Error {
+  constructor(engine: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    super(`${engine} template rendering failed: ${detail}`, { cause })
+    this.name = 'TemplateRenderError'
+  }
+}
 
 /** The slice of the `mustache` package this module depends on. */
 export type MustacheModule = {
@@ -93,7 +119,7 @@ abstract class ModeBasedAdapter implements TemplateEngineAdapter {
   }
 
   abstract render(template: string, variables: Record<string, any>): Promise<string>
-  abstract renderHtml(template: string, variables: Record<string, any>): Promise<string>
+  abstract renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string>
 }
 
 /**
@@ -126,15 +152,19 @@ export class SimpleEngineAdapter extends ModeBasedAdapter {
  * LiquidJS adapter. Two pre-built engine instances back it: `liquid` emits
  * output verbatim (subjects, plain text, and — with pre-escaped variables —
  * layouts), while `liquidEscaped` HTML-escapes every `{{ output }}` for the
- * HTML body. A render-time failure falls back to the simple replacer, matching
- * the behaviour from before engines were adapter-based.
+ * HTML body. A parse or render failure falls back to the simple replacer,
+ * matching the behaviour from before engines were adapter-based — unless
+ * `strict` is set, in which case it throws a {@link TemplateRenderError}.
  */
 export class LiquidEngineAdapter extends ModeBasedAdapter {
+  readonly templateSyntax: TemplateTagSyntax = 'liquid'
+
   constructor(
     private liquid: Liquid,
     private liquidEscaped: Liquid,
     private fallback: TemplateEngineAdapter,
     private onError: RenderErrorLogger,
+    private strict = false,
   ) {
     super()
   }
@@ -143,17 +173,19 @@ export class LiquidEngineAdapter extends ModeBasedAdapter {
     try {
       return await this.liquid.parseAndRender(template, variables)
     } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('LiquidJS', error)}
       this.onError('LiquidJS template rendering error:', error)
       return this.fallback.render(template, variables)
     }
   }
 
-  async renderHtml(template: string, variables: Record<string, any>): Promise<string> {
+  async renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string> {
     try {
       return await this.liquidEscaped.parseAndRender(template, variables)
     } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('LiquidJS', error)}
       this.onError('LiquidJS template rendering error:', error)
-      return this.fallback.renderHtml(template, variables)
+      return this.fallback.renderHtml(fallbackTemplate ?? template, variables)
     }
   }
 }
@@ -202,12 +234,18 @@ function stripSentinel(value: any): any {
  * BEFORE Mustache runs, pre-escapes the remaining variables in JS, renders
  * with Mustache's native escaping turned OFF, and splices the already-rendered
  * body into the sentinel position afterward.
+ *
+ * Errors fall back to the simple replacer unless `strict` is set, in which case
+ * a {@link TemplateRenderError} is thrown.
  */
 export class MustacheEngineAdapter implements TemplateEngineAdapter {
+  readonly templateSyntax: TemplateTagSyntax = 'mustache'
+
   constructor(
     private mustache: MustacheModule,
     private fallback: TemplateEngineAdapter,
     private onError: RenderErrorLogger,
+    private strict = false,
   ) {}
 
   async composeLayout(
@@ -240,6 +278,7 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
       // inserted literally rather than interpreted as a replacement pattern.
       return rendered.split(CONTENT_SENTINEL).join(content)
     } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('Mustache', error)}
       this.onError('Mustache template rendering error:', error)
       return this.fallback.composeLayout(layout, content, variables, escapeVariables)
     }
@@ -253,18 +292,22 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
       // in a recipient's inbox.
       return this.mustache.render(template, variables, undefined, { escape: NO_ESCAPE })
     } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('Mustache', error)}
       this.onError('Mustache template rendering error:', error)
       return this.fallback.render(template, variables)
     }
   }
 
-  async renderHtml(template: string, variables: Record<string, any>): Promise<string> {
+  async renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string> {
+    // Unlike `render`, keep Mustache's native `{{ }}` escaping: it is exactly
+    // what HTML output needs. The fallback must be the escaping one, on the
+    // fully escaped body. In strict mode there is no fallback at all.
     try {
-      // Mustache's native `{{ }}` escaping is exactly what this method needs.
       return this.mustache.render(template, variables)
     } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('Mustache', error)}
       this.onError('Mustache template rendering error:', error)
-      return this.fallback.renderHtml(template, variables)
+      return this.fallback.renderHtml(fallbackTemplate ?? template, variables)
     }
   }
 }
@@ -273,11 +316,14 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
  * Adapter for a user-supplied `templateRenderer` hook. Custom renderers are
  * responsible for their own output escaping, so no escaping is applied here and
  * the layout body is exposed through a `content` variable exactly as before.
+ * A throwing renderer returns the unrendered template unless `strict` is set,
+ * in which case a {@link TemplateRenderError} is thrown.
  */
 export class CustomRendererAdapter implements TemplateEngineAdapter {
   constructor(
     private renderer: (template: string, variables: Record<string, any>) => Promise<string> | string,
     private onError: RenderErrorLogger,
+    private strict = false,
   ) {}
 
   async composeLayout(
@@ -293,6 +339,7 @@ export class CustomRendererAdapter implements TemplateEngineAdapter {
     try {
       return await this.renderer(template, variables)
     } catch (error) {
+      if (this.strict) {throw new TemplateRenderError('Custom', error)}
       this.onError('Custom template renderer error:', error)
       return template
     }

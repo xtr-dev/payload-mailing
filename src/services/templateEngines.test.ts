@@ -8,9 +8,9 @@ import { MustacheEngineAdapter } from './templateEngines.js'
 // test can tell which one MustacheEngineAdapter actually delegated to rather
 // than just checking the output looks escaped.
 const stubFallback = (): TemplateEngineAdapter => ({
-  composeLayout: vi.fn(async (layout, content) => layout.replace('{{content}}', content)),
-  render: vi.fn(async () => 'fallback:verbatim'),
-  renderHtml: vi.fn(async () => 'fallback:escaped'),
+  composeLayout: vi.fn((layout: string, content: string) => Promise.resolve(layout.replace('{{content}}', content))),
+  render: vi.fn(() => Promise.resolve('fallback:verbatim')),
+  renderHtml: vi.fn(() => Promise.resolve('fallback:escaped')),
 })
 
 describe('MustacheEngineAdapter.renderHtml — error fallback', () => {
