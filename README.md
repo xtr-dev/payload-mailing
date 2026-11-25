@@ -33,8 +33,9 @@ export default buildConfig({
       defaultFrom: 'noreply@yoursite.com',
       collections: {
         // Required — collections deny all access by default. See "Access Control".
-        emails: { access: { read: ({ req: { user } }) => Boolean(user) } },
-        templates: { access: { read: ({ req: { user } }) => Boolean(user) } },
+        // Grant staff only: sent emails contain sign-in links and other per-recipient secrets.
+        emails: { access: { read: ({ req: { user } }) => user?.role === 'admin' } },
+        templates: { access: { read: ({ req: { user } }) => user?.role === 'admin' } },
       },
     }),
   ],
@@ -62,7 +63,7 @@ mailingPlugin({
     emails: {
       access: {
         read:   ({ req: { user } }) => user?.role === 'admin',
-        create: ({ req: { user } }) => Boolean(user),
+        create: ({ req: { user } }) => user?.role === 'admin',
         update: ({ req: { user } }) => user?.role === 'admin',
         delete: ({ req: { user } }) => user?.role === 'admin',
       },
@@ -71,6 +72,12 @@ mailingPlugin({
   },
 })
 ```
+
+Keep `emails` staff-only. Each sent email stores its `variables` and rendered
+body, which often hold sign-in links, confirmation links and one-time codes, so
+granting `read` to every signed-in user lets any account take over another.
+Granting `create` lets any account send mail from your domain. Your app's own
+code sends through `sendEmail` (Local API) and needs no access rule.
 
 `access` is the standard [Payload access control](https://payloadcms.com/docs/access-control/collections)
 API. The same override object also accepts custom `fields`, `hooks`, `admin`, etc.
