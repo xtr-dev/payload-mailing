@@ -1,24 +1,17 @@
-# Changelog
+# Changelog history
 
-All notable changes to this project are documented in this file.
+The hand-written changelog for releases up to v0.6.0. It is no longer updated:
+from the next release on, `CHANGELOG.md` is generated from conventional commits
+by [@xtr-dev/changelog](https://github.com/xtr-dev/changelog) when the Release
+workflow runs.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Every release **must** have a matching `## [x.y.z]` section below before it can
-be published. CI enforces this: a pull request that bumps the version in
-`package.json` fails unless this file contains a non-empty section for the new
-version (see `.github/workflows/version-check.yml`). On merge, the publish
-workflow uses that section as the annotated git tag message and the GitHub
-Release body.
-
-To cut a release: move your `## [Unreleased]` notes under a new
-`## [x.y.z] - YYYY-MM-DD` heading in the same PR that bumps the version.
-
 ## [Unreleased]
 
-<!-- Add notes for the next release here. When you bump the version in
-     package.json, move these under a `## [x.y.z] - YYYY-MM-DD` heading. -->
+These notes were written for the release after v0.6.0, before the switch to
+generated changelogs. They describe changes merged after v0.6.0.
 
 ### Added
 
