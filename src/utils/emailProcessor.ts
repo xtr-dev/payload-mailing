@@ -43,8 +43,12 @@ export async function processJobById(payload: Payload, jobId: string): Promise<v
   }
 
   try {
-    // Run a specific job by its ID (using where clause to find the job)
+    // Run a specific job by its ID. `jobs.run` only picks up jobs from the
+    // `default` queue unless told otherwise, so `allQueues` is required for
+    // emails queued on the plugin's configured queue or a per-send `queue`
+    // override; the `where` clause still limits the run to this one job.
     await payload.jobs.run({
+      allQueues: true,
       where: {
         id: {
           equals: jobId
