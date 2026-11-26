@@ -14,20 +14,17 @@ describe('parseAndValidateEmails', () => {
     expect(parseAndValidateEmails(emails)).toBe(emails)
   })
 
-  test('passes an array through without re-splitting entries on comma', () => {
-    // A single array entry that happens to contain a comma is the caller's
-    // already-parsed value and must not be exploded into two addresses. If it
-    // were split, 'a@example.com' and 'not-split@example.com' would both be
-    // valid individually and the bug would pass silently; asserting on the
-    // combined string being rejected as one invalid address is what actually
-    // distinguishes "not split" from "split".
-    expect(() => parseAndValidateEmails(['a@example.com,not-split@example.com'])).toThrow(
-      'Invalid email addresses: a@example.com,not-split@example.com',
+  test('does not re-split an array entry that contains a comma', () => {
+    // If array entries were joined and re-split on ',', this would silently become
+    // two valid recipients (a@b.com, c@d.com) instead of one invalid candidate.
+    expect(() => parseAndValidateEmails(['a@b.com,c@d.com'])).toThrow(
+      'Invalid email addresses: a@b.com,c@d.com',
     )
   })
 
-  test('rejects an address carrying a CR/LF header-injection payload', () => {
-    expect(() => parseAndValidateEmails('victim@example.com\r\nBcc: evil@evil.com')).toThrow('Invalid email addresses')
+  test('rejects a value carrying a CR or LF, so header injection cannot reach the send path', () => {
+    expect(() => parseAndValidateEmails('a@b.com\r\nBcc: evil@x.com')).toThrow('Invalid email addresses')
+    expect(() => parseAndValidateEmails('a@b.com\nBcc: evil@x.com')).toThrow('Invalid email addresses')
   })
 
   test('rejects an address containing a control character', () => {
