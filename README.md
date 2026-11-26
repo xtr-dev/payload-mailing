@@ -175,19 +175,35 @@ Fully opt-in — with no layouts, templates render exactly as before.
 
 ## Jobs
 
-The plugin registers its processing job automatically — nothing to add. Sending
-(or creating an `emails` doc) queues a background job that honors `scheduledAt`
-and retries failures. You just need a job **runner**: either Payload's
-`jobs.autoRun` cron, or call `processEmails(payload)` yourself (drains up to 50
-due emails per call, highest priority first). Emails track a `status` of
-`pending → processing → sent / failed`.
+The plugin registers its `process-email` task automatically. Sending (or
+creating an `emails` doc) queues one job per email on the plugin's `queue`,
+delayed until `scheduledAt` when set. You need a job **runner**: Payload's
+`jobs.autoRun` cron for that queue, or your own `payload.jobs.run()` calls.
+
+Emails move through `pending → processing → sent / failed`. A send error puts
+the email back to `pending` until it has used `retryAttempts` tries, then marks
+it `failed`. The queued job is not re-run for those retries, so drive them
+yourself: `processEmails(payload)` sends up to 50 due `pending` emails per call
+(highest priority, then oldest first), e.g. from a scheduled task.
+
+To queue an email from a Payload job or workflow, register the
+`schedule-email` task from the `/tasks` subpath:
+
+```typescript
+import { ScheduleEmailTask } from '@xtr-dev/payload-mailing/tasks'
+
+export default buildConfig({ jobs: { tasks: [ScheduleEmailTask] } })
+
+await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.com', templateSlug: 'welcome' } })
+```
 
 ## Options
 
 | Option | Description |
 | --- | --- |
 | `defaultFrom` / `defaultFromName` | Default sender for emails that don't set one. |
-| `retryAttempts` / `retryDelay` | Retry count and delay (ms) for failed sends. |
+| `retryAttempts` | Send attempts before an email is marked `failed` (default `3`). |
+| `retryDelay` | Minimum time (ms) since the last attempt before `retryFailedEmails` picks an email up again (default `300000`). |
 | `queue` | Job queue name (default `'default'`). A single `sendEmail` call can override it with its own `queue` option. |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |
@@ -207,10 +223,12 @@ due emails per call, highest priority first). Emails track a `status` of
 | --- | --- |
 | `sendEmail(payload, options)` | Queue (or immediately send) a template/direct email. |
 | `renderTemplate(payload, slug, vars)` | Render `{ html, text, subject }` without sending. |
-| `processEmails(payload)` | Process up to 50 due-pending emails. |
-| `retryFailedEmails(payload)` | Re-queue failed emails. |
+| `processEmails(payload)` | Send up to 50 due `pending` emails. |
+| `retryFailedEmails(payload)` | Resend up to 20 `failed` emails that have attempts left and whose last attempt is older than `retryDelay`. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
 | `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
+| `perPart({ html, text })` | Give a variable separate HTML and plain-text values. |
+| `ImmediateProcessingError` / `TemplateRenderError` | Thrown by `processImmediately` sends whose inline run failed / by `strictTemplates` render errors. |
 
 `sendEmail<Email>(…)` is generic over your generated `Email` type for type-safe
 custom fields.
@@ -218,6 +236,9 @@ custom fields.
 ## Requirements
 
 PayloadCMS ^3.37.0 · Node.js ^18.20.2 || >=20.9.0
+
+`@payloadcms/ui` and `react` are optional peers, used only by the admin
+preview (`adminPreview`); a Payload app with the admin panel already has them.
 
 ## Contributing
 

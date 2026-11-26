@@ -1,170 +1,55 @@
-# PayloadCMS Mailing Plugin - Development Guide
+# Development
 
-🚀 **Zero-Setup Development** with in-memory MongoDB - no database installation required!
-
-## Quick Start
+## Setup
 
 ```bash
-# Install dependencies
-npm install
-
-# Start dev server with in-memory MongoDB
-npm run dev
-
-# Alternative: Use startup script with helpful info
-npm run dev:start
-
-# Alternative: Force memory database
-npm run dev:memory
+pnpm install
+pnpm dev        # Next.js + Payload dev app from dev/, on http://localhost:3000
 ```
 
-## What You Get
+The dev app (`dev/payload.config.ts`) loads the plugin straight from `src/`, so
+source changes are picked up without a build. It uses SQLite (`dev/dev.db`;
+set `DATABASE_URI` to use another file) and a test email adapter that logs each
+email and keeps it in memory instead of sending it.
 
-### 🎯 **Instant Setup**
-- ✅ **In-memory MongoDB** - no installation needed
-- ✅ **Example templates** automatically created
-- ✅ **Test interface** at `/mailing-test`
-- ✅ **Admin panel** at `/admin`
-- ✅ **API endpoints** for testing
+On start it seeds a `welcome-email` template and a user
+`dev@payloadcms.com` / `test`. Useful pages:
 
-### 📧 **Pre-loaded Templates**
-1. **Welcome Email** - User onboarding with premium features
-2. **Order Confirmation** - E-commerce receipt with items
-3. **Password Reset** - Security email with expiring link
+- `/admin`: Payload admin (**Mailing → Email Templates / Emails**, plus the jobs collection)
+- `/mailing-test`: send or schedule an email from a template or raw HTML
+- `/sent-emails`: what the test adapter received
+- `POST /api/test-email`, `POST /api/process-emails`, `GET /api/sent-emails`: the same from scripts
 
-### 🔧 **Development Tools**
-- **Web UI**: http://localhost:3000/mailing-test
-- **Admin Panel**: http://localhost:3000/admin  
-- **GraphQL Playground**: http://localhost:3000/api/graphql-playground
-- **API Endpoints**: 
-  - `POST /api/test-email` - Send/schedule emails
-  - `POST /api/process-outbox` - Process email queue
+A jobs `autoRun` cron processes the `default` queue every minute.
 
-## Database Options
+## Checks
 
-### 🚀 **In-Memory (Default - Recommended)**
 ```bash
-npm run dev  # Automatic
-```
-- Zero setup required
-- Fast startup (5-10 seconds)
-- Data resets on restart
-- Perfect for development
-
-### 🔗 **External MongoDB**
-```bash
-DATABASE_URI=mongodb://localhost:27017/payload-mailing npm run dev
+pnpm lint        # eslint ./src
+pnpm typecheck   # tsc --noEmit
+pnpm test        # unit tests (src/**/*.test.ts)
+pnpm test:int    # integration tests: boots the dev app against SQLite (dev/int.spec.ts)
+pnpm test:e2e    # Playwright against `pnpm dev` on port 3300 (dev/e2e.spec.ts)
+pnpm build       # compile to dist/
 ```
 
-## Email Testing
+CI (`.github/workflows/ci.yml`) runs `scripts/check-readme-peer-version.sh`,
+lint, typecheck, unit and integration tests and the build on every pull request.
+The README's `PayloadCMS ^x.y.z` requirement must match the `payload` peer
+dependency, or that script fails.
 
-### MailHog (Recommended)
-```bash
-# Install and run MailHog
-go install github.com/mailhog/MailHog@latest
-MailHog
+## Layout
 
-# View emails at: http://localhost:8025
-```
+- `src/plugin.ts`: plugin entry; registers the collections, the `process-email` task and `payload.mailing`
+- `src/collections/`: `emails` and `email-templates`, including the hook that queues a job per email
+- `src/services/`: `MailingService` (rendering, sending, processing) and the template engines
+- `src/sendEmail.ts`: the public send API
+- `src/utils/`: rich-text serializer, job scheduler, helpers
+- `src/tasks/`: the optional `schedule-email` task (`/tasks` export)
+- `src/components/`: the admin preview client component (`/client` export)
 
-### Console Output
-The dev setup logs emails to console if no SMTP server is available.
+## Releasing
 
-## Development Workflow
-
-1. **Start server**: `npm run dev`
-2. **Make changes** to plugin source (`src/`)
-3. **Rebuild plugin**: `npm run build` 
-4. **Test changes** in web interface or admin panel
-5. **View results** in MailHog or console
-
-## Plugin Testing
-
-### Via Web Interface
-1. Go to http://localhost:3000/mailing-test
-2. Select a template
-3. Fill in variables  
-4. Send or schedule email
-5. Check MailHog for results
-
-### Via Admin Panel
-1. Go to http://localhost:3000/admin
-2. Navigate to **Mailing > Email Templates**
-3. View/edit templates
-4. Navigate to **Mailing > Email Outbox**  
-5. Monitor email status
-
-### Via API
-```bash
-curl -X POST http://localhost:3000/api/test-email \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "type": "send",
-    "templateId": "TEMPLATE_ID",
-    "to": "test@example.com",
-    "variables": {
-      "firstName": "John",
-      "siteName": "Test App"
-    }
-  }'
-```
-
-## Startup Messages
-
-When you start the dev server, look for these messages:
-
-```
-🚀 PayloadCMS Mailing Plugin - Development Mode
-==================================================
-📦 Using in-memory MongoDB (no installation required)
-
-🔧 Starting development server...
-🚀 Starting MongoDB in-memory database...
-✅ MongoDB in-memory database started
-📊 Database URI: mongodb://***@localhost:port/payload-mailing-dev
-📧 Mailing plugin configured with test transport
-🎯 Test interface will be available at: /mailing-test
-
-✅ Example email templates created successfully
-```
-
-**Note**: The plugin initializes silently on success (no "initialized successfully" message). If you see no errors, the plugin loaded correctly.
-
-## Troubleshooting
-
-### Server won't start
-- Ensure port 3000 is available
-- Check for Node.js version compatibility
-- Run `npm install` to ensure dependencies
-
-### Database issues
-- In-memory database automatically handles setup
-- For external MongoDB, verify `DATABASE_URI` is correct
-- Check MongoDB is running if using external database
-
-### Email issues  
-- Verify MailHog is running on port 1025
-- Check console logs for error messages
-- Ensure template variables are correctly formatted
-
-## Plugin Development
-
-The plugin source is in `src/` directory:
-- `src/plugin.ts` - Main plugin configuration
-- `src/collections/` - Email templates and outbox collections
-- `src/services/` - Mailing service with LiquidJS, Mustache, and simple template processing
-- `src/jobs/` - Background job processing
-- `src/utils/` - Helper functions for developers
-
-Make changes, rebuild with `npm run build`, and test!
-
-## Success Indicators
-
-✅ Server starts without errors  
-✅ Admin panel loads at `/admin`  
-✅ Test interface loads at `/mailing-test`  
-✅ Templates appear in the interface  
-✅ Emails can be sent/scheduled  
-✅ Outbox shows email status  
-
-You're ready to develop and test the PayloadCMS Mailing Plugin! 🎉
+Pull request titles use conventional-commit form; don't bump the version in a
+PR. Releases run from the manual **Release** workflow, which uses
+xtr-dev/changelog to pick the version and write the changelog.
