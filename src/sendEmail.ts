@@ -7,12 +7,25 @@ import { getMailing, parseAndValidateEmails, renderTemplateWithId, sanitizeFromN
 import { ensureEmailJob } from './utils/jobScheduler.js'
 import { createContextLogger } from './utils/logger.js'
 
+// The shape sendEmail's `data` option actually accepts: recipient/sender fields as
+// the caller writes them (a single address or a comma-separated/array list), not the
+// normalized string[] / single-string shape BaseEmailDocument stores. sendEmail runs
+// each of these through parseAndValidateEmails before the row is created, so the
+// public input type must be wider than the stored document type it feeds into.
+type SendEmailData<T extends BaseEmailDocument> = {
+  bcc?: null | string | string[]
+  cc?: null | string | string[]
+  from?: null | string | string[]
+  replyTo?: null | string | string[]
+  to?: string | string[]
+} & Omit<Partial<T>, 'bcc' | 'cc' | 'from' | 'replyTo' | 'to'>
+
 // Options for sending emails
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
   // Common options
   collectionSlug?: string // defaults to 'emails'
   // Direct email data
-  data?: Partial<T>
+  data?: SendEmailData<T>
   processImmediately?: boolean // if true, creates job and processes it immediately
   queue?: string // queue name for the job, defaults to mailing config queue
   // Template-based email
@@ -87,6 +100,16 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
+
+  // parseAndValidateEmails silently collapses a whitespace/comma-only string (e.g.
+  // " , ") to an empty array rather than throwing, since it has no invalid-looking
+  // candidates to reject. The `!emailData.to` check above already ran against the
+  // raw (still-truthy) string, so re-check non-emptiness here, after normalization,
+  // or a caller-supplied garbage `to` reaches payload.create with zero recipients.
+  if (!emailData.to || (emailData.to as string[]).length === 0) {
+    throw new Error('Field "to" is required for sending emails')
+  }
+
   if (emailData.cc) {
     emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }

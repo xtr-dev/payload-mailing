@@ -1,6 +1,6 @@
 {
   "name": "@xtr-dev/payload-mailing",
-  "version": "0.6.0",
+  "version": "0.7.1",
   "description": "Template-based email system with scheduling and job processing for PayloadCMS",
   "type": "module",
   "main": "dist/index.js",
@@ -39,7 +39,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:int": "vitest run --config vitest.int.config.ts"
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [
     "payloadcms",
@@ -56,17 +57,13 @@
     "@payloadcms/richtext-lexical": "^3.37.0",
     "@payloadcms/ui": "^3.37.0",
     "payload": "^3.37.0",
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "@payloadcms/ui": {
       "optional": true
     },
     "react": {
-      "optional": true
-    },
-    "react-dom": {
       "optional": true
     }
   },
