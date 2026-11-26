@@ -222,14 +222,18 @@ function stripSentinel(value: any): any {
 }
 
 /**
- * Mustache adapter. Mustache always HTML-escapes `{{ }}` output, so the body
- * render uses that native escaping. Layout composition cannot, however: the
- * content slot must be injected raw while the layout's own variables must be
- * escaped exactly once, with no `{{{ }}}` raw opt-out (matching the mode-based
- * engines). So `composeLayout` replaces the content slot with a control-char
- * sentinel BEFORE Mustache runs, pre-escapes the remaining variables in JS,
- * renders with Mustache's native escaping turned OFF, and splices the
- * already-rendered body into the sentinel position afterward.
+ * Mustache adapter. Mustache's native `{{ }}` escaping matches what
+ * `renderHtml` needs, but `render` must come out verbatim (subjects and plain
+ * text — see MailingService), so it explicitly disables that native escaping
+ * with `NO_ESCAPE` rather than relying on Mustache's default.
+ *
+ * Layout composition has the opposite problem: the content slot must be
+ * injected raw while the layout's own variables must be escaped exactly once,
+ * with no `{{{ }}}` raw opt-out (matching the mode-based engines). So
+ * `composeLayout` replaces the content slot with a control-char sentinel
+ * BEFORE Mustache runs, pre-escapes the remaining variables in JS, renders
+ * with Mustache's native escaping turned OFF, and splices the already-rendered
+ * body into the sentinel position afterward.
  *
  * Errors fall back to the simple replacer unless `strict` is set, in which case
  * a {@link TemplateRenderError} is thrown.
@@ -282,7 +286,11 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
 
   async render(template: string, variables: Record<string, any>): Promise<string> {
     try {
-      return this.mustache.render(template, variables)
+      // Disable Mustache's default `{{ }}` escaping: this method's contract
+      // (TemplateEngineAdapter.render) is verbatim output, used for subjects
+      // and plain-text bodies where an escaped `&` would show up as `&amp;`
+      // in a recipient's inbox.
+      return this.mustache.render(template, variables, undefined, { escape: NO_ESCAPE })
     } catch (error) {
       if (this.strict) {throw new TemplateRenderError('Mustache', error)}
       this.onError('Mustache template rendering error:', error)
@@ -291,10 +299,9 @@ export class MustacheEngineAdapter implements TemplateEngineAdapter {
   }
 
   async renderHtml(template: string, variables: Record<string, any>, fallbackTemplate?: string): Promise<string> {
-    // Mustache always escapes `{{ }}` output, so HTML and verbatim rendering are
-    // identical; the distinction only matters for the mode-based engines. The
-    // fallback, however, must be the escaping one, on the fully escaped body.
-    // In strict mode there is no fallback at all.
+    // Unlike `render`, keep Mustache's native `{{ }}` escaping: it is exactly
+    // what HTML output needs. The fallback must be the escaping one, on the
+    // fully escaped body. In strict mode there is no fallback at all.
     try {
       return this.mustache.render(template, variables)
     } catch (error) {
