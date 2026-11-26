@@ -1,13 +1,15 @@
 import type { Payload } from 'payload'
 
-let pluginLogger: any = null
+const pluginLoggers = new WeakMap<Payload, any>()
 
 /**
- * Get or create the plugin logger instance
+ * Get or create the plugin logger instance for this Payload instance
  * Uses PAYLOAD_MAILING_LOG_LEVEL environment variable to configure log level
  * Defaults to 'info' if not set
  */
 export function getPluginLogger(payload: Payload) {
+  let pluginLogger = pluginLoggers.get(payload)
+
   if (!pluginLogger && payload.logger) {
     const logLevel = process.env.PAYLOAD_MAILING_LOG_LEVEL || 'info'
 
@@ -18,6 +20,8 @@ export function getPluginLogger(payload: Payload) {
 
     // Log the configured log level on first initialization
     pluginLogger.info(`Logger initialized with level: ${logLevel}`)
+
+    pluginLoggers.set(payload, pluginLogger)
   }
 
   // Fallback to console if logger not available (shouldn't happen in normal operation)
