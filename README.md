@@ -181,10 +181,14 @@ delayed until `scheduledAt` when set. You need a job **runner**: Payload's
 `jobs.autoRun` cron for that queue, or your own `payload.jobs.run()` calls.
 
 Emails move through `pending → processing → sent / failed`. A send error puts
-the email back to `pending` until it has used `retryAttempts` tries, then marks
-it `failed`. The queued job is not re-run for those retries, so drive them
-yourself: `processEmails(payload)` sends up to 50 due `pending` emails per call
-(highest priority, then oldest first), e.g. from a scheduled task.
+the email back to `pending` and queues a new `process-email` job (on the same
+queue) that runs once `retryDelay` has passed, so your job runner retries it
+without extra code. After `retryAttempts` tries the email is marked `failed`.
+`processEmails(payload)` sends up to 50 due `pending` emails per call (highest
+priority, then oldest first, skipping emails whose last failed try is more
+recent than `retryDelay`); call it from a scheduled task if you don't run a job
+runner, or as a safety net. An email is only ever sent by the run that claims
+it, so a retry job and `processEmails` never both send it.
 
 To queue an email from a Payload job or workflow, register the
 `schedule-email` task from the `/tasks` subpath:
@@ -203,7 +207,7 @@ await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.co
 | --- | --- |
 | `defaultFrom` / `defaultFromName` | Default sender for emails that don't set one. |
 | `retryAttempts` | Send attempts before an email is marked `failed` (default `3`). |
-| `retryDelay` | Minimum time (ms) since the last attempt before `retryFailedEmails` picks an email up again (default `300000`). |
+| `retryDelay` | Wait (ms) after a failed send before it is retried (default `300000`). |
 | `queue` | Job queue name (default `'default'`). A single `sendEmail` call can override it with its own `queue` option. |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |

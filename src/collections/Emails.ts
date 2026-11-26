@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { getMailing, resolveID } from '../utils/helpers.js'
+import { SKIP_EMAIL_JOB_CONTEXT_KEY } from '../utils/jobContext.js'
 import { ensureEmailJob } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
 import { denyAllAccess } from './access.js'
@@ -265,11 +266,14 @@ const Emails: CollectionConfig = {
         // Skip if:
         // 1. Email is not pending status
         // 2. Jobs are not configured
-        // 3. Email already has jobs (unless status just changed to pending)
+        // 3. The write asked not to queue a job (a failed send that the send
+        //    path is re-queueing itself with the retry delay)
+        // 4. Email already has jobs (unless status just changed to pending)
 
         const shouldSkip =
           doc.status !== 'pending' ||
           !req.payload.jobs ||
+          (req.context as Record<string, unknown> | undefined)?.[SKIP_EMAIL_JOB_CONTEXT_KEY] === true ||
           (doc.jobs?.length > 0 && previousDoc?.status === 'pending')
 
         if (shouldSkip) {

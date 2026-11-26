@@ -14,6 +14,8 @@ import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js
 
 import { withIntlFallback } from '../utils/formatOptions.js'
 import { sanitizeDisplayName } from '../utils/helpers.js'
+import { SKIP_EMAIL_JOB_CONTEXT_KEY } from '../utils/jobContext.js'
+import { findExistingJobs } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
 import { resolvePartVariables } from '../utils/perPart.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
@@ -24,6 +26,9 @@ import {
   SimpleEngineAdapter,
   TemplateRenderError,
 } from './templateEngines.js'
+
+/** Default `retryDelay`: five minutes. */
+const DEFAULT_RETRY_DELAY_MS = 300000
 
 export class MailingService implements IMailingService {
   private config: MailingPluginConfig
@@ -221,6 +226,16 @@ export class MailingService implements IMailingService {
     }
 
     return this.simpleAdapter
+  }
+
+  /** Send attempts allowed before an email is marked `failed` (`retryAttempts`, default 3). */
+  private getMaxAttempts(): number {
+    return this.config.retryAttempts || 3
+  }
+
+  /** Minimum time in ms between two send attempts of one email (`retryDelay`, default 5 minutes). */
+  private getRetryDelay(): number {
+    return this.config.retryDelay ?? DEFAULT_RETRY_DELAY_MS
   }
 
   private async getTemplateBySlug(templateSlug: string): Promise<BaseEmailTemplateDocument | null> {
@@ -472,6 +487,44 @@ export class MailingService implements IMailingService {
     return sanitizeDisplayName(name, true) // escapeQuotes = true for email headers
   }
 
+  /**
+   * Queues a `process-email` job that retries a failed send once `retryDelay`
+   * has passed (the job's `waitUntil`), so retries happen without the host
+   * calling `processEmails()`. The job goes to the queue of the email's most
+   * recent job, so a per-send `queue` override is kept, falling back to the
+   * plugin's `queue`.
+   *
+   * The job is not a send guarantee on its own and does not need to be unique:
+   * whichever run (this job, a `processEmails()` call, ...) wins the atomic
+   * `pending` -> `processing` claim sends the email, and the others skip it.
+   * When jobs are not configured or queueing fails, `processEmails()` still
+   * picks the email up once `retryDelay` has passed.
+   */
+  private async scheduleRetry(emailId: string): Promise<void> {
+    if (!this.payload.jobs) {
+      return
+    }
+
+    try {
+      let queue = this.config.queue || 'default'
+      const { docs: existingJobs } = await findExistingJobs(this.payload, emailId)
+      if (typeof existingJobs[0]?.queue === 'string' && existingJobs[0].queue) {
+        queue = existingJobs[0].queue
+      }
+
+      const waitUntil = new Date(Date.now() + this.getRetryDelay())
+      const job = await this.payload.jobs.queue({
+        input: { emailId },
+        queue,
+        task: 'process-email',
+        waitUntil,
+      })
+      this.logger.info(`Email ${emailId} send failed; retry job ${job.id} queued for ${waitUntil.toISOString()}`)
+    } catch (error) {
+      this.logger.error(`Failed to queue a retry job for email ${emailId}; processEmails() will still retry it:`, error)
+    }
+  }
+
   async processEmailItem(emailId: string, expectedStatus: 'failed' | 'pending' = 'pending'): Promise<void> {
     // Win the atomic claim before doing any work; if a concurrent run already
     // claimed this row, skip it so the email is never sent twice.
@@ -558,19 +611,26 @@ export class MailingService implements IMailingService {
 
     } catch (error) {
       const attempts = await this.incrementAttempts(emailId)
-      const maxAttempts = this.config.retryAttempts || 3
+      const willRetry = attempts < this.getMaxAttempts()
 
       await this.payload.update({
         id: emailId,
         collection: this.emailsCollection,
+        // The retry job is queued below with the retry delay. Without this flag
+        // the Emails afterChange hook would see the row go back to `pending` and
+        // queue an undelayed job of its own (or, inside a job run, find the job
+        // that is still running and queue nothing).
+        context: { [SKIP_EMAIL_JOB_CONTEXT_KEY]: true },
         data: {
           error: error instanceof Error ? error.message : 'Unknown error',
           lastAttemptAt: new Date().toISOString(),
-          status: attempts >= maxAttempts ? 'failed' : 'pending',
+          status: willRetry ? 'pending' : 'failed',
         },
       })
 
-      if (attempts >= maxAttempts) {
+      if (willRetry) {
+        await this.scheduleRetry(emailId)
+      } else {
         this.logger.error(`Email ${emailId} failed permanently after ${attempts} attempts:`, error)
       }
     }
@@ -579,6 +639,7 @@ export class MailingService implements IMailingService {
   async processEmails(): Promise<void> {
     this.ensureInitialized()
     const currentTime = new Date().toISOString()
+    const retryTime = new Date(Date.now() - this.getRetryDelay()).toISOString()
 
     // Each invocation processes at most 50 due-pending emails (highest priority,
     // oldest first). This bounds the work and memory of a single run; a backlog
@@ -606,6 +667,32 @@ export class MailingService implements IMailingService {
               {
                 scheduledAt: {
                   less_than_equal: currentTime,
+                },
+              },
+            ],
+          },
+          // An email that already failed a send waits `retryDelay` after that
+          // attempt before it is tried again, matching the delayed retry job.
+          {
+            or: [
+              {
+                attempts: {
+                  exists: false,
+                },
+              },
+              {
+                attempts: {
+                  equals: 0,
+                },
+              },
+              {
+                lastAttemptAt: {
+                  exists: false,
+                },
+              },
+              {
+                lastAttemptAt: {
+                  less_than_equal: retryTime,
                 },
               },
             ],
