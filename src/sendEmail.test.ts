@@ -118,3 +118,31 @@ describe('sendEmail immediate-processing queue handoff', () => {
     })).rejects.toThrow('Failed to process email email-1 immediately: Error: adapter exploded')
   })
 })
+
+// Separate factory: parseAndValidateEmails runs before payload.create, so these
+// cases only need create to exist (and to stay uncalled).
+const makeRecipientPayload = () => ({
+  collections: { 'email-templates': {} },
+  create: vi.fn(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'email-1', ...data })),
+  find: vi.fn(),
+  jobs: { run: vi.fn() },
+  mailing: {
+    collections: { emails: 'emails', templates: 'email-templates' },
+    service: { renderTemplateDocument: vi.fn() },
+  },
+})
+
+describe('sendEmail recipient normalization', () => {
+  test.each([
+    { to: ' , ' },
+    { to: ',,,' },
+    { to: [] },
+  ])('rejects a $to recipient string/array that normalizes to zero addresses', async ({ to }) => {
+    const payload = makeRecipientPayload()
+
+    await expect(sendEmail(payload as never, {
+      data: { html: '<p>x</p>', subject: 'x', to },
+    } as never)).rejects.toThrow('Field "to" is required for sending emails')
+    expect(payload.create).not.toHaveBeenCalled()
+  })
+})
