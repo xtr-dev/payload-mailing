@@ -2,6 +2,14 @@
 
 Releases up to v0.6.0, and notes written before the switch to generated changelogs, are in [changelog/HISTORY.md](changelog/HISTORY.md).
 
+## [0.7.1](https://github.com/xtr-dev/payload-mailing/compare/v0.7.0...v0.7.1) - 2026-11-26
+
+### Fixes
+- fill templateSlug for numeric template IDs ([#159](https://github.com/xtr-dev/payload-mailing/issues/159)) ([da06ab0](https://github.com/xtr-dev/payload-mailing/commit/da06ab0904f05c801042f11d798237684cd2b557))
+- resolve dotted names in required template variables ([#161](https://github.com/xtr-dev/payload-mailing/issues/161)) ([cb45d65](https://github.com/xtr-dev/payload-mailing/commit/cb45d65f0dc9ca81a947968535af018d18204db1))
+- render template variables in rich-text link URLs ([#160](https://github.com/xtr-dev/payload-mailing/issues/160)) ([9e0cbbd](https://github.com/xtr-dev/payload-mailing/commit/9e0cbbd210fb33b5270f5e8be3f35253b9fbedc4))
+- run processImmediately jobs on non-default queues ([#158](https://github.com/xtr-dev/payload-mailing/issues/158)) ([eae040b](https://github.com/xtr-dev/payload-mailing/commit/eae040bb43ed152daaf0667ff0edebbcb0e77a47))
+
 ## [0.7.0] - 2026-11-25
 
 ### Features

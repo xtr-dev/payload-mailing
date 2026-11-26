@@ -3,6 +3,76 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.7.1",
+      "date": "2026-11-26",
+      "commit": "da06ab0",
+      "breaking": false,
+      "groups": {
+        "fixes": [
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "fill templateSlug for numeric template IDs (#159)",
+            "commit": "da06ab0",
+            "hash": "da06ab0904f05c801042f11d798237684cd2b557",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "resolve dotted names in required template variables (#161)",
+            "commit": "cb45d65",
+            "hash": "cb45d65f0dc9ca81a947968535af018d18204db1",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "render template variables in rich-text link URLs (#160)",
+            "commit": "9e0cbbd",
+            "hash": "9e0cbbd210fb33b5270f5e8be3f35253b9fbedc4",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "run processImmediately jobs on non-default queues (#158)",
+            "commit": "eae040b",
+            "hash": "eae040bb43ed152daaf0667ff0edebbcb0e77a47",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "version": "0.7.0",
       "date": "2026-11-25",
       "commit": "02efbc8",
