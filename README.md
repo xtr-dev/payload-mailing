@@ -129,7 +129,8 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   config, or override per use: `{{ d | formatDate: "long", "nl-NL" }}`,
   `{{ total | formatCurrency: "EUR", "nl-NL" }}`.
 - **Required variables** — mark declared variables Required and a send missing
-  one is rejected *before it's queued*. Opt-in; declare nothing to skip checks.
+  one is rejected *before it's queued*. Dotted names such as `user.name` are
+  checked as nested paths. Opt-in; declare nothing to skip checks.
 
 Render without sending: `renderTemplate(payload, slug, vars)` →
 `{ html, text, subject }`.

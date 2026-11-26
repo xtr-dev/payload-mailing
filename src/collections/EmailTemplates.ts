@@ -143,7 +143,7 @@ export const createEmailTemplatesCollection = (
           name: 'name',
           type: 'text',
           admin: {
-            description: 'Variable name as referenced in the template, e.g. firstName (without the {{ }}).',
+            description: 'Variable name as referenced in the template, e.g. firstName or user.name (without the {{ }}).',
           },
           required: true,
         },
