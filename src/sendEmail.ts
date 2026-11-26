@@ -21,12 +21,6 @@ type SendEmailData<T extends BaseEmailDocument> = {
 } & Omit<Partial<T>, 'bcc' | 'cc' | 'from' | 'replyTo' | 'to'>
 
 // Options for sending emails
-type SendEmailData<T extends BaseEmailDocument> = {
-  bcc?: null | string | string[]
-  cc?: null | string | string[]
-  to?: string | string[]
-} & Omit<Partial<T>, 'bcc' | 'cc' | 'to'>
-
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
   // Common options
   collectionSlug?: string // defaults to 'emails'
