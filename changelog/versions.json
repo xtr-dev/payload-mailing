@@ -1,0 +1,551 @@
+{
+  "$schema": "https://unpkg.com/@xtr-dev/changelog/schema/versions.schema.json",
+  "schemaVersion": 2,
+  "versions": [
+    {
+      "version": "0.7.1",
+      "date": "2026-11-26",
+      "commit": "da06ab0",
+      "breaking": false,
+      "groups": {
+        "fixes": [
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "fill templateSlug for numeric template IDs (#159)",
+            "commit": "da06ab0",
+            "hash": "da06ab0904f05c801042f11d798237684cd2b557",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "resolve dotted names in required template variables (#161)",
+            "commit": "cb45d65",
+            "hash": "cb45d65f0dc9ca81a947968535af018d18204db1",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "render template variables in rich-text link URLs (#160)",
+            "commit": "9e0cbbd",
+            "hash": "9e0cbbd210fb33b5270f5e8be3f35253b9fbedc4",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": null,
+            "description": "run processImmediately jobs on non-default queues (#158)",
+            "commit": "eae040b",
+            "hash": "eae040bb43ed152daaf0667ff0edebbcb0e77a47",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "version": "0.7.0",
+      "date": "2026-11-25",
+      "commit": "02efbc8",
+      "breaking": false,
+      "groups": {
+        "features": [
+          {
+            "type": "feat",
+            "scope": "templates",
+            "description": "perPart() gives a variable separate HTML and text values (#149)",
+            "commit": "75bf293",
+            "hash": "75bf293eb95c33eea312d535ce1284e6d48da5d1",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "feat",
+            "scope": "filters",
+            "description": "locale, currency and timeZone options for formatDate/formatCurrency (#150)",
+            "commit": "5e7aab0",
+            "hash": "5e7aab005024e3b4e2135ee06772510d197a431c",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "feat",
+            "scope": "templates",
+            "description": "add strictTemplates to fail on template errors instead of falling back (#148)",
+            "commit": "8572e85",
+            "hash": "8572e858efbe5a2c18a79d43eea52e74e7347931",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "feat",
+            "scope": "filters",
+            "description": "locale, currency and timeZone options for formatDate/formatCurrency",
+            "commit": "43d6dc5",
+            "hash": "43d6dc506d2427a85b386651e0c8bfd96f62a658",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "feat",
+            "scope": "templates",
+            "description": "perPart() gives a variable separate HTML and text values",
+            "commit": "a4ae44c",
+            "hash": "a4ae44c733df91e27df8c2bf90b7b2577b541fde",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "feat",
+            "scope": "templates",
+            "description": "add strictTemplates to fail on template errors instead of falling back",
+            "commit": "1215c00",
+            "hash": "1215c00e1b5d21ab9eb0f2fea95b8512c537659b",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          }
+        ],
+        "fixes": [
+          {
+            "type": "fix",
+            "scope": "richtext",
+            "description": "read Payload 3 link fields, render autolinks, resolve internal links (#147)",
+            "commit": "5b71a2d",
+            "hash": "5b71a2d139fea87a7cc2f8a010f7ad8e9c5bf6ac",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "richtext",
+            "description": "keep Liquid tags verbatim when escaping text nodes (#155)",
+            "commit": "4b7fac7",
+            "hash": "4b7fac79d662a3b7dfa6db06f10da5ebc0fcab7d",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "preview",
+            "description": "check template access in the preview endpoint; export escapeHtml (#153)",
+            "commit": "5210651",
+            "hash": "5210651fa38e8496b0a4745574a3d1ada1340305",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "richtext",
+            "description": "engine-aware tag passthrough, escaped fallback on parse errors",
+            "commit": "2beca2f",
+            "hash": "2beca2ffe8411a96487f6b45ed487352b5182304",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "richtext",
+            "description": "keep Liquid tags verbatim when escaping text nodes",
+            "commit": "3a53bd8",
+            "hash": "3a53bd8e32942a39d5482b9456e1e4efeb7ccc54",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "richtext",
+            "description": "don't escape quotes in text nodes so quoted Liquid args parse",
+            "commit": "df1cb3a",
+            "hash": "df1cb3a1173c442347d200af49a5723073c6aa7c",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "preview",
+            "description": "static export test, escape single quotes, handle throwing access",
+            "commit": "c2dfc7b",
+            "hash": "c2dfc7bf9736b2fc3ab93e067542936252f36ccb",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "templates",
+            "description": "guard perPart resolution against cyclic variables",
+            "commit": "6ec71a0",
+            "hash": "6ec71a04aca02835aa2f28b23e8dc06e3edcc101",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "templates",
+            "description": "strict mode also rejects unknown filters and missing engines",
+            "commit": "c1d8588",
+            "hash": "c1d858805186f9f216a52cf0b0cfaa1023dbc9b4",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "filters",
+            "description": "validate locale/currency/timeZone at init, fall back on bad filter args",
+            "commit": "415b7f5",
+            "hash": "415b7f571df4d1f896480679a319e2588e8db221",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "preview",
+            "description": "check template access in the preview endpoint; export escapeHtml",
+            "commit": "2662cce",
+            "hash": "2662cce7bf1ca20c554ea7693a83404c6ef04faa",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "richtext",
+            "description": "read Payload 3 link fields, render autolinks, resolve internal links",
+            "commit": "3923be9",
+            "hash": "3923be9a92f8f669f91b1c3424ebe10f6aedbcda",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "queue",
+            "description": "sort equal-priority emails oldest-first via Local API array",
+            "commit": "b1f14e1",
+            "hash": "b1f14e10e6b98c19eafb4bce413c0d8612996544",
+            "author": "zestysloth.96b0",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "scripts",
+            "description": "resolve package.json path instead of assuming it's relative",
+            "commit": "13bccf0",
+            "hash": "13bccf09348e41ef2191283063c61a5b0cbb0573",
+            "author": "fluffymango.0780",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "docs",
+            "description": "tie README's PayloadCMS floor to package.json's peerDependency",
+            "commit": "1b28a37",
+            "hash": "1b28a3750acd90658ce79858d4cd1960bdb5cce9",
+            "author": "shinytomato278.5070",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "dev",
+            "description": "call seedUser in onInit so a dev user actually exists",
+            "commit": "f9b3f4d",
+            "hash": "f9b3f4d032882f3b4934da14f7e2b7cda3d43f41",
+            "author": "zestydonut.8c51",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "sendEmail",
+            "description": "honor per-send queue override",
+            "commit": "e119bf0",
+            "hash": "e119bf0949114a6bdab9482efc8c1210aad7ced9",
+            "author": "alcor.7572",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "deps",
+            "description": "remove unused payload-automation peer",
+            "commit": "162415a",
+            "hash": "162415ad7de9545544ef222b6eced1912b4fb9c0",
+            "author": "lupus.623a",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "queue",
+            "description": "process equal-priority emails FIFO",
+            "commit": "b068358",
+            "hash": "b068358c4584f73f3653cb79ad45894c975fa2de",
+            "author": "alcor.3ab0",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "fix",
+            "scope": "deps",
+            "description": "declare @payloadcms/richtext-lexical as a required peer dependency",
+            "commit": "8150076",
+            "hash": "8150076d250953e6f17d8d32adb81c8d694502ef",
+            "author": "larissa.906b",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Fable 5 <noreply@anthropic.com>"
+              }
+            ]
+          }
+        ],
+        "other": [
+          {
+            "type": "ci",
+            "scope": null,
+            "description": "release through the shared workflow with xtr-dev/changelog (#157)",
+            "commit": "02efbc8",
+            "hash": "02efbc825235110a8529dd8bd39cb0f2df9a6b42",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "docs",
+            "scope": null,
+            "description": "document the per-send queue option (#112)",
+            "commit": "2ee4506",
+            "hash": "2ee4506f2080cd220fb33b668deda79ca2e4a864",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "nunki.6e64 <nunki.6e64@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "rhea.4d60 <rhea.4d60@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "phobos.38d9 <phobos.38d9@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "mellowpickle.801f <mellowpickle.801f@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "docs",
+            "scope": null,
+            "description": "staff-only access in the README examples (#156)",
+            "commit": "93e2c9e",
+            "hash": "93e2c9e628dd4262e7a675c3633da8758c1f17a2",
+            "author": "Bas",
+            "breaking": false,
+            "notes": []
+          },
+          {
+            "type": "docs",
+            "scope": null,
+            "description": "staff-only access in the README examples",
+            "commit": "98f2102",
+            "hash": "98f21028c76d6ac17884deb8abb94b01e9a17980",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "richtext",
+            "description": "an internal-link resolver returning javascript: still yields href=\"#\"",
+            "commit": "a34d6f7",
+            "hash": "a34d6f7b719b11c3b6ee6ed423a250037c879082",
+            "author": "Bas van den Aakster",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "ci",
+            "scope": null,
+            "description": "gate CI and publish on test:int now that it actually runs",
+            "commit": "79de840",
+            "hash": "79de840ff4edf0c3d0d176ecd13caa286526a77e",
+            "author": "callisto.d489",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "docs",
+            "scope": "changelog",
+            "description": "note new richtext-lexical peerDependency under Unreleased",
+            "commit": "0dafda5",
+            "hash": "0dafda57223a91647292312a61d2ec436e17daf3",
+            "author": "kaus.bd6c",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "int",
+            "description": "give test:int its own vitest config so dev/int.spec.ts actually runs",
+            "commit": "9288440",
+            "hash": "9288440dcae9823413180be2dba1b032c4861196",
+            "author": "deneb.5ade",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-Authored-By",
+                "text": "Claude Fable 5 <noreply@anthropic.com>"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
