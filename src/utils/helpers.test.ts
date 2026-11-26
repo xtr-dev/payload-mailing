@@ -14,6 +14,23 @@ describe('parseAndValidateEmails', () => {
     expect(parseAndValidateEmails(emails)).toBe(emails)
   })
 
+  test('does not re-split an array entry that contains a comma', () => {
+    // If array entries were joined and re-split on ',', this would silently become
+    // two valid recipients (a@b.com, c@d.com) instead of one invalid candidate.
+    expect(() => parseAndValidateEmails(['a@b.com,c@d.com'])).toThrow(
+      'Invalid email addresses: a@b.com,c@d.com',
+    )
+  })
+
+  test('rejects a value carrying a CR or LF, so header injection cannot reach the send path', () => {
+    expect(() => parseAndValidateEmails('a@b.com\r\nBcc: evil@x.com')).toThrow('Invalid email addresses')
+    expect(() => parseAndValidateEmails('a@b.com\nBcc: evil@x.com')).toThrow('Invalid email addresses')
+  })
+
+  test('rejects an address containing a control character', () => {
+    expect(() => parseAndValidateEmails('vic\x00tim@example.com')).toThrow('Invalid email addresses')
+  })
+
   test.each([null, undefined, ''] as const)('returns undefined for an absent value (%s)', (emails) => {
     expect(parseAndValidateEmails(emails)).toBeUndefined()
   })
@@ -60,6 +77,18 @@ describe('sanitizeDisplayName', () => {
     expect(sanitizeDisplayName(displayName)).toBe(displayName)
     expect(sanitizeDisplayName(displayName, true)).toBe('Ada \\"The\\" Lovelace')
   })
+
+  test('replaces CR/LF with a space to prevent header injection', () => {
+    expect(sanitizeDisplayName('Evil\r\nBcc: evil@evil.com')).toBe('Evil  Bcc: evil@evil.com')
+  })
+
+  test('trims surrounding whitespace', () => {
+    expect(sanitizeDisplayName('  Jane Doe  ')).toBe('Jane Doe')
+  })
+
+  test('passes falsy input through unchanged', () => {
+    expect(sanitizeDisplayName('')).toBe('')
+  })
 })
 
 describe('sanitizeFromName', () => {
@@ -69,5 +98,18 @@ describe('sanitizeFromName', () => {
 
   test('returns undefined when sanitization removes the entire value', () => {
     expect(sanitizeFromName('\x00\x01')).toBeUndefined()
+  })
+
+  test('returns undefined when a name is only CR/LF or whitespace', () => {
+    expect(sanitizeFromName('\r\n')).toBeUndefined()
+    expect(sanitizeFromName('   ')).toBeUndefined()
+  })
+
+  test('strips a CR/LF header-injection payload from a fromName', () => {
+    expect(sanitizeFromName('Evil\r\nBcc: evil@evil.com')).toBe('Evil  Bcc: evil@evil.com')
+  })
+
+  test('does not escape quotes — that only happens at header-build time, not here', () => {
+    expect(sanitizeFromName('"Jane" Doe')).toBe('"Jane" Doe')
   })
 })
