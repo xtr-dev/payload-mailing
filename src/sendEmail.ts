@@ -20,6 +20,30 @@ type SendEmailData<T extends BaseEmailDocument> = {
   to?: string | string[]
 } & Omit<Partial<T>, 'bcc' | 'cc' | 'from' | 'replyTo' | 'to'>
 
+/**
+ * Thrown by `sendEmail` when `processImmediately` is set, the email row was
+ * created and its processing job queued, but running that job inline failed.
+ *
+ * The email is not lost: it stays in the outbox with its job, so the regular
+ * queue run (or `processEmails`) delivers it later. Callers that only need
+ * "accepted for delivery" can catch this error and treat the send as queued.
+ * Validation, template and create errors stay plain `Error`s, so they still
+ * mean no email was created.
+ */
+export class ImmediateProcessingError<TEmail extends BaseEmailDocument = BaseEmailDocument> extends Error {
+  /** The email document that was created before immediate processing failed. */
+  readonly email: TEmail
+  /** ID of the queued job that failed to run inline. */
+  readonly jobId: string
+
+  constructor(email: TEmail, jobId: string, cause: unknown) {
+    super(`Failed to process email ${email.id} immediately: ${String(cause)}`, { cause })
+    this.name = 'ImmediateProcessingError'
+    this.email = email
+    this.jobId = jobId
+  }
+}
+
 // Options for sending emails
 export interface SendEmailOptions<T extends BaseEmailDocument = BaseEmailDocument> {
   // Common options
@@ -198,7 +222,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
       logger.debug(`Successfully processed email ${email.id} immediately`)
     } catch (error) {
       logger.error(`Failed to process email ${email.id} immediately:`, error)
-      throw new Error(`Failed to process email ${email.id} immediately: ${String(error)}`)
+      throw new ImmediateProcessingError(email as TEmail, jobId, error)
     }
   }
 
