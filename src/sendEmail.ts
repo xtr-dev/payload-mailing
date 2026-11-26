@@ -7,6 +7,19 @@ import { getMailing, parseAndValidateEmails, renderTemplateWithId, sanitizeFromN
 import { ensureEmailJob } from './utils/jobScheduler.js'
 import { createContextLogger } from './utils/logger.js'
 
+// The shape sendEmail's `data` option actually accepts: recipient/sender fields as
+// the caller writes them (a single address or a comma-separated/array list), not the
+// normalized string[] / single-string shape BaseEmailDocument stores. sendEmail runs
+// each of these through parseAndValidateEmails before the row is created, so the
+// public input type must be wider than the stored document type it feeds into.
+type SendEmailData<T extends BaseEmailDocument> = {
+  bcc?: null | string | string[]
+  cc?: null | string | string[]
+  from?: null | string | string[]
+  replyTo?: null | string | string[]
+  to?: string | string[]
+} & Omit<Partial<T>, 'bcc' | 'cc' | 'from' | 'replyTo' | 'to'>
+
 // Options for sending emails
 type SendEmailData<T extends BaseEmailDocument> = {
   bcc?: null | string | string[]
@@ -93,6 +106,16 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   if (emailData.to) {
     emailData.to = parseAndValidateEmails(emailData.to as string | string[])
   }
+
+  // parseAndValidateEmails silently collapses a whitespace/comma-only string (e.g.
+  // " , ") to an empty array rather than throwing, since it has no invalid-looking
+  // candidates to reject. The `!emailData.to` check above already ran against the
+  // raw (still-truthy) string, so re-check non-emptiness here, after normalization,
+  // or a caller-supplied garbage `to` reaches payload.create with zero recipients.
+  if (!emailData.to || (emailData.to as string[]).length === 0) {
+    throw new Error('Field "to" is required for sending emails')
+  }
+
   if (emailData.cc) {
     emailData.cc = parseAndValidateEmails(emailData.cc as string | string[])
   }
@@ -130,7 +153,12 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
   // runs synchronously within this call and writes the IDs of the job(s) it
   // queues onto this same object (Payload assigns `req.context` to the object we
   // pass here by reference), letting us run the job below without polling for it.
-  const createContext: { emailJobIds?: (number | string)[] } = {}
+  // The afterChange hook queues ordinary sends, so carry the per-send queue
+  // override through the same context object it uses to hand back job IDs.
+  const createContext: { emailJobIds?: (number | string)[], emailQueueName?: string } = {}
+  if (options.queue) {
+    createContext.emailQueueName = options.queue
+  }
 
   const email = await payload.create({
     collection: collectionSlug,
@@ -165,6 +193,7 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     if (!jobId) {
       const { jobIds } = await ensureEmailJob(payload, email.id, {
+        queueName: options.queue,
         scheduledAt: emailData.scheduledAt as Date | string | undefined,
       })
       jobId = String(jobIds[0])
