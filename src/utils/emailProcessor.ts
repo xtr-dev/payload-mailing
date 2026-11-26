@@ -63,7 +63,10 @@ export async function processJobById(payload: Payload, jobId: string): Promise<v
 }
 
 /**
- * Processes all pending and failed emails using the mailing service
+ * Sends due `pending` emails (`processEmails`), then gives `failed` emails one
+ * more attempt each (`retryFailedEmails`). Calling this on a schedule therefore
+ * keeps re-trying permanently failed emails, once per `retryDelay`; schedule
+ * `processEmails` alone if failed emails should stay failed.
  * @param payload Payload instance
  * @returns Promise that resolves when all emails are processed
  */
