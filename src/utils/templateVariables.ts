@@ -9,6 +9,25 @@ const isMissing = (value: unknown): boolean =>
   value === undefined || value === null || value === ''
 
 /**
+ * Looks up a declared variable name in the supplied variables. A dotted name
+ * such as `user.name` is resolved as a path into nested objects, matching how
+ * templates reference it (`{{ user.name }}`). A top-level key that itself
+ * contains the dots is checked first, so `{ 'user.name': … }` also satisfies it.
+ */
+const lookupVariable = (variables: TemplateVariables | undefined, name: string): unknown => {
+  if (!variables) {return undefined}
+  if (Object.prototype.hasOwnProperty.call(variables, name)) {
+    return variables[name]
+  }
+  let value: unknown = variables
+  for (const segment of name.split('.')) {
+    if (value === null || typeof value !== 'object') {return undefined}
+    value = (value as Record<string, unknown>)[segment.trim()]
+  }
+  return value
+}
+
+/**
  * Throws when a template declares required variables that the caller did not
  * supply. Templates with no `variables` declarations (including the draft
  * documents used for the in-admin preview) are not constrained, so this is a
@@ -25,7 +44,7 @@ export const validateRequiredTemplateVariables = (
   }
 
   const missing = declared
-    .filter((definition) => definition?.required && definition.name && isMissing(variables?.[definition.name]))
+    .filter((definition) => definition?.required && definition.name && isMissing(lookupVariable(variables, definition.name.trim())))
     .map((definition) => definition.name)
 
   if (missing.length > 0) {
