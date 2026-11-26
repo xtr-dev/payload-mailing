@@ -235,9 +235,16 @@ const Emails: CollectionConfig = {
             } catch {
               // Mailing context not initialized; keep the default slug.
             }
+            // `data.template` is a bare ID (a string on MongoDB, a number on
+            // the SQL adapters) or a populated template document.
+            const templateId = resolveID(data.template)
+            if (templateId === undefined) {
+              throw new Error('Email template relation has no ID')
+            }
             const template = await req.payload.findByID({
-              id: typeof data.template === 'string' ? data.template : data.template.id,
+              id: templateId,
               collection: templatesCollection,
+              req,
             })
             data.templateSlug = template.slug
           } catch (error) {
@@ -281,6 +288,9 @@ const Emails: CollectionConfig = {
           // 2. Updating the relationship in afterChange causes transaction isolation issues
           //    (the new job isn't committed yet, so the relationship validation fails)
           const { jobIds } = await ensureEmailJob(req.payload, doc.id, {
+            // sendEmail supplies a per-send queue override through the create
+            // context. Direct creates retain ensureEmailJob's config fallback.
+            queueName: (req.context as { emailQueueName?: string } | undefined)?.emailQueueName,
             scheduledAt: doc.scheduledAt,
           })
 

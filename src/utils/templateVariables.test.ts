@@ -46,4 +46,22 @@ describe('validateRequiredTemplateVariables', () => {
     const tpl = template([{ name: 'firstName', required: false }, { name: 'siteName' }])
     expect(() => validateRequiredTemplateVariables(tpl, {})).not.toThrow()
   })
+
+  test('resolves dotted names as paths into nested variables', () => {
+    const tpl = template([
+      { name: 'user.name', required: true },
+      { name: 'order.total.amount', required: true },
+    ])
+    expect(() =>
+      validateRequiredTemplateVariables(tpl, { order: { total: { amount: 0 } }, user: { name: 'Ada' } }),
+    ).not.toThrow()
+    expect(() => validateRequiredTemplateVariables(tpl, { order: { total: 5 }, user: {} })).toThrow(
+      /"welcome": user\.name, order\.total\.amount/,
+    )
+  })
+
+  test('accepts a top-level key that contains the dots itself', () => {
+    const tpl = template([{ name: 'user.name', required: true }])
+    expect(() => validateRequiredTemplateVariables(tpl, { 'user.name': 'Ada' })).not.toThrow()
+  })
 })

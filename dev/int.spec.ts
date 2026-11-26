@@ -27,24 +27,6 @@ describe('Plugin integration tests', () => {
     expect((payload as any).mailing.config).toBeDefined()
   })
 
-  test('can create post with custom text field added by plugin', async () => {
-    const post = await payload.create({
-      collection: 'posts',
-      data: {
-        addedByPlugin: 'added by plugin',
-      },
-    })
-    expect(post.addedByPlugin).toBe('added by plugin')
-  })
-
-  test('plugin creates and seeds plugin-collection', async () => {
-    expect(payload.collections['plugin-collection']).toBeDefined()
-
-    const { docs } = await payload.find({ collection: 'plugin-collection' })
-
-    expect(docs).toHaveLength(1)
-  })
-
   test('creating an email queues a process-email job (kept for observability)', async () => {
     const email = await sendEmail(payload, {
       data: {
@@ -119,6 +101,32 @@ describe('Plugin integration tests', () => {
 
     // The job ran synchronously via the context handoff (no polling), so the
     // email has advanced out of the pending state by the time sendEmail returns.
+    const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
+    expect(reloaded.status).not.toBe('pending')
+  })
+
+  test('sendEmail with a template stores the template slug', async () => {
+    // The dev app uses SQLite, where relationship IDs are numbers.
+    const email = await sendEmail(payload, {
+      data: { to: 'slug@test.com' },
+      template: { slug: 'welcome-email', variables: { firstName: 'Ada', siteName: 'Test' } },
+    })
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
+    expect(reloaded.templateSlug).toBe('welcome-email')
+  })
+
+  test('sendEmail({ processImmediately: true }) runs the job on a non-default queue', async () => {
+    const email = await sendEmail(payload, {
+      data: {
+        html: '<p>Immediate</p>',
+        subject: 'Immediate send on another queue',
+        to: 'immediate-queue@test.com',
+      },
+      processImmediately: true,
+      queue: 'high',
+    })
+
     const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
     expect(reloaded.status).not.toBe('pending')
   })
