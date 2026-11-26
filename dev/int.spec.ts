@@ -115,4 +115,19 @@ describe('Plugin integration tests', () => {
     const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
     expect(reloaded.templateSlug).toBe('welcome-email')
   })
+
+  test('sendEmail({ processImmediately: true }) runs the job on a non-default queue', async () => {
+    const email = await sendEmail(payload, {
+      data: {
+        html: '<p>Immediate</p>',
+        subject: 'Immediate send on another queue',
+        to: 'immediate-queue@test.com',
+      },
+      processImmediately: true,
+      queue: 'high',
+    })
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
+    expect(reloaded.status).not.toBe('pending')
+  })
 })

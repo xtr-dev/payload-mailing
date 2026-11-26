@@ -622,6 +622,62 @@ describe('renderTemplateDocument — Payload 3 links in the HTML body', () => {
   })
 })
 
+describe('renderTemplateDocument — template variables in link URLs', () => {
+  const linkTemplate = (url: string) =>
+    ({
+      content: {
+        root: {
+          children: [{ type: 'paragraph', children: [{ type: 'link', children: [{ type: 'text', text: 'Go' }], fields: { linkType: 'custom', url } }] }],
+        },
+      },
+      subject: 's',
+    }) as any
+
+  // Lexical's link field stores any URL failing its validation as
+  // encodeURIComponent(url), which is what these templates hold.
+  test('renders a URL that Lexical percent-encoded ({{siteUrl}}/account)', async () => {
+    const svc = makeService()
+    const { html, text } = await svc.renderTemplateDocument(
+      linkTemplate(encodeURIComponent('{{siteUrl}}/account?u={{userId}}')),
+      { siteUrl: 'https://x.test', userId: 'a&b' },
+    )
+    expect(html).toBe('<p><a href="https://x.test/account?u=a&amp;b">Go</a></p>')
+    expect(text.trim()).toBe('Go (https://x.test/account?u=a&b)')
+  })
+
+  test('renders a Liquid tag with a quoted filter argument in the URL', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      linkTemplate(encodeURIComponent('{{siteUrl|append:"/reset"}}')),
+      { siteUrl: 'https://x.test' },
+    )
+    expect(html).toBe('<p><a href="https://x.test/reset">Go</a></p>')
+  })
+
+  test('renders with the Mustache engine', async () => {
+    const svc = makeService({ templateEngine: 'mustache' })
+    const { html } = await svc.renderTemplateDocument(linkTemplate(encodeURIComponent('{{resetUrl}}')), {
+      resetUrl: 'https://x.test/r?t=1',
+    })
+    // Mustache entity-encodes `/` and `=` in values, which is valid inside an attribute.
+    expect(html).toBe('<p><a href="https:&#x2F;&#x2F;x.test&#x2F;r?t&#x3D;1">Go</a></p>')
+  })
+
+  test('the substituted value cannot break out of the href attribute', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(linkTemplate(encodeURIComponent('{{u}}')), {
+      u: '" onclick="x',
+    })
+    expect(html).toBe('<p><a href="&#34; onclick=&#34;x">Go</a></p>')
+  })
+
+  test('keeps ordinary percent-encoding in URLs without template tags', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(linkTemplate('https://x.test/?q=a%20b%7D'), {})
+    expect(html).toBe('<p><a href="https://x.test/?q=a%20b%7D">Go</a></p>')
+  })
+})
+
 describe('renderTemplateDocument — perPart() with strictTemplates, the escaped fallback and filters', () => {
   const button = perPart({
     html: '<a href="https://example.com">Log in</a>',
