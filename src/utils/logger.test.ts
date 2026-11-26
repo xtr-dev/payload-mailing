@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+
 import { getPluginLogger } from './logger.js'
 
 function makeMockPayload() {
