@@ -11,7 +11,7 @@ export type { ProcessEmailJobInput } from './jobs/processEmailJob.js'
 export { default as mailingPluginDefault, mailingPlugin } from './plugin.js'
 
 // Main email sending function
-export { sendEmail, type SendEmailOptions } from './sendEmail.js'
+export { ImmediateProcessingError, sendEmail, type SendEmailOptions } from './sendEmail.js'
 export { default as sendEmailDefault } from './sendEmail.js'
 
 // Services

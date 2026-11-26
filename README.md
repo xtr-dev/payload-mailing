@@ -108,6 +108,23 @@ Emails are queued and sent in the background (see [Jobs](#jobs)). Pass
 send's job onto a named queue (e.g. `'high'`) instead of the plugin's `queue`
 option.
 
+If `processImmediately` creates and queues the email but running its job inline
+fails, `sendEmail` throws an `ImmediateProcessingError`. The email is still in the
+outbox with its job and goes out on the next queue run. Its `email` and `jobId`
+properties tell you which email it was, so you can treat the send as queued
+instead of failed:
+
+```typescript
+import { ImmediateProcessingError, sendEmail } from '@xtr-dev/payload-mailing'
+
+try {
+  await sendEmail(payload, { template: { slug: 'invite' }, data: { to }, processImmediately: true })
+} catch (error) {
+  if (!(error instanceof ImmediateProcessingError)) throw error
+  // Queued, not lost: error.email.id is in the outbox.
+}
+```
+
 ## Templates
 
 Author templates in the admin (**Mailing → Email Templates**): a `slug`,

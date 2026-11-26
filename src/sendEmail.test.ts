@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { sendEmail } from './sendEmail.js'
+import { ImmediateProcessingError, sendEmail } from './sendEmail.js'
 import { processJobById } from './utils/emailProcessor.js'
 import { ensureEmailJob } from './utils/jobScheduler.js'
 
@@ -116,6 +116,41 @@ describe('sendEmail immediate-processing queue handoff', () => {
       data: directEmail,
       processImmediately: true,
     })).rejects.toThrow('Failed to process email email-1 immediately: Error: adapter exploded')
+  })
+
+  test('reports an inline-run failure as ImmediateProcessingError carrying the created email', async () => {
+    const payload = makePayload((context) => {
+      context.emailJobIds = ['job-7']
+    })
+    const cause = new Error('adapter exploded')
+    vi.mocked(processJobById).mockRejectedValue(cause)
+
+    const error = await sendEmail(payload as never, {
+      data: directEmail,
+      processImmediately: true,
+    }).catch((err: unknown) => err)
+
+    expect(error).toBeInstanceOf(ImmediateProcessingError)
+    expect(error).toBeInstanceOf(Error)
+    expect(error).toMatchObject({
+      name: 'ImmediateProcessingError',
+      cause,
+      email: { id: 'email-1' },
+      jobId: 'job-7',
+    })
+  })
+
+  test('throws a plain Error, not ImmediateProcessingError, when no email was created', async () => {
+    const payload = makePayload()
+
+    const error = await sendEmail(payload as never, {
+      data: { ...directEmail, to: 'not-an-address' },
+      processImmediately: true,
+    }).catch((err: unknown) => err)
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(ImmediateProcessingError)
+    expect(payload.create).not.toHaveBeenCalled()
   })
 })
 
