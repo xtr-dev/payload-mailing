@@ -14,6 +14,19 @@ describe('parseAndValidateEmails', () => {
     expect(parseAndValidateEmails(emails)).toBe(emails)
   })
 
+  test('does not re-split an array entry that contains a comma', () => {
+    // If array entries were joined and re-split on ',', this would silently become
+    // two valid recipients (a@b.com, c@d.com) instead of one invalid candidate.
+    expect(() => parseAndValidateEmails(['a@b.com,c@d.com'])).toThrow(
+      'Invalid email addresses: a@b.com,c@d.com',
+    )
+  })
+
+  test('rejects a value carrying a CR or LF, so header injection cannot reach the send path', () => {
+    expect(() => parseAndValidateEmails('a@b.com\r\nBcc: evil@x.com')).toThrow('Invalid email addresses')
+    expect(() => parseAndValidateEmails('a@b.com\nBcc: evil@x.com')).toThrow('Invalid email addresses')
+  })
+
   test.each([null, undefined, ''] as const)('returns undefined for an absent value (%s)', (emails) => {
     expect(parseAndValidateEmails(emails)).toBeUndefined()
   })
