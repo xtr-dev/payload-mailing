@@ -222,7 +222,7 @@ export interface EmailTemplate {
   variables?:
     | {
         /**
-         * Variable name as referenced in the template, e.g. firstName (without the {{ }}).
+         * Variable name as referenced in the template, e.g. firstName or user.name (without the {{ }}).
          */
         name: string;
         /**
