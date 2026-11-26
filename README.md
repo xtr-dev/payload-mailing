@@ -33,8 +33,9 @@ export default buildConfig({
       defaultFrom: 'noreply@yoursite.com',
       collections: {
         // Required — collections deny all access by default. See "Access Control".
-        emails: { access: { read: ({ req: { user } }) => Boolean(user) } },
-        templates: { access: { read: ({ req: { user } }) => Boolean(user) } },
+        // Grant staff only: sent emails contain sign-in links and other per-recipient secrets.
+        emails: { access: { read: ({ req: { user } }) => user?.role === 'admin' } },
+        templates: { access: { read: ({ req: { user } }) => user?.role === 'admin' } },
       },
     }),
   ],
@@ -62,7 +63,7 @@ mailingPlugin({
     emails: {
       access: {
         read:   ({ req: { user } }) => user?.role === 'admin',
-        create: ({ req: { user } }) => Boolean(user),
+        create: ({ req: { user } }) => user?.role === 'admin',
         update: ({ req: { user } }) => user?.role === 'admin',
         delete: ({ req: { user } }) => user?.role === 'admin',
       },
@@ -71,6 +72,12 @@ mailingPlugin({
   },
 })
 ```
+
+Keep `emails` staff-only. Each sent email stores its `variables` and rendered
+body, which often hold sign-in links, confirmation links and one-time codes, so
+granting `read` to every signed-in user lets any account take over another.
+Granting `create` lets any account send mail from your domain. Your app's own
+code sends through `sendEmail` (Local API) and needs no access rule.
 
 `access` is the standard [Payload access control](https://payloadcms.com/docs/access-control/collections)
 API. The same override object also accepts custom `fields`, `hooks`, `admin`, etc.
@@ -97,7 +104,9 @@ await sendEmail(payload, {
 ```
 
 Emails are queued and sent in the background (see [Jobs](#jobs)). Pass
-`processImmediately: true` to send synchronously.
+`processImmediately: true` to send synchronously, or `queue` to route a single
+send's job onto a named queue (e.g. `'high'`) instead of the plugin's `queue`
+option.
 
 ## Templates
 
@@ -114,13 +123,18 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   the HTML body one value and the plain-text body (and subject) another, e.g. a
   link button as markup in HTML and as `Log in: https://…` in text. The HTML
   value is still escaped unless you use `| raw` / `{{{ }}}`.
+- **Links** — rich-text link URLs can hold variables, e.g. `{{siteUrl}}/account`
+  or `{{resetUrl}}`. Leave out spaces inside the braces (the link field rejects
+  URLs with spaces). The value is HTML-escaped but its scheme is not checked, so
+  pass only trusted URLs.
 - **Filters** (LiquidJS) — `formatDate` (`"short"`, `"long"` or default),
   `formatCurrency` and `capitalize`. Set `locale` (e.g. `'nl-NL'`), `currency`
   (e.g. `'EUR'`) and `timeZone` (e.g. `'Europe/Amsterdam'`) in the plugin
   config, or override per use: `{{ d | formatDate: "long", "nl-NL" }}`,
   `{{ total | formatCurrency: "EUR", "nl-NL" }}`.
 - **Required variables** — mark declared variables Required and a send missing
-  one is rejected *before it's queued*. Opt-in; declare nothing to skip checks.
+  one is rejected *before it's queued*. Dotted names such as `user.name` are
+  checked as nested paths. Opt-in; declare nothing to skip checks.
 
 Render without sending: `renderTemplate(payload, slug, vars)` →
 `{ html, text, subject }`.
@@ -157,7 +171,7 @@ due emails per call, highest priority first). Emails track a `status` of
 | --- | --- |
 | `defaultFrom` / `defaultFromName` | Default sender for emails that don't set one. |
 | `retryAttempts` / `retryDelay` | Retry count and delay (ms) for failed sends. |
-| `queue` | Job queue name (default `'default'`). |
+| `queue` | Job queue name (default `'default'`). A single `sendEmail` call can override it with its own `queue` option. |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |
 | `strictTemplates` | `true` makes a template parse/render error throw a `TemplateRenderError` (so `sendEmail` rejects) instead of falling back to plain `{{ name }}` substitution. Default `false`. |
@@ -167,6 +181,8 @@ due emails per call, highest priority first). Emails track a `status` of
 | `collections` | Rename (`'slug'`) or override (`{ access, fields, … }`) the emails/templates collections. |
 | `beforeSend` | `(options, email) => options` hook to mutate the send just before delivery. |
 | `resolveInternalLink` | `(fields) => url` for rich-text links to other documents (`fields.doc.relationTo` / `fields.doc.value`). Without it, internal links render as plain text. |
+| `richTextEditor` | Custom Lexical editor config for the templates collection's `content` field, passed through as `RichTextField['editor']`. |
+| `initOrder` | `'before'` (default) sets up `payload.mailing` before the host app's own `onInit` runs; `'after'` runs the host's `onInit` first. |
 
 ## API
 

@@ -71,7 +71,30 @@ function getLinkTarget(
     url = fields?.url ?? node.url
   }
 
-  return { newTab, url: typeof url === 'string' ? url.trim() : '' }
+  return { newTab, url: typeof url === 'string' ? decodeTemplateTagsInUrl(url.trim()) : '' }
+}
+
+// `%7B%7B` is an encoded `{{`, `%7B%25` an encoded `{%`.
+const ENCODED_TAG_OPENER = /%7B(?:%7B|%25)/i
+
+/**
+ * Restores template tags that Lexical percent-encoded in a link URL.
+ *
+ * Lexical's link field runs `encodeURIComponent` over the whole URL whenever it
+ * fails Lexical's own URL validation, which every URL starting with a template
+ * tag does (`{{siteUrl}}/account` is stored as `%7B%7BsiteUrl%7D%7D%2Faccount`).
+ * Because the whole string was encoded, decoding the whole string recovers
+ * exactly what the editor typed. URLs without an encoded tag opener are
+ * returned unchanged, so ordinary percent-encoded URLs keep their encoding.
+ */
+export function decodeTemplateTagsInUrl(url: string): string {
+  if (!ENCODED_TAG_OPENER.test(url)) {return url}
+  try {
+    return decodeURIComponent(url)
+  } catch {
+    // Malformed escape sequences mean this was not Lexical's encoding.
+    return url
+  }
 }
 
 /**
@@ -142,16 +165,25 @@ const TAG_PATTERNS: Record<Exclude<TemplateTagSyntax, 'none'>, RegExp> = {
  * `<strong>`) that no engine can parse anyway; its text is escaped as usual.
  */
 function escapeTextNode(input: string, syntax: TemplateTagSyntax): string {
+  return escapeOutsideTags(input, syntax, escapeTextContent)
+}
+
+/**
+ * Applies `escape` to everything in `input` except the engine's template tags,
+ * which are passed through verbatim (see {@link escapeTextNode} for why that is
+ * safe). With `syntax: 'none'` the whole input is escaped.
+ */
+function escapeOutsideTags(input: string, syntax: TemplateTagSyntax, escape: (s: string) => string): string {
   if (syntax === 'none') {
-    return escapeTextContent(input)
+    return escape(input)
   }
   let out = ''
   let last = 0
   for (const match of input.matchAll(TAG_PATTERNS[syntax])) {
-    out += escapeTextContent(input.slice(last, match.index)) + match[0]
+    out += escape(input.slice(last, match.index)) + match[0]
     last = match.index + match[0].length
   }
-  return out + escapeTextContent(input.slice(last))
+  return out + escape(input.slice(last))
 }
 
 /**
@@ -159,9 +191,21 @@ function escapeTextNode(input: string, syntax: TemplateTagSyntax): string {
  * escapes the result, and returns '#' for anything else (e.g. javascript:).
  */
 export function safeUrl(rawUrl: string): string {
+  return safeTemplateUrl(rawUrl, 'none')
+}
+
+/**
+ * {@link safeUrl} for a link in the HTML body, which is template source: the
+ * engine's tags (e.g. `{{resetUrl}}` or `{{ url | append: "/x" }}`) are left
+ * unescaped so the engine can parse them, and everything else is
+ * attribute-escaped. The scheme allow-list applies to the URL as written, so a
+ * URL that starts with a tag passes as relative and the scheme of the value
+ * substituted into it is not checked.
+ */
+function safeTemplateUrl(rawUrl: string, syntax: TemplateTagSyntax): string {
   const url = (rawUrl || '#').trim()
   if (/^(?:https?:|mailto:)/i.test(url) || /^[^a-z]/i.test(url)) {
-    return escapeHtml(url)
+    return escapeOutsideTags(url, syntax, escapeHtml)
   }
   return '#'
 }
@@ -210,7 +254,7 @@ function serializeNodeToHTML(node: SerializedLexicalNode, options: RichTextSeria
       // text but drops the anchor rather than pointing at a dead `#`.
       if (!url) {return linkChildren}
       const target = newTab ? ' target="_blank" rel="noopener noreferrer"' : ''
-      return `<a href="${safeUrl(url)}"${target}>${linkChildren}</a>`
+      return `<a href="${safeTemplateUrl(url, options.templateSyntax || 'none')}"${target}>${linkChildren}</a>`
     }
 
     case 'heading': {
