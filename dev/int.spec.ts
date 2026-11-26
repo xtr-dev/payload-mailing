@@ -130,4 +130,41 @@ describe('Plugin integration tests', () => {
     const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
     expect(reloaded.status).not.toBe('pending')
   })
+
+  test('a failed send queues a retry job delayed by retryDelay on the same queue', async () => {
+    // Make the adapter fail for this one send; the service calls
+    // payload.email.sendEmail at send time, so swapping it here is enough.
+    const originalSendEmail = payload.email.sendEmail
+    payload.email.sendEmail = () => Promise.reject(new Error('smtp down'))
+    const before = Date.now()
+    let emailId: number | string
+    try {
+      const email = await sendEmail(payload, {
+        data: { html: '<p>Retry</p>', subject: 'Retry me', to: 'retry@test.com' },
+        processImmediately: true,
+        queue: 'high',
+      })
+      emailId = email.id
+    } finally {
+      payload.email.sendEmail = originalSendEmail
+    }
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: emailId })
+    expect(reloaded.status).toBe('pending')
+    expect(reloaded.attempts).toBe(1)
+
+    const jobs = await payload.find({
+      collection: 'payload-jobs',
+      limit: 100,
+      where: { taskSlug: { equals: 'process-email' } },
+    })
+    const retryJobs = (jobs.docs as { completedAt?: null | string, input?: { emailId?: string }, queue?: string, waitUntil?: null | string }[])
+      .filter((job) => job.input?.emailId === String(emailId) && !job.completedAt)
+    expect(retryJobs).toHaveLength(1)
+    expect(retryJobs[0].queue).toBe('high')
+    // The dev config sets retryDelay to one minute.
+    const waitUntil = new Date(retryJobs[0].waitUntil as string).getTime()
+    expect(waitUntil).toBeGreaterThanOrEqual(before + 60000)
+    expect(waitUntil).toBeLessThan(Date.now() + 60000 + 1000)
+  })
 })
