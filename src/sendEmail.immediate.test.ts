@@ -50,6 +50,7 @@ describe('sendEmail processImmediately', () => {
 
     expect(payload.jobs.run).toHaveBeenCalledOnce()
     expect(payload.jobs.run).toHaveBeenCalledWith({
+      allQueues: true,
       where: { id: { equals: 'job-1' } },
     })
     expect(payload.jobs.queue).not.toHaveBeenCalled()
@@ -67,6 +68,7 @@ describe('sendEmail processImmediately', () => {
       task: 'process-email',
     }))
     expect(payload.jobs.run).toHaveBeenCalledWith({
+      allQueues: true,
       where: { id: { equals: 'job-queued' } },
     })
   })
@@ -81,6 +83,7 @@ describe('sendEmail processImmediately', () => {
     await sendEmail(payload as never, { data: emailData, processImmediately: true })
 
     expect(payload.jobs.run).toHaveBeenCalledWith({
+      allQueues: true,
       where: { id: { equals: '7' } },
     })
   })
@@ -96,6 +99,7 @@ describe('sendEmail processImmediately', () => {
 
     expect(payload.jobs.run).toHaveBeenCalledOnce()
     expect(payload.jobs.run).toHaveBeenCalledWith({
+      allQueues: true,
       where: { id: { equals: 'a' } },
     })
   })
@@ -150,6 +154,7 @@ describe('sendEmail processImmediately', () => {
     }))
     expect(payload.jobs.run).toHaveBeenCalledOnce()
     expect(payload.jobs.run).toHaveBeenCalledWith({
+      allQueues: true,
       where: { id: { equals: 'job-queued' } },
     })
   })
