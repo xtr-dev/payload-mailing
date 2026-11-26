@@ -123,6 +123,10 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   the HTML body one value and the plain-text body (and subject) another, e.g. a
   link button as markup in HTML and as `Log in: https://…` in text. The HTML
   value is still escaped unless you use `| raw` / `{{{ }}}`.
+- **Links** — rich-text link URLs can hold variables, e.g. `{{siteUrl}}/account`
+  or `{{resetUrl}}`. Leave out spaces inside the braces (the link field rejects
+  URLs with spaces). The value is HTML-escaped but its scheme is not checked, so
+  pass only trusted URLs.
 - **Filters** (LiquidJS) — `formatDate` (`"short"`, `"long"` or default),
   `formatCurrency` and `capitalize`. Set `locale` (e.g. `'nl-NL'`), `currency`
   (e.g. `'EUR'`) and `timeZone` (e.g. `'Europe/Amsterdam'`) in the plugin
