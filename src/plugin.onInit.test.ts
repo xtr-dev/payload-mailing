@@ -8,7 +8,7 @@ import { mailingPlugin } from './plugin.js'
 // throws if `.email` is missing) without needing a real Payload instance.
 const stubPayload = () => ({ db: {}, email: {} }) as any
 
-const buildPlugin = (pluginConfig: Record<string, any>, hostOnInit: (payload: any) => void | Promise<void>) =>
+const buildPlugin = (pluginConfig: Record<string, any>, hostOnInit: (payload: any) => Promise<void> | void) =>
   mailingPlugin(pluginConfig as never)({ collections: [], onInit: hostOnInit } as unknown as Config)
 
 describe('onInit ordering (initOrder)', () => {
