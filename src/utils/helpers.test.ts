@@ -100,6 +100,11 @@ describe('sanitizeFromName', () => {
     expect(sanitizeFromName('\x00\x01')).toBeUndefined()
   })
 
+  test('returns undefined when a name is only CR/LF or whitespace', () => {
+    expect(sanitizeFromName('\r\n')).toBeUndefined()
+    expect(sanitizeFromName('   ')).toBeUndefined()
+  })
+
   test('strips a CR/LF header-injection payload from a fromName', () => {
     expect(sanitizeFromName('Evil\r\nBcc: evil@evil.com')).toBe('Evil  Bcc: evil@evil.com')
   })
