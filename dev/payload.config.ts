@@ -101,6 +101,7 @@ export default buildConfig({
     email: testEmailAdapter,
     onInit: async (payload) => {
       await seed(payload)
+      await seedUser(payload)
     },
     jobs: {
       jobsCollectionOverrides: c => {
@@ -118,7 +119,6 @@ export default buildConfig({
     plugins: [
       mailingPlugin({
         defaultFrom: 'noreply@test.com',
-        initOrder: 'after',
         retryAttempts: 3,
         retryDelay: 60000, // 1 minute for dev
         queue: 'default',
