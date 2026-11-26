@@ -105,6 +105,17 @@ describe('Plugin integration tests', () => {
     expect(reloaded.status).not.toBe('pending')
   })
 
+  test('sendEmail with a template stores the template slug', async () => {
+    // The dev app uses SQLite, where relationship IDs are numbers.
+    const email = await sendEmail(payload, {
+      data: { to: 'slug@test.com' },
+      template: { slug: 'welcome-email', variables: { firstName: 'Ada', siteName: 'Test' } },
+    })
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
+    expect(reloaded.templateSlug).toBe('welcome-email')
+  })
+
   test('sendEmail({ processImmediately: true }) runs the job on a non-default queue', async () => {
     const email = await sendEmail(payload, {
       data: {
