@@ -9,3 +9,9 @@
 # upward search at this directory instead.
 packages:
   - .
+
+# Security floor for a transitive dev-only dependency whose parent pins a
+# vulnerable version (@lexical/headless, via @payloadcms/richtext-lexical, pins
+# happy-dom 20). Remove it once the parent ships happy-dom >= 21.0.4.
+overrides:
+  happy-dom@<21.0.4: ^21.0.4
