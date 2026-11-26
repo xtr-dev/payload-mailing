@@ -192,6 +192,10 @@ export const processEmails = (payload: Payload): Promise<void> => {
   return mailing.service.processEmails()
 }
 
+/**
+ * Gives up to 20 `failed` emails (those that used up `retryAttempts`) one more
+ * send attempt each, once `retryDelay` has passed since their last attempt.
+ */
 export const retryFailedEmails = (payload: Payload): Promise<void> => {
   const mailing = getMailing(payload)
   return mailing.service.retryFailedEmails()

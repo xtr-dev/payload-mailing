@@ -173,3 +173,59 @@ describe('processEmails honours retryDelay for emails that already failed', () =
     })
   })
 })
+
+describe('retryFailedEmails gives failed emails one more attempt', () => {
+  test('selects failed emails whatever their attempt count, once retryDelay has passed, oldest first', async () => {
+    const payload = stubPayload()
+    const svc = new MailingService(payload, { retryAttempts: 3, retryDelay: 60000 } as any)
+
+    await svc.retryFailedEmails()
+
+    const findCall = payload.find.mock.calls[0][0]
+    expect(findCall.limit).toBe(20)
+    expect(findCall.sort).toBe('lastAttemptAt')
+    // No `attempts < retryAttempts` clause: an email only becomes `failed`
+    // once its attempts are used up, so such a clause matched nothing.
+    expect(findCall.where).toEqual({
+      and: [
+        { status: { equals: 'failed' } },
+        {
+          or: [
+            { lastAttemptAt: { exists: false } },
+            { lastAttemptAt: { less_than_equal: new Date(NOW.getTime() - 60000).toISOString() } },
+          ],
+        },
+      ],
+    })
+  })
+
+  test('an exhausted email is claimed from failed and sent', async () => {
+    const payload = stubPayload()
+    payload.find.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.email.sendEmail.mockResolvedValue(undefined)
+    payload.findByID.mockResolvedValue(email(3))
+    const svc = new MailingService(payload, { retryAttempts: 3 } as any)
+
+    await svc.retryFailedEmails()
+
+    expect(payload.update.mock.calls[0][0].where.and[1]).toEqual({ status: { equals: 'failed' } })
+    expect(payload.email.sendEmail).toHaveBeenCalledTimes(1)
+    const finalCall = payload.update.mock.calls[payload.update.mock.calls.length - 1][0]
+    expect(finalCall.data.status).toBe('sent')
+  })
+
+  test('if the extra attempt fails the email stays failed and no retry job is queued', async () => {
+    const payload = stubPayload()
+    payload.find.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.findByID.mockResolvedValue(email(3))
+    const svc = new MailingService(payload, { retryAttempts: 3 } as any)
+
+    await svc.retryFailedEmails()
+
+    const finalCall = payload.update.mock.calls[payload.update.mock.calls.length - 1][0]
+    expect(finalCall.data.status).toBe('failed')
+    const attemptsUpdate = payload.update.mock.calls.find((call: any[]) => call[0].data.attempts !== undefined)
+    expect(attemptsUpdate[0].data.attempts).toBe(4)
+    expect(payload.jobs.queue).not.toHaveBeenCalled()
+  })
+})

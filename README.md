@@ -228,7 +228,7 @@ await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.co
 | `sendEmail(payload, options)` | Queue (or immediately send) a template/direct email. |
 | `renderTemplate(payload, slug, vars)` | Render `{ html, text, subject }` without sending. |
 | `processEmails(payload)` | Send up to 50 due `pending` emails. |
-| `retryFailedEmails(payload)` | Resend up to 20 `failed` emails that have attempts left and whose last attempt is older than `retryDelay`. |
+| `retryFailedEmails(payload)` | Give up to 20 `failed` emails (attempts used up) one more try each, oldest first, once `retryDelay` has passed since their last attempt. If that try fails too, the email stays `failed`. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
 | `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 | `perPart({ html, text })` | Give a variable separate HTML and plain-text values. |

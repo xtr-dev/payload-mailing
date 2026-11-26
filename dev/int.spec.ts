@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import config from '@payload-config'
-import { sendEmail } from '@xtr-dev/payload-mailing'
+import { retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
 import { createPayloadRequest, getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
@@ -166,5 +166,26 @@ describe('Plugin integration tests', () => {
     const waitUntil = new Date(retryJobs[0].waitUntil as string).getTime()
     expect(waitUntil).toBeGreaterThanOrEqual(before + 60000)
     expect(waitUntil).toBeLessThan(Date.now() + 60000 + 1000)
+  })
+
+  test('retryFailedEmails sends an email that used up its attempts', async () => {
+    // An email only reaches `failed` once all retryAttempts (3 in the dev
+    // config) are used, so that is the state retryFailedEmails has to find.
+    const failed = await payload.create({
+      collection: 'emails',
+      data: {
+        attempts: 3,
+        html: '<p>Failed before</p>',
+        lastAttemptAt: new Date(Date.now() - 2 * 60000).toISOString(),
+        status: 'failed',
+        subject: 'Exhausted',
+        to: ['exhausted@test.com'],
+      },
+    })
+
+    await retryFailedEmails(payload)
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: failed.id })
+    expect(reloaded.status).toBe('sent')
   })
 })

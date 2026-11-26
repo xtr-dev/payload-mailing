@@ -737,25 +737,30 @@ export class MailingService implements IMailingService {
     }
   }
 
+  /**
+   * Gives emails that used up their `retryAttempts` (status `failed`) one more
+   * send attempt each: up to 20 per call, longest-waiting first, and only once
+   * `retryDelay` has passed since their last attempt. Failed sends with
+   * attempts left never reach `failed`; they are retried automatically (see
+   * scheduleRetry). If the extra attempt fails too, the email stays `failed`
+   * (its `attempts` count keeps growing), so this is a manual "try these
+   * again" action rather than part of the normal retry flow.
+   */
   async retryFailedEmails(): Promise<void> {
     this.ensureInitialized()
-    const maxAttempts = this.config.retryAttempts || 3
-    const retryDelay = this.config.retryDelay || 300000 // 5 minutes
-    const retryTime = new Date(Date.now() - retryDelay).toISOString()
+    const retryTime = new Date(Date.now() - this.getRetryDelay()).toISOString()
 
     const { docs: failedEmails } = await this.payload.find({
       collection: this.emailsCollection,
       limit: 20,
+      // Oldest last attempt first, so repeated calls work through a backlog of
+      // more than 20 failed emails instead of retrying the same ones.
+      sort: 'lastAttemptAt',
       where: {
         and: [
           {
             status: {
               equals: 'failed',
-            },
-          },
-          {
-            attempts: {
-              less_than: maxAttempts,
             },
           },
           {
@@ -767,7 +772,7 @@ export class MailingService implements IMailingService {
               },
               {
                 lastAttemptAt: {
-                  less_than: retryTime,
+                  less_than_equal: retryTime,
                 },
               },
             ],
