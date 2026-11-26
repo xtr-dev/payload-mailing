@@ -34,5 +34,6 @@ jobs:
       check: |
         bash scripts/check-readme-peer-version.sh
         pnpm lint
+        pnpm typecheck
         pnpm test
         pnpm test:int
