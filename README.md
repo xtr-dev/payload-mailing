@@ -181,6 +181,8 @@ due emails per call, highest priority first). Emails track a `status` of
 | `collections` | Rename (`'slug'`) or override (`{ access, fields, … }`) the emails/templates collections. |
 | `beforeSend` | `(options, email) => options` hook to mutate the send just before delivery. |
 | `resolveInternalLink` | `(fields) => url` for rich-text links to other documents (`fields.doc.relationTo` / `fields.doc.value`). Without it, internal links render as plain text. |
+| `richTextEditor` | Custom Lexical editor config for the templates collection's `content` field, passed through as `RichTextField['editor']`. |
+| `initOrder` | `'before'` (default) sets up `payload.mailing` before the host app's own `onInit` runs; `'after'` runs the host's `onInit` first. |
 
 ## API
 
