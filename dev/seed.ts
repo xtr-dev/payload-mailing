@@ -45,7 +45,7 @@ export const seed = async (payload: Payload) => {
                     format: 0,
                     mode: 'normal',
                     style: '',
-                    text: "We're thrilled to have you join {{siteName}}! This email demonstrates how easy it is to create beautiful emails using PayloadCMS's rich text editor with Handlebars variables.",
+                    text: "We're thrilled to have you join {{siteName}}! This email demonstrates how easy it is to create beautiful emails using PayloadCMS's rich text editor with Liquid variables.",
                     type: 'text',
                     version: 1,
                   },
