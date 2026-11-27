@@ -2,6 +2,17 @@
 
 Releases up to v0.6.0, and notes written before the switch to generated changelogs, are in [changelog/HISTORY.md](changelog/HISTORY.md).
 
+## [0.9.0](https://github.com/xtr-dev/payload-mailing/compare/v0.8.0...v0.9.0) - 2026-11-27
+
+### Breaking
+- **templates:** require liquidjs ^10.30.1 so {% echo %} output is HTML-escaped ([#174](https://github.com/xtr-dev/payload-mailing/issues/174)) ([253f847](https://github.com/xtr-dev/payload-mailing/commit/253f8478eb2d0760f494740252019fe0c1875874))
+- **retry:** stop processAllEmails retrying emails that used up their attempts ([#173](https://github.com/xtr-dev/payload-mailing/issues/173)) ([ff8b0a6](https://github.com/xtr-dev/payload-mailing/commit/ff8b0a66853c7cc834073070dcbc7bd60ee806da))
+- **send:** throw ImmediateProcessingError when an immediate send is not delivered ([#172](https://github.com/xtr-dev/payload-mailing/issues/172)) ([318618b](https://github.com/xtr-dev/payload-mailing/commit/318618bedddc29af2476e4c450c0047d7fa09eb4))
+
+### Other
+- **readme:** use the shared v0.x pre-release note ([#176](https://github.com/xtr-dev/payload-mailing/issues/176)) ([d4624a5](https://github.com/xtr-dev/payload-mailing/commit/d4624a58816b1706a7fe2e69024ab5b2072cf9bb))
+- **dev:** make the dev app build and drop the unused mongodb adapter ([#175](https://github.com/xtr-dev/payload-mailing/issues/175)) ([24d6ffc](https://github.com/xtr-dev/payload-mailing/commit/24d6ffc4b9331325f161f44a01c64329213691da))
+
 ## [0.8.0](https://github.com/xtr-dev/payload-mailing/compare/v0.7.1...v0.8.0) - 2026-11-27
 
 ### Features
