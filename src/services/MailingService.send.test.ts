@@ -33,6 +33,14 @@ const baseEmail = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 })
 
+// processEmails/retryFailedEmails first look for stale `processing` claims
+// (recoverStaleClaims); these helpers keep that lookup out of the way of
+// tests about the main email selection.
+const isStaleClaimLookup = (args: any) => JSON.stringify(args?.where ?? {}).includes('"processing"')
+const emailSelection = (find: any) => find.mock.calls.map((call: any[]) => call[0]).find((args: any) => !isStaleClaimLookup(args))
+const selectionReturns = (docs: any[]) => (args: any) =>
+  Promise.resolve({ docs: isStaleClaimLookup(args) ? [] : docs })
+
 describe('processEmailItem — the atomic claim', () => {
   test('the claim update guards on id + expectedStatus and sets status: processing', async () => {
     const payload = stubPayload()
@@ -65,7 +73,7 @@ describe('processEmailItem — the atomic claim', () => {
 describe('expectedStatus is threaded through the scheduled entry points', () => {
   test('processEmails claims candidates against "pending"', async () => {
     const payload = stubPayload()
-    payload.find.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.find.mockImplementation(selectionReturns([{ id: '1' }]))
     // Losing the claim keeps this test to a single update call.
     payload.update.mockResolvedValue({ docs: [] })
     const svc = makeService(payload)
@@ -78,7 +86,7 @@ describe('expectedStatus is threaded through the scheduled entry points', () => 
 
   test('retryFailedEmails claims candidates against "failed"', async () => {
     const payload = stubPayload()
-    payload.find.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.find.mockImplementation(selectionReturns([{ id: '1' }]))
     payload.update.mockResolvedValue({ docs: [] })
     const svc = makeService(payload)
 
@@ -326,8 +334,7 @@ describe('processEmails — selection query', () => {
 
     await svc.processEmails()
 
-    expect(payload.find).toHaveBeenCalledTimes(1)
-    const findCall = payload.find.mock.calls[0][0]
+    const findCall = emailSelection(payload.find)
     expect(findCall.limit).toBe(50)
     expect(findCall.where.and[0]).toEqual({ status: { equals: 'pending' } })
     expect(findCall.where.and[1].or).toEqual([

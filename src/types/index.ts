@@ -152,6 +152,14 @@ export interface MailingPluginConfig {
    * format) and `'en-US'` for `formatCurrency`.
    */
   locale?: string
+  /**
+   * Time in ms after which an email still `processing` counts as abandoned (its
+   * process crashed mid-send). `processEmails()` and `retryFailedEmails()` then
+   * release it as a failed attempt so it is retried. Keep it well above your
+   * slowest send, since a send still running past it can be sent twice.
+   * Default `900000` (15 minutes).
+   */
+  processingTimeout?: number
   queue?: string
   /**
    * Turns an internal rich-text link (a link to another Payload document, made

@@ -188,7 +188,9 @@ without extra code. After `retryAttempts` tries the email is marked `failed`.
 priority, then oldest first, skipping emails whose last failed try is more
 recent than `retryDelay`); call it from a scheduled task if you don't run a job
 runner, or as a safety net. An email is only ever sent by the run that claims
-it, so a retry job and `processEmails` never both send it.
+it, so a retry job and `processEmails` never both send it. An email left
+`processing` by a crashed process is released by `processEmails` /
+`retryFailedEmails` once `processingTimeout` has passed, as a failed attempt.
 
 To queue an email from a Payload job or workflow, register the
 `schedule-email` task from the `/tasks` subpath:
@@ -208,6 +210,7 @@ await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.co
 | `defaultFrom` / `defaultFromName` | Default sender for emails that don't set one. |
 | `retryAttempts` | Send attempts before an email is marked `failed` (default `3`). |
 | `retryDelay` | Wait (ms) after a failed send before it is retried (default `300000`). |
+| `processingTimeout` | Time (ms) after which an email stuck in `processing` (its process crashed mid-send) is released for a retry (default `900000`). Keep it above your slowest send: a send still running past it may go out twice. |
 | `queue` | Job queue name (default `'default'`). A single `sendEmail` call can override it with its own `queue` option. |
 | `templateEngine` | `'liquidjs'` \| `'mustache'` \| `'simple'`. |
 | `templateRenderer` | Custom `(tpl, vars) => string \| Promise<string>`. |

@@ -19,6 +19,14 @@ const stubPayload = (jobsFound: any[] = []) =>
     update: vi.fn().mockResolvedValue({ docs: [{ id: '1' }] }),
   }) as any
 
+// processEmails/retryFailedEmails first look for stale `processing` claims
+// (recoverStaleClaims); these helpers keep that lookup out of the way of
+// tests about the main email selection.
+const isStaleClaimLookup = (args: any) => JSON.stringify(args?.where ?? {}).includes('"processing"')
+const emailSelection = (find: any) => find.mock.calls.map((call: any[]) => call[0]).find((args: any) => !isStaleClaimLookup(args))
+const selectionReturns = (docs: any[]) => (args: any) =>
+  Promise.resolve({ docs: isStaleClaimLookup(args) ? [] : docs })
+
 const email = (attempts: number) => ({
   id: '1',
   attempts,
@@ -162,7 +170,7 @@ describe('processEmails honours retryDelay for emails that already failed', () =
 
     await svc.processEmails()
 
-    const findCall = payload.find.mock.calls[0][0]
+    const findCall = emailSelection(payload.find)
     expect(findCall.where.and[2]).toEqual({
       or: [
         { attempts: { exists: false } },
@@ -181,7 +189,7 @@ describe('retryFailedEmails gives failed emails one more attempt', () => {
 
     await svc.retryFailedEmails()
 
-    const findCall = payload.find.mock.calls[0][0]
+    const findCall = emailSelection(payload.find)
     expect(findCall.limit).toBe(20)
     expect(findCall.sort).toBe('lastAttemptAt')
     // No `attempts < retryAttempts` clause: an email only becomes `failed`
@@ -201,7 +209,7 @@ describe('retryFailedEmails gives failed emails one more attempt', () => {
 
   test('an exhausted email is claimed from failed and sent', async () => {
     const payload = stubPayload()
-    payload.find.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.find.mockImplementation(selectionReturns([{ id: '1' }]))
     payload.email.sendEmail.mockResolvedValue(undefined)
     payload.findByID.mockResolvedValue(email(3))
     const svc = new MailingService(payload, { retryAttempts: 3 } as any)
@@ -216,7 +224,7 @@ describe('retryFailedEmails gives failed emails one more attempt', () => {
 
   test('if the extra attempt fails the email stays failed and no retry job is queued', async () => {
     const payload = stubPayload()
-    payload.find.mockResolvedValue({ docs: [{ id: '1' }] })
+    payload.find.mockImplementation(selectionReturns([{ id: '1' }]))
     payload.findByID.mockResolvedValue(email(3))
     const svc = new MailingService(payload, { retryAttempts: 3 } as any)
 
