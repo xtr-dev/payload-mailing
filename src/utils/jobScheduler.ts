@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { Payload, Where } from 'payload'
 
 import { createContextLogger } from './logger.js'
 
@@ -13,14 +13,14 @@ import { createContextLogger } from './logger.js'
  * the real double-send guard is the atomic `pending` -> `processing` claim at
  * process time (see MailingService.processEmailItem), not this check. A
  * duplicate job is queued near-simultaneously with the original, so it is among
- * the most recent jobs; and Payload's `deleteJobOnComplete` removes finished
- * jobs, keeping the live set small. Sorting newest-first means the relevant jobs
- * are always within this window.
+ * the most recent jobs; and finished jobs are excluded in the query (or removed
+ * by Payload's default `deleteJobOnComplete`), keeping the live set small.
+ * Sorting newest-first means the relevant jobs are always within this window.
  */
 const MAX_RECENT_JOBS_SCANNED = 100
 
 /**
- * Finds existing `process-email` jobs queued for a given email.
+ * Finds `process-email` jobs for a given email, newest first.
  *
  * The default payload-jobs collection identifies the task in the top-level
  * `taskSlug` field (not `task` — that is only the argument name passed to
@@ -28,23 +28,50 @@ const MAX_RECENT_JOBS_SCANNED = 100
  * `input` JSON column, whose nested path (`input.emailId`) is not filterable on
  * every database adapter — notably SQLite returns no matches — so it is matched
  * in JS over the most recent {@link MAX_RECENT_JOBS_SCANNED} jobs.
+ *
+ * With `includeFinished: false`, jobs Payload will never run again are
+ * filtered out in the query itself (so retained finished jobs cannot crowd
+ * live ones out of the scanned window), using the same fields as Payload's own
+ * runner: a set `completedAt` (kept when the host sets
+ * `deleteJobOnComplete: false`) or `hasError: true` (set once a job has used
+ * up its retries).
  */
-export async function findExistingJobs(
+export async function findEmailJobs(
   payload: Payload,
-  emailId: number | string
+  emailId: number | string,
+  options: { includeFinished: boolean },
 ): Promise<{ docs: any[], totalDocs: number }> {
   const normalizedEmailId = String(emailId)
+
+  const taskFilter: Where = {
+    taskSlug: {
+      equals: 'process-email',
+    },
+  }
+  const where: Where = options.includeFinished
+    ? taskFilter
+    : {
+        and: [
+          taskFilter,
+          {
+            completedAt: {
+              exists: false,
+            },
+          },
+          {
+            hasError: {
+              not_equals: true,
+            },
+          },
+        ],
+      }
 
   const result = await payload.find({
     collection: 'payload-jobs',
     depth: 0,
     limit: MAX_RECENT_JOBS_SCANNED,
     sort: '-createdAt',
-    where: {
-      taskSlug: {
-        equals: 'process-email',
-      },
-    },
+    where,
   })
 
   const docs = result.docs.filter(
@@ -52,6 +79,20 @@ export async function findExistingJobs(
   )
 
   return { docs, totalDocs: docs.length }
+}
+
+/**
+ * Finds the `process-email` jobs for a given email that can still run: not
+ * completed and not failed for good (see {@link findEmailJobs}). A job that is
+ * queued, waiting for its `waitUntil`, retrying or currently running counts.
+ * ensureEmailJob uses this to avoid queueing a duplicate, so an email set back
+ * to `pending` gets a new job even when its earlier jobs are kept as history.
+ */
+export async function findExistingJobs(
+  payload: Payload,
+  emailId: number | string
+): Promise<{ docs: any[], totalDocs: number }> {
+  return findEmailJobs(payload, emailId, { includeFinished: false })
 }
 
 /**
