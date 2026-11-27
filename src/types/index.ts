@@ -222,12 +222,22 @@ export interface TemplateVariables {
   [key: string]: any
 }
 
+export interface RetryFailedEmailsOptions {
+  /**
+   * When `true`, emails whose `attempts` reached `retryAttempts` are skipped,
+   * so permanently failed emails stay `failed`. Defaults to `false`: every
+   * `failed` email gets one more attempt, including those that used up their
+   * attempts.
+   */
+  onlyWithAttemptsLeft?: boolean
+}
+
 export interface MailingService {
   processEmailItem(emailId: string, expectedStatus?: 'failed' | 'pending'): Promise<void>
   processEmails(): Promise<void>
   renderTemplate(templateSlug: string, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }>
   renderTemplateDocument(template: BaseEmailTemplateDocument, variables: TemplateVariables): Promise<{ html: string; subject: string; text: string }>
-  retryFailedEmails(): Promise<void>
+  retryFailedEmails(options?: RetryFailedEmailsOptions): Promise<void>
 }
 
 export interface MailingContext {

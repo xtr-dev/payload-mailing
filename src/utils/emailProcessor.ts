@@ -63,10 +63,13 @@ export async function processJobById(payload: Payload, jobId: string): Promise<v
 }
 
 /**
- * Sends due `pending` emails (`processEmails`), then gives `failed` emails one
- * more attempt each (`retryFailedEmails`). Calling this on a schedule therefore
- * keeps re-trying permanently failed emails, once per `retryDelay`; schedule
- * `processEmails` alone if failed emails should stay failed.
+ * Sends due `pending` emails (`processEmails`), then retries `failed` emails
+ * that still have attempts left (`retryFailedEmails` with
+ * `onlyWithAttemptsLeft`). An email that used up its `retryAttempts` stays
+ * `failed` and is skipped, so this is safe to call on a schedule. `failed`
+ * emails below the limit only exist when `retryAttempts` was raised after they
+ * failed. To give permanently failed emails another try anyway, call
+ * `retryFailedEmails(payload)` yourself.
  * @param payload Payload instance
  * @returns Promise that resolves when all emails are processed
  */
@@ -92,6 +95,7 @@ export async function processAllEmails(payload: Payload): Promise<void> {
   // Process pending emails first
   await mailingContext.service.processEmails()
 
-  // Then retry failed emails
-  await mailingContext.service.retryFailedEmails()
+  // Then retry failed emails, but never one that already used up its attempts:
+  // on a schedule that would re-send a permanently failing email forever.
+  await mailingContext.service.retryFailedEmails({ onlyWithAttemptsLeft: true })
 }

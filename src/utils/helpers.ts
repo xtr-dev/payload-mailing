@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 
-import type { BaseEmailTemplateDocument, MailingContext, PayloadID, PayloadRelation, TemplateVariables } from '../types/index.js'
+import type { BaseEmailTemplateDocument, MailingContext, PayloadID, PayloadRelation, RetryFailedEmailsOptions, TemplateVariables } from '../types/index.js'
 
 import { validateRequiredTemplateVariables } from './templateVariables.js'
 
@@ -193,10 +193,12 @@ export const processEmails = (payload: Payload): Promise<void> => {
 }
 
 /**
- * Gives up to 20 `failed` emails (those that used up `retryAttempts`) one more
- * send attempt each, once `retryDelay` has passed since their last attempt.
+ * Gives up to 20 `failed` emails one more send attempt each, once `retryDelay`
+ * has passed since their last attempt. By default that includes emails that
+ * used up `retryAttempts`, so this is a manual "try again" action; pass
+ * `{ onlyWithAttemptsLeft: true }` to leave those emails `failed`.
  */
-export const retryFailedEmails = (payload: Payload): Promise<void> => {
+export const retryFailedEmails = (payload: Payload, options?: RetryFailedEmailsOptions): Promise<void> => {
   const mailing = getMailing(payload)
-  return mailing.service.retryFailedEmails()
+  return mailing.service.retryFailedEmails(options)
 }

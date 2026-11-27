@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import config from '@payload-config'
-import { processEmails, retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
+import { processAllEmails, processEmails, retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
 import { createPayloadRequest, getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
@@ -187,6 +187,96 @@ describe('Plugin integration tests', () => {
 
     const reloaded = await payload.findByID({ collection: 'emails', id: failed.id })
     expect(reloaded.status).toBe('sent')
+  })
+
+  test('processAllEmails leaves an email that used up its attempts failed, run after run', async () => {
+    const createFailed = (attempts: number, subject: string) => payload.create({
+      collection: 'emails',
+      data: {
+        attempts,
+        error: 'smtp down',
+        html: '<p>Failed before</p>',
+        // Older than the dev config's one-minute retryDelay, so only the
+        // attempts limit can keep the email from being retried.
+        lastAttemptAt: new Date(Date.now() - 2 * 60000).toISOString(),
+        status: 'failed',
+        subject,
+        to: ['process-all@test.com'],
+      },
+    })
+    // retryAttempts is 3 in the dev config.
+    const exhausted = await createFailed(3, 'Permanently failed')
+    const belowLimit = await createFailed(2, 'Failed with an attempt left')
+
+    // Count deliveries of the exhausted email: it must never reach the adapter.
+    const originalSendEmail = payload.email.sendEmail
+    const deliveredSubjects: string[] = []
+    payload.email.sendEmail = (message) => {
+      deliveredSubjects.push(String(message.subject))
+      return originalSendEmail(message)
+    }
+    try {
+      await processAllEmails(payload)
+      await processAllEmails(payload)
+    } finally {
+      payload.email.sendEmail = originalSendEmail
+    }
+
+    const stillFailed = await payload.findByID({ collection: 'emails', id: exhausted.id })
+    expect(stillFailed.status).toBe('failed')
+    expect(stillFailed.attempts).toBe(3)
+    expect(deliveredSubjects).not.toContain('Permanently failed')
+
+    // A failed email below the limit (e.g. after retryAttempts was raised) is
+    // still picked up.
+    const retried = await payload.findByID({ collection: 'emails', id: belowLimit.id })
+    expect(retried.status).toBe('sent')
+  })
+
+  test('processAllEmails marks an email failed on the attempt that reaches retryAttempts', async () => {
+    const lastTry = await payload.create({
+      collection: 'emails',
+      data: {
+        attempts: 2,
+        html: '<p>Last try</p>',
+        lastAttemptAt: new Date(Date.now() - 2 * 60000).toISOString(),
+        status: 'pending',
+        subject: 'Last allowed attempt',
+        to: ['last-try@test.com'],
+      },
+    })
+
+    const originalSendEmail = payload.email.sendEmail
+    let deliveries = 0
+    payload.email.sendEmail = (message) => {
+      if (message.subject !== 'Last allowed attempt') {
+        return originalSendEmail(message)
+      }
+      deliveries++
+      return Promise.reject(new Error('smtp down'))
+    }
+    try {
+      await processAllEmails(payload)
+      const failed = await payload.findByID({ collection: 'emails', id: lastTry.id })
+      expect(failed.status).toBe('failed')
+      expect(failed.attempts).toBe(3)
+
+      // Even once retryDelay has passed, later runs skip it.
+      await payload.update({
+        collection: 'emails',
+        data: { lastAttemptAt: new Date(Date.now() - 2 * 60000).toISOString() },
+        id: lastTry.id,
+      })
+      await processAllEmails(payload)
+      await processAllEmails(payload)
+    } finally {
+      payload.email.sendEmail = originalSendEmail
+    }
+
+    expect(deliveries).toBe(1)
+    const reloaded = await payload.findByID({ collection: 'emails', id: lastTry.id })
+    expect(reloaded.status).toBe('failed')
+    expect(reloaded.attempts).toBe(3)
   })
 
   test('processEmails releases and sends an email left processing by a crashed run', async () => {

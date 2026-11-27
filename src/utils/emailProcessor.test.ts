@@ -113,4 +113,15 @@ describe('processAllEmails', () => {
 
     expect(calls).toEqual(['processEmails', 'retryFailedEmails'])
   })
+
+  test('asks retryFailedEmails to skip emails that used up their attempts', async () => {
+    const processEmails = vi.fn().mockResolvedValue(undefined)
+    const retryFailedEmails = vi.fn().mockResolvedValue(undefined)
+    const payload = { mailing: { service: { processEmails, retryFailedEmails } } } as never
+
+    await processAllEmails(payload)
+
+    expect(retryFailedEmails).toHaveBeenCalledOnce()
+    expect(retryFailedEmails).toHaveBeenCalledWith({ onlyWithAttemptsLeft: true })
+  })
 })

@@ -237,3 +237,74 @@ describe('retryFailedEmails gives failed emails one more attempt', () => {
     expect(payload.jobs.queue).not.toHaveBeenCalled()
   })
 })
+
+describe('retryFailedEmails with onlyWithAttemptsLeft leaves exhausted emails failed', () => {
+  test('only selects failed emails whose attempts are below retryAttempts', async () => {
+    const payload = stubPayload()
+    const svc = new MailingService(payload, { retryAttempts: 4, retryDelay: 60000 } as any)
+
+    await svc.retryFailedEmails({ onlyWithAttemptsLeft: true })
+
+    const findCall = emailSelection(payload.find)
+    expect(findCall.where).toEqual({
+      and: [
+        { status: { equals: 'failed' } },
+        {
+          or: [
+            { lastAttemptAt: { exists: false } },
+            { lastAttemptAt: { less_than_equal: new Date(NOW.getTime() - 60000).toISOString() } },
+          ],
+        },
+        {
+          or: [
+            { attempts: { exists: false } },
+            { attempts: { less_than: 4 } },
+          ],
+        },
+      ],
+    })
+  })
+
+  test('uses the default limit of three attempts when retryAttempts is unset', async () => {
+    const payload = stubPayload()
+    const svc = new MailingService(payload, {} as any)
+
+    await svc.retryFailedEmails({ onlyWithAttemptsLeft: true })
+
+    expect(emailSelection(payload.find).where.and[2]).toEqual({
+      or: [
+        { attempts: { exists: false } },
+        { attempts: { less_than: 3 } },
+      ],
+    })
+  })
+
+  test('a failed email below the limit that fails again goes back to pending with a retry job', async () => {
+    const payload = stubPayload()
+    payload.find.mockImplementation((args: any) =>
+      Promise.resolve({ docs: args.collection === 'payload-jobs' || isStaleClaimLookup(args) ? [] : [{ id: '1' }] }),
+    )
+    // Failed after 3 attempts under an older limit; the limit is now 5.
+    payload.findByID.mockResolvedValue(email(3))
+    const svc = new MailingService(payload, { retryAttempts: 5 } as any)
+
+    await svc.retryFailedEmails({ onlyWithAttemptsLeft: true })
+
+    const finalCall = payload.update.mock.calls[payload.update.mock.calls.length - 1][0]
+    expect(finalCall.data.status).toBe('pending')
+    expect(payload.jobs.queue).toHaveBeenCalledTimes(1)
+  })
+
+  test('the attempt that reaches the limit marks the email failed without a retry job', async () => {
+    const payload = stubPayload()
+    payload.find.mockImplementation(selectionReturns([{ id: '1' }]))
+    payload.findByID.mockResolvedValue(email(4))
+    const svc = new MailingService(payload, { retryAttempts: 5 } as any)
+
+    await svc.retryFailedEmails({ onlyWithAttemptsLeft: true })
+
+    const finalCall = payload.update.mock.calls[payload.update.mock.calls.length - 1][0]
+    expect(finalCall.data.status).toBe('failed')
+    expect(payload.jobs.queue).not.toHaveBeenCalled()
+  })
+})
