@@ -89,7 +89,6 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.6",
     "graphql": "^16.15.0",
-    "mongodb-memory-server": "^10.4.3",
     "next": "^16.4.6",
     "open": "^10.2.0",
     "payload": "3.94.2",
