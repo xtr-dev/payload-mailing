@@ -2,6 +2,49 @@
 
 Releases up to v0.6.0, and notes written before the switch to generated changelogs, are in [changelog/HISTORY.md](changelog/HISTORY.md).
 
+## [0.8.0](https://github.com/xtr-dev/payload-mailing/compare/v0.7.1...v0.8.0) - 2026-11-27
+
+### Features
+- **send:** throw ImmediateProcessingError when an email was queued but the inline run failed ([#163](https://github.com/xtr-dev/payload-mailing/issues/163)) ([500169d](https://github.com/xtr-dev/payload-mailing/commit/500169d2d0e71c09c00403a5e9f55ac42a194e3f))
+
+### Fixes
+- **jobs:** ignore finished jobs when checking for an email's existing job ([#170](https://github.com/xtr-dev/payload-mailing/issues/170)) ([553bbf1](https://github.com/xtr-dev/payload-mailing/commit/553bbf1286fb6c138ad6b8d1af8cc5b0fdee94b4))
+- **retry:** release emails left in processing by a crashed send ([#169](https://github.com/xtr-dev/payload-mailing/issues/169)) ([8d5e430](https://github.com/xtr-dev/payload-mailing/commit/8d5e430ed618c2d6a4306ab579f4a5689629ec41))
+- **retry:** make retryFailedEmails find emails that used up their attempts ([#167](https://github.com/xtr-dev/payload-mailing/issues/167)) ([20bafc5](https://github.com/xtr-dev/payload-mailing/commit/20bafc5da7e15d538d0e5445d217614ee6660383))
+- **retry:** retry failed sends automatically after retryDelay ([#166](https://github.com/xtr-dev/payload-mailing/issues/166)) ([50306af](https://github.com/xtr-dev/payload-mailing/commit/50306af077e7cd9013e2c669c9394c8c4588d5b6))
+- **dev:** use the default initOrder in the demo config ([#125](https://github.com/xtr-dev/payload-mailing/issues/125)) ([d4e5312](https://github.com/xtr-dev/payload-mailing/commit/d4e5312759104dd1cf08eea947533a17507d979b))
+- **logger:** cache the plugin logger per payload instance ([#124](https://github.com/xtr-dev/payload-mailing/issues/124)) ([709adbb](https://github.com/xtr-dev/payload-mailing/commit/709adbb9905f23e64da19415ba16f95b829f93c8))
+- **dev:** name Liquid, not Handlebars, in the playground seed and types ([#118](https://github.com/xtr-dev/payload-mailing/issues/118)) ([ef0065e](https://github.com/xtr-dev/payload-mailing/commit/ef0065e12def883306f883068016ff397a9bdf60))
+- **deps:** remove unused react-dom peer ([#113](https://github.com/xtr-dev/payload-mailing/issues/113)) ([039c008](https://github.com/xtr-dev/payload-mailing/commit/039c00833cd50902b16543c4f16d4a0c4a3d0658))
+- **templates:** render mustache subject and text verbatim ([#110](https://github.com/xtr-dev/payload-mailing/issues/110)) ([9fdc0e6](https://github.com/xtr-dev/payload-mailing/commit/9fdc0e642ac6e2ffe48bac603dd5e95e3adeac87))
+- **types:** accept string recipients in sendEmail's data option ([#108](https://github.com/xtr-dev/payload-mailing/issues/108)) ([256e845](https://github.com/xtr-dev/payload-mailing/commit/256e845a34340ca806610a38ba34eb529567cfbc))
+- **recipients:** reject a to value that normalizes to no addresses ([#106](https://github.com/xtr-dev/payload-mailing/issues/106)) ([5ae0808](https://github.com/xtr-dev/payload-mailing/commit/5ae08088507d16e6086b5d0962f9a56ab14c64af))
+
+### Other
+- **deps:** remove the unused mongodb-memory-server devDependency ([#171](https://github.com/xtr-dev/payload-mailing/issues/171)) ([157892c](https://github.com/xtr-dev/payload-mailing/commit/157892c5dc2c612529d2177f53bc5803716c5cb6))
+- **dev:** remove the broken dev:memory and dev:start scripts ([#168](https://github.com/xtr-dev/payload-mailing/issues/168)) ([9ef5280](https://github.com/xtr-dev/payload-mailing/commit/9ef52803ed17f760cf801aa5603c2a1d24ad8dfe))
+- audit README and docs for accuracy and brevity ([#165](https://github.com/xtr-dev/payload-mailing/issues/165)) ([264fea7](https://github.com/xtr-dev/payload-mailing/commit/264fea7a8ef2369fbf401025daf9929516d8256d))
+- bump dev dependencies to clear security advisories ([#164](https://github.com/xtr-dev/payload-mailing/issues/164)) ([8f81c1b](https://github.com/xtr-dev/payload-mailing/commit/8f81c1b33545a1752582afca74b9c3c5c9663034))
+- **templates:** cover renderTemplate refusing an unknown slug ([#136](https://github.com/xtr-dev/payload-mailing/issues/136)) ([55f1059](https://github.com/xtr-dev/payload-mailing/commit/55f1059a893249641813e8532be7d36d93f49ece))
+- **mailing:** pin defaultFrom resolution at the send boundary ([#135](https://github.com/xtr-dev/payload-mailing/issues/135)) ([55253a9](https://github.com/xtr-dev/payload-mailing/commit/55253a9a05716d24836a86c7024a5318f0ad7d6c))
+- **email-processor:** cover the processor guards and dispatch order ([#162](https://github.com/xtr-dev/payload-mailing/issues/162)) ([5724383](https://github.com/xtr-dev/payload-mailing/commit/57243833b94451cb298b18235fe08f871c5e051a))
+- **typecheck:** add a typecheck script and run it in CI ([#129](https://github.com/xtr-dev/payload-mailing/issues/129)) ([a309a97](https://github.com/xtr-dev/payload-mailing/commit/a309a97376859e7ee99f495d1443da08726d2620))
+- **e2e:** add a playwright config that scopes test:e2e to the e2e spec ([#128](https://github.com/xtr-dev/payload-mailing/issues/128)) ([ea19022](https://github.com/xtr-dev/payload-mailing/commit/ea1902239a64e563d5987da1f6473cc7b9cf7b0d))
+- **readme:** document the initOrder and richTextEditor options ([#127](https://github.com/xtr-dev/payload-mailing/issues/127)) ([5591f53](https://github.com/xtr-dev/payload-mailing/commit/5591f539c223b5e601f43a64f08bb02a26049ec4))
+- **pnpm:** stop install from adopting an ancestor's workspace ([#126](https://github.com/xtr-dev/payload-mailing/issues/126)) ([c0ec5bd](https://github.com/xtr-dev/payload-mailing/commit/c0ec5bd34ddce783029190c0865b0f1a708a74f8))
+- **plugin:** pin the adminPreview:false field and endpoint asymmetry ([#123](https://github.com/xtr-dev/payload-mailing/issues/123)) ([cb0c572](https://github.com/xtr-dev/payload-mailing/commit/cb0c5722ad6e3815c89615cfc35e429a6595a736))
+- **plugin:** cover host collections that collide with plugin slugs ([#122](https://github.com/xtr-dev/payload-mailing/issues/122)) ([5bfcecd](https://github.com/xtr-dev/payload-mailing/commit/5bfcecde34381918d4de04e12443491b806651fd))
+- **plugin:** cover onInit ordering for initOrder before and after ([#121](https://github.com/xtr-dev/payload-mailing/issues/121)) ([8db64e3](https://github.com/xtr-dev/payload-mailing/commit/8db64e3a3787a0ea6301c3e9ec087bd5563040ce))
+- **plugin:** cover custom template slugs on the email relationship ([#120](https://github.com/xtr-dev/payload-mailing/issues/120)) ([68bf070](https://github.com/xtr-dev/payload-mailing/commit/68bf0705e69ae6db96b9a766fb41618953741c10))
+- **exports:** pin default export aliases to their named references ([#119](https://github.com/xtr-dev/payload-mailing/issues/119)) ([51b54bd](https://github.com/xtr-dev/payload-mailing/commit/51b54bde490d8e2c517154d38a53d6169e62824c))
+- name the real template engines in DEVELOPMENT.md ([#117](https://github.com/xtr-dev/payload-mailing/issues/117)) ([bf1128b](https://github.com/xtr-dev/payload-mailing/commit/bf1128b1a0adb9b1e7223c535c4021c09f7e9dfe))
+- **send:** cover sendEmail's create contract and recipient input types ([#116](https://github.com/xtr-dev/payload-mailing/issues/116)) ([0a378a9](https://github.com/xtr-dev/payload-mailing/commit/0a378a9f87a43be27b445fcb7b5dc9d9342afc6c))
+- **send:** cover sendEmail's immediate processing path ([#115](https://github.com/xtr-dev/payload-mailing/issues/115)) ([0c6be65](https://github.com/xtr-dev/payload-mailing/commit/0c6be656f033104989531c820c79af6f72af5185))
+- **helpers:** cover display-name header-injection guards ([#114](https://github.com/xtr-dev/payload-mailing/issues/114)) ([cd8a428](https://github.com/xtr-dev/payload-mailing/commit/cd8a4280e8067c87ee714a174f7c02e3ee512234))
+- **recipients:** cover address parsing and header-injection guards ([#111](https://github.com/xtr-dev/payload-mailing/issues/111)) ([4ff527f](https://github.com/xtr-dev/payload-mailing/commit/4ff527fb22e9722e8e57572e9cb8347617266deb))
+- **helpers:** cover parseAndValidateEmails normalization and validation ([#109](https://github.com/xtr-dev/payload-mailing/issues/109)) ([1eef0e7](https://github.com/xtr-dev/payload-mailing/commit/1eef0e79b0601452e84149f576f5ef0e2430cf35))
+- **mailing:** cover processEmailItem's claim, retry and send contract ([#107](https://github.com/xtr-dev/payload-mailing/issues/107)) ([7f78c43](https://github.com/xtr-dev/payload-mailing/commit/7f78c43c94b1ec05e4aadb98c3369bf2e0997c63))
+
 ## [0.7.1](https://github.com/xtr-dev/payload-mailing/compare/v0.7.0...v0.7.1) - 2026-11-26
 
 ### Fixes

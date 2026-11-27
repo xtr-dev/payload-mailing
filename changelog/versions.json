@@ -3,6 +3,657 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.8.0",
+      "date": "2026-11-27",
+      "commit": "157892c",
+      "breaking": false,
+      "groups": {
+        "features": [
+          {
+            "type": "feat",
+            "scope": "send",
+            "description": "throw ImmediateProcessingError when an email was queued but the inline run failed (#163)",
+            "commit": "500169d",
+            "hash": "500169d2d0e71c09c00403a5e9f55ac42a194e3f",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          }
+        ],
+        "fixes": [
+          {
+            "type": "fix",
+            "scope": "jobs",
+            "description": "ignore finished jobs when checking for an email's existing job (#170)",
+            "commit": "553bbf1",
+            "hash": "553bbf1286fb6c138ad6b8d1af8cc5b0fdee94b4",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "retry",
+            "description": "release emails left in processing by a crashed send (#169)",
+            "commit": "8d5e430",
+            "hash": "8d5e430ed618c2d6a4306ab579f4a5689629ec41",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "retry",
+            "description": "make retryFailedEmails find emails that used up their attempts (#167)",
+            "commit": "20bafc5",
+            "hash": "20bafc5da7e15d538d0e5445d217614ee6660383",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "retry",
+            "description": "retry failed sends automatically after retryDelay (#166)",
+            "commit": "50306af",
+            "hash": "50306af077e7cd9013e2c669c9394c8c4588d5b6",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "dev",
+            "description": "use the default initOrder in the demo config (#125)",
+            "commit": "d4e5312",
+            "hash": "d4e5312759104dd1cf08eea947533a17507d979b",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "wobblywalrus42.a33b <wobblywalrus42.a33b@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "logger",
+            "description": "cache the plugin logger per payload instance (#124)",
+            "commit": "709adbb",
+            "hash": "709adbb9905f23e64da19415ba16f95b829f93c8",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "dizzyotter.ab54 <dizzyotter.ab54@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "dev",
+            "description": "name Liquid, not Handlebars, in the playground seed and types (#118)",
+            "commit": "ef0065e",
+            "hash": "ef0065e12def883306f883068016ff397a9bdf60",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "saltygoose.06f0 <saltygoose.06f0@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "deps",
+            "description": "remove unused react-dom peer (#113)",
+            "commit": "039c008",
+            "hash": "039c00833cd50902b16543c4f16d4a0c4a3d0658",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "puppis.6283 <puppis.6283@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "puppis.fa30 <puppis.fa30@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "hypergoose.2a1a <hypergoose.2a1a@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "templates",
+            "description": "render mustache subject and text verbatim (#110)",
+            "commit": "9fdc0e6",
+            "hash": "9fdc0e642ac6e2ffe48bac603dd5e95e3adeac87",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "venus.6ade <venus.6ade@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "ninjawizard.0ac3 <ninjawizard.0ac3@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "types",
+            "description": "accept string recipients in sendEmail's data option (#108)",
+            "commit": "256e845",
+            "hash": "256e845a34340ca806610a38ba34eb529567cfbc",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "chunkybacon99.8426 <chunkybacon99.8426@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "fix",
+            "scope": "recipients",
+            "description": "reject a to value that normalizes to no addresses (#106)",
+            "commit": "5ae0808",
+            "hash": "5ae08088507d16e6086b5d0962f9a56ab14c64af",
+            "author": "XTR Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "bouncyllama.771f <bouncyllama.771f@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "tinypigeon.167e <tinypigeon.167e@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "swiftnoodle.5076 <swiftnoodle.5076@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Bas van den Aakster <bvdaakster@gmail.com>"
+              }
+            ]
+          }
+        ],
+        "other": [
+          {
+            "type": "chore",
+            "scope": "deps",
+            "description": "remove the unused mongodb-memory-server devDependency (#171)",
+            "commit": "157892c",
+            "hash": "157892c5dc2c612529d2177f53bc5803716c5cb6",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "chore",
+            "scope": "dev",
+            "description": "remove the broken dev:memory and dev:start scripts (#168)",
+            "commit": "9ef5280",
+            "hash": "9ef52803ed17f760cf801aa5603c2a1d24ad8dfe",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "docs",
+            "scope": null,
+            "description": "audit README and docs for accuracy and brevity (#165)",
+            "commit": "264fea7",
+            "hash": "264fea7a8ef2369fbf401025daf9929516d8256d",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "deps",
+            "scope": null,
+            "description": "bump dev dependencies to clear security advisories (#164)",
+            "commit": "8f81c1b",
+            "hash": "8f81c1b33545a1752582afca74b9c3c5c9663034",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "templates",
+            "description": "cover renderTemplate refusing an unknown slug (#136)",
+            "commit": "55f1059",
+            "hash": "55f1059a893249641813e8532be7d36d93f49ece",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "mellowllama.ef47 <mellowllama.ef47@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "mailing",
+            "description": "pin defaultFrom resolution at the send boundary (#135)",
+            "commit": "55253a9",
+            "hash": "55253a9a05716d24836a86c7024a5318f0ad7d6c",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "feralwombat.9f7c <feralwombat.9f7c@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "email-processor",
+            "description": "cover the processor guards and dispatch order (#162)",
+            "commit": "5724383",
+            "hash": "57243833b94451cb298b18235fe08f871c5e051a",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "ci",
+            "scope": "typecheck",
+            "description": "add a typecheck script and run it in CI (#129)",
+            "commit": "a309a97",
+            "hash": "a309a97376859e7ee99f495d1443da08726d2620",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "error418.7356 <error418.7356@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "e2e",
+            "description": "add a playwright config that scopes test:e2e to the e2e spec (#128)",
+            "commit": "ea19022",
+            "hash": "ea1902239a64e563d5987da1f6473cc7b9cf7b0d",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "thuban.0eb8 <thuban.0eb8@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "docs",
+            "scope": "readme",
+            "description": "document the initOrder and richTextEditor options (#127)",
+            "commit": "5591f53",
+            "hash": "5591f539c223b5e601f43a64f08bb02a26049ec4",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "sirius.3f44 <sirius.3f44@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "build",
+            "scope": "pnpm",
+            "description": "stop install from adopting an ancestor's workspace (#126)",
+            "commit": "c0ec5bd",
+            "hash": "c0ec5bd34ddce783029190c0865b0f1a708a74f8",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "hyperllama393.f634 <hyperllama393.f634@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "plugin",
+            "description": "pin the adminPreview:false field and endpoint asymmetry (#123)",
+            "commit": "cb0c572",
+            "hash": "cb0c5722ad6e3815c89615cfc35e429a6595a736",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "sleepyfalcon404.8bca <sleepyfalcon404.8bca@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "plugin",
+            "description": "cover host collections that collide with plugin slugs (#122)",
+            "commit": "5bfcecd",
+            "hash": "5bfcecde34381918d4de04e12443491b806651fd",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "alcor.ce43 <alcor.ce43@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "plugin",
+            "description": "cover onInit ordering for initOrder before and after (#121)",
+            "commit": "8db64e3",
+            "hash": "8db64e3a3787a0ea6301c3e9ec087bd5563040ce",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "pyxis.601e <pyxis.601e@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "plugin",
+            "description": "cover custom template slugs on the email relationship (#120)",
+            "commit": "68bf070",
+            "hash": "68bf0705e69ae6db96b9a766fb41618953741c10",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "deimos.0077 <deimos.0077@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "exports",
+            "description": "pin default export aliases to their named references (#119)",
+            "commit": "51b54bd",
+            "hash": "51b54bde490d8e2c517154d38a53d6169e62824c",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "saltyllama404.f39d <saltyllama404.f39d@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "docs",
+            "scope": null,
+            "description": "name the real template engines in DEVELOPMENT.md (#117)",
+            "commit": "bf1128b",
+            "hash": "bf1128b1a0adb9b1e7223c535c4021c09f7e9dfe",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "mellownoodle.af1d <mellownoodle.af1d@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "send",
+            "description": "cover sendEmail's create contract and recipient input types (#116)",
+            "commit": "0a378a9",
+            "hash": "0a378a9f87a43be27b445fcb7b5dc9d9342afc6c",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "draco.f98a <draco.f98a@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "proteus.07c1 <proteus.07c1@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "gacrux.1fb9 <gacrux.1fb9@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "send",
+            "description": "cover sendEmail's immediate processing path (#115)",
+            "commit": "0c6be65",
+            "hash": "0c6be656f033104989531c820c79af6f72af5185",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "aldebar.f1d6 <aldebar.f1d6@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "orion.32f5 <orion.32f5@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "helpers",
+            "description": "cover display-name header-injection guards (#114)",
+            "commit": "cd8a428",
+            "hash": "cd8a4280e8067c87ee714a174f7c02e3ee512234",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "algol.815e <algol.815e@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "recipients",
+            "description": "cover address parsing and header-injection guards (#111)",
+            "commit": "4ff527f",
+            "hash": "4ff527fb22e9722e8e57572e9cb8347617266deb",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "arcturus.3ff8 <arcturus.3ff8@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "crustynugget.d34b <crustynugget.d34b@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Opus 5.5 <noreply@anthropic.com>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "helpers",
+            "description": "cover parseAndValidateEmails normalization and validation (#109)",
+            "commit": "1eef0e7",
+            "hash": "1eef0e79b0601452e84149f576f5ef0e2430cf35",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "pollux.2498 <pollux.2498@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "Claude Sonnet 5 <noreply@anthropic.com>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "mercury.03b1 <mercury.03b1@agents.wandel.local>"
+              }
+            ]
+          },
+          {
+            "type": "test",
+            "scope": "mailing",
+            "description": "cover processEmailItem's claim, retry and send contract (#107)",
+            "commit": "7f78c43",
+            "hash": "7f78c43c94b1ec05e4aadb98c3369bf2e0997c63",
+            "author": "Bas",
+            "breaking": false,
+            "notes": [
+              {
+                "title": "Co-authored-by",
+                "text": "volans.9c66 <volans.9c66@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "mimas.f2f8 <mimas.f2f8@agents.wandel.local>"
+              },
+              {
+                "title": "Co-authored-by",
+                "text": "snazzygoose7.d120 <snazzygoose7.d120@agents.wandel.local>"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "version": "0.7.1",
       "date": "2026-11-26",
       "commit": "da06ab0",
