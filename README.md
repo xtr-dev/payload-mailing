@@ -108,11 +108,15 @@ Emails are queued and sent in the background (see [Jobs](#jobs)). Pass
 send's job onto a named queue (e.g. `'high'`) instead of the plugin's `queue`
 option.
 
-If `processImmediately` creates and queues the email but running its job inline
-fails, `sendEmail` throws an `ImmediateProcessingError`. The email is still in the
-outbox with its job and goes out on the next queue run. Its `email` and `jobId`
-properties tell you which email it was, so you can treat the send as queued
-instead of failed:
+With `processImmediately`, `sendEmail` resolves (with the `sent` email) only
+when the email actually went out. If the email was created and queued but not
+sent inline (the delivery failed, e.g. your SMTP server is down, or the job
+could not be run), `sendEmail` throws an `ImmediateProcessingError`. The email is
+not lost: it is back to `pending` and is retried by your job runner after
+`retryDelay`, like any failed send (see [Jobs](#jobs)). The error's `email`
+(with its current `status` and `error`) and `jobId` tell you which email it was.
+If "queued is fine" for your caller, catch the error and treat the send as
+queued instead of failed:
 
 ```typescript
 import { ImmediateProcessingError, sendEmail } from '@xtr-dev/payload-mailing'
@@ -121,9 +125,15 @@ try {
   await sendEmail(payload, { template: { slug: 'invite' }, data: { to }, processImmediately: true })
 } catch (error) {
   if (!(error instanceof ImmediateProcessingError)) throw error
-  // Queued, not lost: error.email.id is in the outbox.
+  // Created and queued, not lost: error.email.id will be retried by the queue.
 }
 ```
+
+Any other error (validation, template, database) means no email was created.
+If that inline try was the email's last allowed attempt (`retryAttempts: 1`),
+`error.email.status` is `failed` and it is not retried. An email with a future
+`scheduledAt` is not sent inline and does not throw; it stays `pending` until
+it is due.
 
 ## Templates
 
@@ -243,7 +253,7 @@ await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.co
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
 | `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 | `perPart({ html, text })` | Give a variable separate HTML and plain-text values. |
-| `ImmediateProcessingError` / `TemplateRenderError` | Thrown by `processImmediately` sends whose inline run failed / by `strictTemplates` render errors. |
+| `ImmediateProcessingError` / `TemplateRenderError` | Thrown by `processImmediately` sends that were queued but not sent inline / by `strictTemplates` render errors. |
 
 `sendEmail<Email>(…)` is generic over your generated `Email` type for type-safe
 custom fields.

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { sendEmail } from './sendEmail.js'
+import { ImmediateProcessingError, sendEmail } from './sendEmail.js'
 
 const emailData = {
   html: '<p>Hello</p>',
@@ -11,6 +11,9 @@ const emailData = {
 const createPayload = () => {
   const create = vi.fn().mockResolvedValue({ id: 'email-1' })
   const find = vi.fn().mockResolvedValue({ docs: [], totalDocs: 0 })
+  // What sendEmail reads back after the inline job run; `sent` is the outcome
+  // of a successful delivery.
+  const findByID = vi.fn().mockResolvedValue({ id: 'email-1', status: 'sent' })
   const queue = vi.fn().mockResolvedValue({ id: 'job-queued' })
   const run = vi.fn().mockResolvedValue(undefined)
 
@@ -18,6 +21,7 @@ const createPayload = () => {
     collections: {},
     create,
     find,
+    findByID,
     jobs: { queue, run },
     logger: {
       child: vi.fn(() => ({
@@ -138,11 +142,78 @@ describe('sendEmail processImmediately', () => {
     expect(payload.jobs.run).not.toHaveBeenCalled()
   })
 
-  test('runs immediately even when the fallback job has a future waitUntil', async () => {
+  test('returns the email as it is after the inline run when it was sent', async () => {
+    const payload = createPayload()
+    payload.findByID.mockResolvedValueOnce({ id: 'email-1', sentAt: '2026-01-01T00:00:00.000Z', status: 'sent' })
+
+    const email = await sendEmail(payload as never, { data: emailData, processImmediately: true })
+
+    expect(payload.findByID).toHaveBeenCalledWith({ id: 'email-1', collection: 'emails' })
+    expect(email).toEqual({ id: 'email-1', sentAt: '2026-01-01T00:00:00.000Z', status: 'sent' })
+  })
+
+  test('throws ImmediateProcessingError when the job run resolves but the delivery failed', async () => {
+    const payload = createPayload()
+    payload.create.mockImplementationOnce((args) => {
+      args.context.emailJobIds = ['job-1']
+      return Promise.resolve({ id: 'email-1' })
+    })
+    // The state the mailing service leaves behind after a failed delivery with
+    // attempts left: back to pending, with the adapter's error recorded.
+    const afterFailure = { id: 'email-1', attempts: 1, error: 'smtp down', status: 'pending' }
+    payload.findByID.mockResolvedValueOnce(afterFailure)
+
+    const error = await sendEmail(payload as never, { data: emailData, processImmediately: true })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(ImmediateProcessingError)
+    const immediateError = error as ImmediateProcessingError
+    expect(immediateError.email).toEqual(afterFailure)
+    expect(immediateError.email.id).toBe('email-1')
+    expect(immediateError.jobId).toBe('job-1')
+    expect(immediateError.message).toMatch(/email-1.*smtp down/)
+  })
+
+  test('throws ImmediateProcessingError when the email used up its attempts inline', async () => {
+    const payload = createPayload()
+    payload.findByID.mockResolvedValueOnce({ id: 'email-1', attempts: 1, error: 'smtp down', status: 'failed' })
+
+    const error = await sendEmail(payload as never, { data: emailData, processImmediately: true })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(ImmediateProcessingError)
+    expect((error as ImmediateProcessingError).email.status).toBe('failed')
+  })
+
+  test('throws ImmediateProcessingError when the inline run left the email untouched', async () => {
+    const payload = createPayload()
+    payload.findByID.mockResolvedValueOnce({ id: 'email-1', attempts: 0, status: 'pending' })
+
+    await expect(sendEmail(payload as never, { data: emailData, processImmediately: true }))
+      .rejects.toThrow(/email-1.*status: pending/)
+  })
+
+  test('throws ImmediateProcessingError when the outcome cannot be read back', async () => {
+    const payload = createPayload()
+    payload.findByID.mockRejectedValueOnce(new Error('db gone'))
+
+    const error = await sendEmail(payload as never, { data: emailData, processImmediately: true })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(ImmediateProcessingError)
+    expect((error as ImmediateProcessingError).email.id).toBe('email-1')
+    expect((error as ImmediateProcessingError).message).toMatch(/db gone/)
+  })
+
+  test('returns a future-scheduled email as pending instead of throwing', async () => {
     const payload = createPayload()
     const scheduledAt = new Date(Date.now() + 60_000)
+    // The job runner skips a job whose waitUntil is in the future, so the email
+    // is still pending and untried after the inline run.
+    const stillScheduled = { id: 'email-1', attempts: 0, scheduledAt: scheduledAt.toISOString(), status: 'pending' }
+    payload.findByID.mockResolvedValueOnce(stillScheduled)
 
-    await sendEmail(payload as never, {
+    const email = await sendEmail(payload as never, {
       data: { ...emailData, scheduledAt },
       processImmediately: true,
     })
@@ -157,5 +228,6 @@ describe('sendEmail processImmediately', () => {
       allQueues: true,
       where: { id: { equals: 'job-queued' } },
     })
+    expect(email).toEqual(stillScheduled)
   })
 })

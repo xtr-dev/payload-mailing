@@ -21,19 +21,27 @@ type SendEmailData<T extends BaseEmailDocument> = {
 } & Omit<Partial<T>, 'bcc' | 'cc' | 'from' | 'replyTo' | 'to'>
 
 /**
- * Thrown by `sendEmail` when `processImmediately` is set, the email row was
- * created and its processing job queued, but running that job inline failed.
+ * Thrown by `sendEmail` when `processImmediately` is set and the email row was
+ * created and its processing job queued, but the email was not sent inline:
+ * the delivery itself failed (e.g. the SMTP server is down), or the job could
+ * not be run.
  *
- * The email is not lost: it stays in the outbox with its job, so the regular
- * queue run (or `processEmails`) delivers it later. Callers that only need
- * "accepted for delivery" can catch this error and treat the send as queued.
- * Validation, template and create errors stay plain `Error`s, so they still
- * mean no email was created.
+ * The email is not lost. After a failed delivery it is back to `pending` with a
+ * retry job that the regular queue run (or `processEmails`) picks up once
+ * `retryDelay` has passed; only when that was its last allowed attempt
+ * (`retryAttempts: 1`) is it `failed`. Callers that only need "accepted for
+ * delivery" can catch this error and treat the send as queued. Validation,
+ * template and create errors stay plain `Error`s, so they still mean no email
+ * was created.
  */
 export class ImmediateProcessingError<TEmail extends BaseEmailDocument = BaseEmailDocument> extends Error {
-  /** The email document that was created before immediate processing failed. */
+  /**
+   * The email document that was created, as it is after the inline attempt:
+   * `status` tells whether it waits for a retry (`pending`) or has given up
+   * (`failed`), and `error` holds the delivery error.
+   */
   readonly email: TEmail
-  /** ID of the queued job that failed to run inline. */
+  /** ID of the queued job that was run inline. */
   readonly jobId: string
 
   constructor(email: TEmail, jobId: string, cause: unknown) {
@@ -219,11 +227,48 @@ export const sendEmail = async <TEmail extends BaseEmailDocument = BaseEmailDocu
 
     try {
       await processJobById(payload, jobId)
-      logger.debug(`Successfully processed email ${email.id} immediately`)
     } catch (error) {
       logger.error(`Failed to process email ${email.id} immediately:`, error)
       throw new ImmediateProcessingError(email as TEmail, jobId, error)
     }
+
+    // A resolved job run does not mean the email went out: Payload records a
+    // failing task on the job instead of rejecting, and the mailing service
+    // turns a delivery error into a `pending` email with a delayed retry job.
+    // The email's own status is the only reliable outcome, so read it back.
+    let processed: TEmail
+    try {
+      processed = await payload.findByID({
+        id: email.id,
+        collection: collectionSlug,
+      }) as TEmail
+    } catch (error) {
+      logger.error(`Could not confirm that email ${email.id} was sent immediately:`, error)
+      throw new ImmediateProcessingError(email as TEmail, jobId, error)
+    }
+
+    // An email scheduled for later keeps its job waiting until `scheduledAt`
+    // (the job runner skips a job whose `waitUntil` is in the future), so the
+    // inline run leaves it untouched. That is the requested outcome, not a
+    // failed send.
+    const scheduledFor = processed.scheduledAt ? new Date(processed.scheduledAt).getTime() : NaN
+    if (processed.status === 'pending' && !processed.attempts && scheduledFor > Date.now()) {
+      logger.debug(`Email ${email.id} is scheduled for ${String(processed.scheduledAt)}; not sent immediately`)
+      return processed
+    }
+
+    if (processed.status !== 'sent') {
+      const reason = processed.error
+        ? processed.error
+        : `the email was not sent by the inline job run (status: ${processed.status})`
+      logger.error(`Email ${email.id} was not sent immediately: ${reason}`)
+      throw new ImmediateProcessingError(processed, jobId, new Error(reason))
+    }
+
+    logger.debug(`Successfully processed email ${email.id} immediately`)
+    // Return the email as it is after the send (`status: 'sent'`, `sentAt`)
+    // rather than the `pending` row from before the job ran.
+    return processed
   }
 
   return email as TEmail

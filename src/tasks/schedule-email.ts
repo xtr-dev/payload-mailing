@@ -1,6 +1,6 @@
 import type { TaskConfig, TaskHandler } from 'payload'
 
-import { sendEmail } from '../sendEmail.js'
+import { ImmediateProcessingError, sendEmail } from '../sendEmail.js'
 
 export interface ScheduleEmailInput {
   bcc?: string | string[]
@@ -111,6 +111,20 @@ const scheduleEmailHandler: TaskHandler<'schedule-email'> = async ({ input, req 
       },
     }
   } catch (error) {
+    // The immediate send failed after the email was created and queued. Report
+    // the email along with the error, so a workflow can tell "queued for a
+    // retry" (status `pending`) apart from "no email was created".
+    if (error instanceof ImmediateProcessingError) {
+      return {
+        output: {
+          emailId: String(error.email.id),
+          errorMessage: error.message,
+          scheduledAt: (input as { scheduledAt?: string } | undefined)?.scheduledAt,
+          status: error.email.status || 'pending',
+        },
+      }
+    }
+
     return {
       output: {
         errorMessage: error instanceof Error ? error.message : 'Unknown error scheduling email',
