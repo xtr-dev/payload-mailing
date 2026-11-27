@@ -146,6 +146,10 @@ data with `{{ }}`, e.g. `Hello {{ user.name }}!` or
   `simple`, or supply `templateRenderer: (tpl, vars) => string` for your own.
 - **Escaping** — HTML-body variables are HTML-escaped by default (opt out with
   LiquidJS `{{ x | raw }}` / Mustache `{{{ x }}}`); subject and text are verbatim.
+  LiquidJS `{% echo x %}` is escaped the same way as `{{ x }}`, literals
+  included; write `{% echo x | raw %}` for intentional HTML. Use `| raw` only
+  on values you trust. This needs `liquidjs` 10.30.1 or newer, which the
+  plugin installs; older versions wrote `echo` output unescaped.
 - **HTML vs. text values** — wrap a variable in `perPart({ html, text })` to give
   the HTML body one value and the plain-text body (and subject) another, e.g. a
   link button as markup in HTML and as `Log in: https://…` in text. The HTML

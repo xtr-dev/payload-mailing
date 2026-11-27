@@ -81,6 +81,40 @@ describe('Plugin integration tests', () => {
     expect(result.text).toContain('Hello Ada')
   })
 
+  test('Liquid {% echo %} output is HTML-escaped unless it uses | raw', async () => {
+    // Renders through the real liquidjs the plugin installs, so a liquidjs
+    // release that changes how `echo` is escaped fails here.
+    const draftContent = {
+      root: {
+        children: [{
+          children: [{ text: '{% echo snippet %}|{% echo snippet | raw %}|{{ snippet | raw }}', type: 'text' }],
+          type: 'paragraph',
+        }],
+      },
+    }
+    const req = {
+      body: 'present',
+      headers: new Headers({ 'Content-Length': '999', 'Content-Type': 'application/json' }),
+      method: 'POST',
+      payload,
+      text: async () =>
+        JSON.stringify({
+          content: draftContent,
+          subject: 'Echo',
+          variables: { snippet: '<b>bold</b>' },
+        }),
+      user: { id: 'tester' },
+    } as unknown as Parameters<typeof previewTemplateHandler>[0]
+
+    const response = await previewTemplateHandler(req)
+    expect(response.status).toBe(200)
+
+    const result = (await response.json()) as { html: string; text: string }
+    expect(result.html).toContain('&lt;b&gt;bold&lt;/b&gt;|<b>bold</b>|<b>bold</b>')
+    // The plain-text part is never escaped.
+    expect(result.text).toContain('<b>bold</b>|<b>bold</b>|<b>bold</b>')
+  })
+
   test('preview-template endpoint rejects unauthenticated requests', async () => {
     const req = { method: 'POST', payload, user: null } as unknown as Parameters<typeof previewTemplateHandler>[0]
     const response = await previewTemplateHandler(req)
