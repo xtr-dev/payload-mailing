@@ -23,6 +23,9 @@ const makePayload = (onCreate?: (context: { emailJobIds?: (number | string)[] })
 
   return {
     create,
+    // sendEmail reads the email back after the inline job run to learn whether
+    // it was delivered; `sent` stands for a successful delivery.
+    findByID: vi.fn().mockResolvedValue({ id: 'email-1', status: 'sent' }),
     jobs: { run: vi.fn() },
     mailing: {
       collections: { emails: 'emails', templates: 'email-templates' },

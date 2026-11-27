@@ -1,6 +1,6 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { sendEmail } from '@xtr-dev/payload-mailing'
+import { ImmediateProcessingError, sendEmail } from '@xtr-dev/payload-mailing'
 
 export async function POST(request: Request) {
   try {
@@ -72,6 +72,17 @@ export async function POST(request: Request) {
               'queued'
     })
   } catch (error) {
+    // The email was created and queued, only the inline send failed: the queue
+    // retries it, so report it as accepted rather than as a server error.
+    if (error instanceof ImmediateProcessingError) {
+      return Response.json({
+        success: true,
+        emailId: error.email.id,
+        message: `Email queued for retry: ${error.message}`,
+        status: 'queued',
+      }, { status: 202 })
+    }
+
     console.error('Test email error:', error)
     return Response.json(
       { 
