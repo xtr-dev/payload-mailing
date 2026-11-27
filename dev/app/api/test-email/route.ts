@@ -97,6 +97,9 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const payload = await getPayload({ config })
+    // The plugin attaches its context to the Payload instance at init; it is
+    // not part of Payload's own type.
+    const mailing = (payload as { mailing?: { service?: unknown } }).mailing
     
     // Get email templates
     const { docs: templates } = await payload.find({
@@ -118,8 +121,8 @@ export async function GET() {
         total: totalDocs,
       },
       mailing: {
-        pluginActive: 'mailing' in payload && !!payload.mailing,
-        service: 'mailing' in payload && payload.mailing && 'service' in payload.mailing && !!payload.mailing.service,
+        pluginActive: !!mailing,
+        service: !!mailing?.service,
       },
     })
   } catch (error) {

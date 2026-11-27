@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 
 interface EmailStats {
   total: number
@@ -111,7 +110,7 @@ export default function HomePage() {
           </p>
 
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link
+            <a
               href="/admin"
               style={{
                 backgroundColor: '#3b82f6',
@@ -124,8 +123,8 @@ export default function HomePage() {
               }}
             >
               📊 Admin Panel
-            </Link>
-            <Link
+            </a>
+            <a
               href="/mailing-test"
               style={{
                 backgroundColor: '#10b981',
@@ -138,8 +137,8 @@ export default function HomePage() {
               }}
             >
               🧪 Test Interface
-            </Link>
-            <Link
+            </a>
+            <a
               href="/sent-emails"
               style={{
                 backgroundColor: '#8b5cf6',
@@ -152,7 +151,7 @@ export default function HomePage() {
               }}
             >
               📬 Sent Emails
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -260,7 +259,7 @@ export default function HomePage() {
               <p style={{ color: '#6b7280', marginBottom: '12px', fontSize: '0.9rem' }}>
                 Send test emails using templates with the interactive testing interface.
               </p>
-              <Link
+              <a
                 href="/mailing-test"
                 style={{
                   color: '#3b82f6',
@@ -269,7 +268,7 @@ export default function HomePage() {
                 }}
               >
                 Open Test Interface →
-              </Link>
+              </a>
             </div>
 
             <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
@@ -277,7 +276,7 @@ export default function HomePage() {
               <p style={{ color: '#6b7280', marginBottom: '12px', fontSize: '0.9rem' }}>
                 Create and edit email templates in the Payload admin interface.
               </p>
-              <Link
+              <a
                 href="/admin/collections/email-templates"
                 style={{
                   color: '#3b82f6',
@@ -286,7 +285,7 @@ export default function HomePage() {
                 }}
               >
                 Manage Templates →
-              </Link>
+              </a>
             </div>
 
             <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
@@ -294,7 +293,7 @@ export default function HomePage() {
               <p style={{ color: '#6b7280', marginBottom: '12px', fontSize: '0.9rem' }}>
                 View and manage the email outbox and delivery status.
               </p>
-              <Link
+              <a
                 href="/admin/collections/emails"
                 style={{
                   color: '#3b82f6',
@@ -303,7 +302,7 @@ export default function HomePage() {
                 }}
               >
                 View Email Queue →
-              </Link>
+              </a>
             </div>
           </div>
         </div>

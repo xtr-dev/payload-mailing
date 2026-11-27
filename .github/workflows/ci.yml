@@ -48,3 +48,8 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # The dev app is the only place dev/ is type-checked and where the plugin
+      # source is compiled by Next.js, so build it to keep the playground working.
+      - name: Build dev app
+        run: pnpm dev:build

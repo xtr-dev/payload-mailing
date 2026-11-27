@@ -221,6 +221,15 @@ Unsubscribe: https://example.com/unsubscribe`,
     secret: process.env.PAYLOAD_SECRET || 'test-secret_key',
     sharp,
     typescript: {
+      // Types are regenerated on demand with `pnpm dev:generate-types`, never as
+      // a side effect of starting the dev server or the tests.
+      autoGenerate: false,
+      // Leave out the `declare module 'payload'` block. It would narrow
+      // Payload's types to this app's collections for every file in the
+      // program, including the plugin's own source (dev/tsconfig.json includes
+      // ../src), which has to compile for any host app and so takes collection
+      // slugs as plain strings. With the block, `next build` fails type-checking.
+      declare: false,
       outputFile: path.resolve(dirname, 'payload-types.ts'),
     },
   })

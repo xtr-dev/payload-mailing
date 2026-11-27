@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
 interface CapturedEmail {
@@ -55,9 +54,9 @@ export default function SentEmailsPage() {
     <div style={{ backgroundColor: '#f9fafb', minHeight: '100vh', padding: '40px 20px' }}>
       <div style={{ margin: '0 auto', maxWidth: '1200px' }}>
         <div style={{ alignItems: 'center', display: 'flex', gap: '16px', marginBottom: '8px' }}>
-          <Link href="/dashboard" style={{ color: '#3b82f6', fontSize: '0.9rem', textDecoration: 'none' }}>
+          <a href="/dashboard" style={{ color: '#3b82f6', fontSize: '0.9rem', textDecoration: 'none' }}>
             ← Dashboard
-          </Link>
+          </a>
         </div>
         <div
           style={{
@@ -121,9 +120,9 @@ export default function SentEmailsPage() {
             }}
           >
             No emails sent yet. Create a user or use the{' '}
-            <Link href="/mailing-test" style={{ color: '#3b82f6' }}>
+            <a href="/mailing-test" style={{ color: '#3b82f6' }}>
               Test interface
-            </Link>{' '}
+            </a>{' '}
             to send one.
           </div>
         ) : (
