@@ -28,6 +28,7 @@
     "clean": "rimraf {dist,*.tsbuildinfo}",
     "copyfiles": "copyfiles -u 1 \"src/**/*.{html,css,scss,ttf,woff,woff2,eot,svg,jpg,png,json}\" dist/",
     "dev": "next dev dev --turbo",
+    "dev:build": "next build dev",
     "dev:generate-importmap": "npm run dev:payload generate:importmap",
     "dev:generate-types": "npm run dev:payload generate:types",
     "dev:payload": "cross-env PAYLOAD_CONFIG_PATH=./dev/payload.config.ts payload",
@@ -71,7 +72,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
-    "@payloadcms/db-mongodb": "3.94.2",
     "@payloadcms/db-postgres": "3.94.2",
     "@payloadcms/db-sqlite": "3.94.2",
     "@payloadcms/eslint-config": "^3.28.0",

@@ -31,6 +31,7 @@ pnpm test        # unit tests (src/**/*.test.ts)
 pnpm test:int    # integration tests: boots the dev app against SQLite (dev/int.spec.ts)
 pnpm test:e2e    # Playwright against `pnpm dev` on port 3300 (dev/e2e.spec.ts)
 pnpm build       # compile to dist/
+pnpm dev:build   # production build of the dev app (type-checks dev/ and src/ together)
 ```
 
 CI (`.github/workflows/ci.yml`) runs `scripts/check-readme-peer-version.sh`,

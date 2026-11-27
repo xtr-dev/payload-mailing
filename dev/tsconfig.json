@@ -29,6 +29,8 @@
         "../src/exports/rsc.ts"
       ]
     },
+    "composite": false,
+    "declaration": false,
     "noEmit": true,
     "emitDeclarationOnly": false,
     "plugins": [
