@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import config from '@payload-config'
-import { retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
+import { processEmails, retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
 import { createPayloadRequest, getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
@@ -187,5 +187,64 @@ describe('Plugin integration tests', () => {
 
     const reloaded = await payload.findByID({ collection: 'emails', id: failed.id })
     expect(reloaded.status).toBe('sent')
+  })
+
+  test('processEmails releases and sends an email left processing by a crashed run', async () => {
+    // A crash between the claim and the final status update leaves the email
+    // `processing` with the claim's lastAttemptAt; 20 minutes is past the
+    // default 15-minute processingTimeout.
+    const stuck = await payload.create({
+      collection: 'emails',
+      data: {
+        attempts: 0,
+        html: '<p>Stuck</p>',
+        lastAttemptAt: new Date(Date.now() - 20 * 60000).toISOString(),
+        status: 'processing',
+        subject: 'Stuck in processing',
+        to: ['stuck@test.com'],
+      },
+    })
+    // A claim younger than the timeout is an in-flight send and must be left alone.
+    const inFlight = await payload.create({
+      collection: 'emails',
+      data: {
+        attempts: 0,
+        html: '<p>In flight</p>',
+        lastAttemptAt: new Date().toISOString(),
+        status: 'processing',
+        subject: 'Still sending',
+        to: ['inflight@test.com'],
+      },
+    })
+
+    await processEmails(payload)
+
+    const recovered = await payload.findByID({ collection: 'emails', id: stuck.id })
+    expect(recovered.status).toBe('sent')
+    // The interrupted try counts as an attempt.
+    expect(recovered.attempts).toBe(1)
+    const untouched = await payload.findByID({ collection: 'emails', id: inFlight.id })
+    expect(untouched.status).toBe('processing')
+    expect(untouched.attempts).toBe(0)
+  })
+
+  test('retryFailedEmails retries a stuck email whose attempts are used up', async () => {
+    const stuck = await payload.create({
+      collection: 'emails',
+      data: {
+        attempts: 2,
+        html: '<p>Stuck last try</p>',
+        lastAttemptAt: new Date(Date.now() - 20 * 60000).toISOString(),
+        status: 'processing',
+        subject: 'Stuck on the last attempt',
+        to: ['stuck-last@test.com'],
+      },
+    })
+
+    await retryFailedEmails(payload)
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: stuck.id })
+    expect(reloaded.status).toBe('sent')
+    expect(reloaded.attempts).toBe(3)
   })
 })

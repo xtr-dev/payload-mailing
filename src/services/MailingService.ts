@@ -1,5 +1,5 @@
 import type { Liquid } from 'liquidjs'
-import type {CollectionSlug, Payload, SendEmailOptions} from 'payload';
+import type {CollectionSlug, Payload, SendEmailOptions, Where} from 'payload';
 
 import { EmailAdapter} from 'payload'
 
@@ -29,6 +29,12 @@ import {
 
 /** Default `retryDelay`: five minutes. */
 const DEFAULT_RETRY_DELAY_MS = 300000
+
+/** Default `processingTimeout`: fifteen minutes. */
+const DEFAULT_PROCESSING_TIMEOUT_MS = 900000
+
+/** Upper bound on stale `processing` emails recovered per processEmails/retryFailedEmails call. */
+const MAX_STALE_CLAIMS_RECOVERED = 50
 
 export class MailingService implements IMailingService {
   private config: MailingPluginConfig
@@ -233,6 +239,14 @@ export class MailingService implements IMailingService {
     return this.config.retryAttempts || 3
   }
 
+  /**
+   * How long in ms an email may stay `processing` before its claim counts as
+   * abandoned (`processingTimeout`, default 15 minutes). See recoverStaleClaims.
+   */
+  private getProcessingTimeout(): number {
+    return this.config.processingTimeout ?? DEFAULT_PROCESSING_TIMEOUT_MS
+  }
+
   /** Minimum time in ms between two send attempts of one email (`retryDelay`, default 5 minutes). */
   private getRetryDelay(): number {
     return this.config.retryDelay ?? DEFAULT_RETRY_DELAY_MS
@@ -327,6 +341,105 @@ export class MailingService implements IMailingService {
       this.logger.warn('Mustache not available. Falling back to simple variable replacement. Install mustache package.', error)
       this.mustacheModule = false
       return null
+    }
+  }
+
+  /**
+   * Releases emails whose send was interrupted: a process that crashes (or is
+   * killed) between the `processing` claim and the final status update leaves
+   * the email `processing`, and no run would ever claim it again.
+   *
+   * A claim stamps `lastAttemptAt`, so an email still `processing` more than
+   * `processingTimeout` after it was claimed is treated as abandoned (rows
+   * without `lastAttemptAt` fall back to `updatedAt`). The interrupted try
+   * counts as a failed attempt: the email goes back to `pending` with a delayed
+   * retry job, or to `failed` once `retryAttempts` are used up, exactly like a
+   * send error. `lastAttemptAt` keeps the interrupted claim's time, so the
+   * `retryDelay` wait is measured from that try.
+   *
+   * Each release is a guarded update that only matches while the row is still
+   * `processing` with that stale timestamp, so concurrent recoveries release a
+   * row once, and an in-flight send younger than the timeout is never touched.
+   * A send that genuinely runs longer than `processingTimeout` can be released
+   * and sent a second time, which is why the default is generous.
+   */
+  private async recoverStaleClaims(): Promise<void> {
+    const staleBefore = new Date(Date.now() - this.getProcessingTimeout()).toISOString()
+    const isStale: Where = {
+      and: [
+        {
+          status: {
+            equals: 'processing',
+          },
+        },
+        {
+          or: [
+            {
+              lastAttemptAt: {
+                less_than_equal: staleBefore,
+              },
+            },
+            {
+              and: [
+                {
+                  lastAttemptAt: {
+                    exists: false,
+                  },
+                },
+                {
+                  updatedAt: {
+                    less_than_equal: staleBefore,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+
+    const { docs: staleEmails } = await this.payload.find({
+      collection: this.emailsCollection,
+      depth: 0,
+      limit: MAX_STALE_CLAIMS_RECOVERED,
+      sort: 'lastAttemptAt',
+      where: isStale,
+    })
+
+    for (const email of staleEmails) {
+      const attempts = ((email as any).attempts || 0) + 1
+      const willRetry = attempts < this.getMaxAttempts()
+
+      const { docs: released } = await this.payload.update({
+        collection: this.emailsCollection,
+        // Like a failed send, the retry job is queued below with the retry
+        // delay, so the afterChange hook must not queue an undelayed one.
+        context: { [SKIP_EMAIL_JOB_CONTEXT_KEY]: true },
+        data: {
+          attempts,
+          error: `Send interrupted: the email was still processing ${this.getProcessingTimeout()} ms after it was claimed (the process probably crashed); it may or may not have been delivered`,
+          status: willRetry ? 'pending' : 'failed',
+        },
+        where: {
+          and: [
+            {
+              id: {
+                equals: email.id,
+              },
+            },
+            isStale,
+          ],
+        },
+      })
+
+      if (released.length === 0) {
+        continue
+      }
+
+      this.logger.warn(`Email ${email.id} was stuck in processing; released it as ${willRetry ? 'pending' : 'failed'}`)
+      if (willRetry) {
+        await this.scheduleRetry(String(email.id))
+      }
     }
   }
 
@@ -638,6 +751,7 @@ export class MailingService implements IMailingService {
 
   async processEmails(): Promise<void> {
     this.ensureInitialized()
+    await this.recoverStaleClaims()
     const currentTime = new Date().toISOString()
     const retryTime = new Date(Date.now() - this.getRetryDelay()).toISOString()
 
@@ -748,6 +862,7 @@ export class MailingService implements IMailingService {
    */
   async retryFailedEmails(): Promise<void> {
     this.ensureInitialized()
+    await this.recoverStaleClaims()
     const retryTime = new Date(Date.now() - this.getRetryDelay()).toISOString()
 
     const { docs: failedEmails } = await this.payload.find({
