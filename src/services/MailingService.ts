@@ -8,7 +8,7 @@ import type {
   BaseEmailTemplateDocument,
   EmailLayout,
   MailingService as IMailingService,
-  MailingPluginConfig, TemplateVariables
+  MailingPluginConfig, RetryFailedEmailsOptions, TemplateVariables
 } from '../types/index.js'
 import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js'
 
@@ -854,18 +854,65 @@ export class MailingService implements IMailingService {
   }
 
   /**
-   * Gives emails that used up their `retryAttempts` (status `failed`) one more
-   * send attempt each: up to 20 per call, longest-waiting first, and only once
-   * `retryDelay` has passed since their last attempt. Failed sends with
-   * attempts left never reach `failed`; they are retried automatically (see
-   * scheduleRetry). If the extra attempt fails too, the email stays `failed`
-   * (its `attempts` count keeps growing), so this is a manual "try these
-   * again" action rather than part of the normal retry flow.
+   * Gives `failed` emails one more send attempt each: up to 20 per call,
+   * longest-waiting first, and only once `retryDelay` has passed since their
+   * last attempt. Failed sends with attempts left never reach `failed`; they
+   * are retried automatically (see scheduleRetry).
+   *
+   * By default this includes emails that used up their `retryAttempts`, which
+   * makes it a manual "try these again" action: if the extra attempt fails too,
+   * the email stays `failed` (its `attempts` count keeps growing), and calling
+   * this on a schedule would retry such an email forever.
+   *
+   * With `onlyWithAttemptsLeft` it skips emails whose `attempts` reached
+   * `retryAttempts`, so a permanently failed email is left alone. It then only
+   * picks up `failed` emails that are below the limit again, e.g. after
+   * `retryAttempts` was raised. This is what `processAllEmails` uses, so it is
+   * safe to run on a schedule.
    */
-  async retryFailedEmails(): Promise<void> {
+  async retryFailedEmails(options: RetryFailedEmailsOptions = {}): Promise<void> {
     this.ensureInitialized()
     await this.recoverStaleClaims()
     const retryTime = new Date(Date.now() - this.getRetryDelay()).toISOString()
+
+    const conditions: Where[] = [
+      {
+        status: {
+          equals: 'failed',
+        },
+      },
+      {
+        or: [
+          {
+            lastAttemptAt: {
+              exists: false,
+            },
+          },
+          {
+            lastAttemptAt: {
+              less_than_equal: retryTime,
+            },
+          },
+        ],
+      },
+    ]
+
+    if (options.onlyWithAttemptsLeft) {
+      conditions.push({
+        or: [
+          {
+            attempts: {
+              exists: false,
+            },
+          },
+          {
+            attempts: {
+              less_than: this.getMaxAttempts(),
+            },
+          },
+        ],
+      })
+    }
 
     const { docs: failedEmails } = await this.payload.find({
       collection: this.emailsCollection,
@@ -874,27 +921,7 @@ export class MailingService implements IMailingService {
       // more than 20 failed emails instead of retrying the same ones.
       sort: 'lastAttemptAt',
       where: {
-        and: [
-          {
-            status: {
-              equals: 'failed',
-            },
-          },
-          {
-            or: [
-              {
-                lastAttemptAt: {
-                  exists: false,
-                },
-              },
-              {
-                lastAttemptAt: {
-                  less_than_equal: retryTime,
-                },
-              },
-            ],
-          },
-        ],
+        and: conditions,
       },
     })
 

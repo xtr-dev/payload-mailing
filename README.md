@@ -193,7 +193,9 @@ delayed until `scheduledAt` when set. You need a job **runner**: Payload's
 Emails move through `pending → processing → sent / failed`. A send error puts
 the email back to `pending` and queues a new `process-email` job (on the same
 queue) that runs once `retryDelay` has passed, so your job runner retries it
-without extra code. After `retryAttempts` tries the email is marked `failed`.
+without extra code. After `retryAttempts` tries (default `3`) the email is
+marked `failed` and is not sent again unless you ask for it with
+`retryFailedEmails(payload)`.
 `processEmails(payload)` sends up to 50 due `pending` emails per call (highest
 priority, then oldest first, skipping emails whose last failed try is more
 recent than `retryDelay`); call it from a scheduled task if you don't run a job
@@ -201,6 +203,11 @@ runner, or as a safety net. An email is only ever sent by the run that claims
 it, so a retry job and `processEmails` never both send it. An email left
 `processing` by a crashed process is released by `processEmails` /
 `retryFailedEmails` once `processingTimeout` has passed, as a failed attempt.
+
+`processAllEmails(payload)` is the one call to put on a schedule: it runs
+`processEmails`, then retries `failed` emails that are below `retryAttempts`
+again (which only happens after you raise that option). Emails that used up
+their attempts stay `failed` and are skipped on every later run.
 
 To queue an email from a Payload job or workflow, register the
 `schedule-email` task from the `/tasks` subpath:
@@ -218,7 +225,7 @@ await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.co
 | Option | Description |
 | --- | --- |
 | `defaultFrom` / `defaultFromName` | Default sender for emails that don't set one. |
-| `retryAttempts` | Send attempts before an email is marked `failed` (default `3`). |
+| `retryAttempts` | Maximum send attempts per email (default `3`). The attempt that reaches it marks the email `failed`; automatic retries and `processAllEmails` then leave it alone. |
 | `retryDelay` | Wait (ms) after a failed send before it is retried (default `300000`). |
 | `processingTimeout` | Time (ms) after which an email stuck in `processing` (its process crashed mid-send) is released for a retry (default `900000`). Keep it above your slowest send: a send still running past it may go out twice. |
 | `queue` | Job queue name (default `'default'`). A single `sendEmail` call can override it with its own `queue` option. |
@@ -241,7 +248,8 @@ await payload.jobs.queue({ task: 'schedule-email', input: { to: 'user@example.co
 | `sendEmail(payload, options)` | Queue (or immediately send) a template/direct email. |
 | `renderTemplate(payload, slug, vars)` | Render `{ html, text, subject }` without sending. |
 | `processEmails(payload)` | Send up to 50 due `pending` emails. |
-| `retryFailedEmails(payload)` | Give up to 20 `failed` emails (attempts used up) one more try each, oldest first, once `retryDelay` has passed since their last attempt. If that try fails too, the email stays `failed`. |
+| `processAllEmails(payload)` | `processEmails`, then `retryFailedEmails` limited to emails with attempts left. Never retries an email that used up `retryAttempts`, so it is safe to schedule. |
+| `retryFailedEmails(payload, options?)` | Manual retry: give up to 20 `failed` emails one more try each, oldest first, once `retryDelay` has passed since their last attempt, including emails that used up `retryAttempts`. If that try fails too, the email stays `failed`. Don't schedule it as is (it would retry forever); pass `{ onlyWithAttemptsLeft: true }` to skip emails that reached `retryAttempts`. |
 | `getMailing(payload)` | Get the mailing context (service, config, slugs). |
 | `escapeHtml(str)` / `safeUrl(url)` | Escape text for HTML / allow only http(s), mailto and relative URLs. |
 | `perPart({ html, text })` | Give a variable separate HTML and plain-text values. |
