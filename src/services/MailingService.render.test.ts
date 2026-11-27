@@ -484,12 +484,44 @@ describe('renderTemplateDocument — Liquid comparisons in a rich-text HTML body
     expect(html).toBe('<p>&lt;img src=x onerror=alert(1)&gt;</p>')
   })
 
-  test('{% echo %} with a literal is output unescaped (author-controlled, documented)', async () => {
-    // liquidjs does not apply outputEscape to `echo`; this pins that behaviour
-    // so a change in liquidjs or in the passthrough is noticed.
+  // liquidjs applies `outputEscape` to `{% echo %}` from 10.30.1 on (10.30.0
+  // and older wrote its value raw), so `echo` behaves like `{{ }}`. These tests pin that for
+  // the liquidjs range in package.json: a liquidjs or passthrough change that
+  // makes `echo` emit raw HTML again must be noticed.
+  test('{% echo %} HTML-escapes a literal in the HTML body, like {{ }}', async () => {
     const svc = makeService()
     const { html } = await svc.renderTemplateDocument(template('{% echo "<b>x</b>" %}', 's'), {})
+    expect(html).toBe('<p>&lt;b&gt;x&lt;/b&gt;</p>')
+  })
+
+  test('{% echo %} HTML-escapes a variable in the HTML body', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(
+      template('{% echo v %}', 's'),
+      { v: '<img src=x onerror=alert(1)>' },
+    )
+    expect(html).toBe('<p>&lt;img src=x onerror=alert(1)&gt;</p>')
+  })
+
+  test('{% echo %} with | raw outputs intentional HTML unescaped', async () => {
+    const svc = makeService()
+    const literal = await svc.renderTemplateDocument(template('{% echo "<b>x</b>" | raw %}', 's'), {})
+    expect(literal.html).toBe('<p><b>x</b></p>')
+    const variable = await svc.renderTemplateDocument(template('{% echo v | raw %}', 's'), { v: '<b>x</b>' })
+    expect(variable.html).toBe('<p><b>x</b></p>')
+  })
+
+  test('{{ }} with | raw outputs intentional HTML unescaped', async () => {
+    const svc = makeService()
+    const { html } = await svc.renderTemplateDocument(template('{{ v | raw }}', 's'), { v: '<b>x</b>' })
     expect(html).toBe('<p><b>x</b></p>')
+  })
+
+  test('{% echo %} is written verbatim to the text body and subject', async () => {
+    const svc = makeService()
+    const { subject, text } = await svc.renderTemplateDocument(template('{% echo v %}', '{% echo v %}'), { v: 'Tom & <Jerry>' })
+    expect(text.trim()).toBe('Tom & <Jerry>')
+    expect(subject).toBe('Tom & <Jerry>')
   })
 })
 
