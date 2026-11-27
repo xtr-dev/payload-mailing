@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import config from '@payload-config'
-import { processEmails, retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
+import { ImmediateProcessingError, processEmails, retryFailedEmails, sendEmail } from '@xtr-dev/payload-mailing'
 import { createPayloadRequest, getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
@@ -102,7 +102,10 @@ describe('Plugin integration tests', () => {
     // The job ran synchronously via the context handoff (no polling), so the
     // email has advanced out of the pending state by the time sendEmail returns.
     const reloaded = await payload.findByID({ collection: 'emails', id: email.id })
-    expect(reloaded.status).not.toBe('pending')
+    expect(reloaded.status).toBe('sent')
+    // The returned document reflects the finished send, not the row as created.
+    expect(email.status).toBe('sent')
+    expect(email.sentAt).toBeTruthy()
   })
 
   test('sendEmail with a template stores the template slug', async () => {
@@ -131,23 +134,32 @@ describe('Plugin integration tests', () => {
     expect(reloaded.status).not.toBe('pending')
   })
 
-  test('a failed send queues a retry job delayed by retryDelay on the same queue', async () => {
+  test('a failed immediate send throws ImmediateProcessingError and queues a retry job delayed by retryDelay on the same queue', async () => {
     // Make the adapter fail for this one send; the service calls
     // payload.email.sendEmail at send time, so swapping it here is enough.
     const originalSendEmail = payload.email.sendEmail
     payload.email.sendEmail = () => Promise.reject(new Error('smtp down'))
     const before = Date.now()
-    let emailId: number | string
+    let caught: unknown
     try {
-      const email = await sendEmail(payload, {
+      await sendEmail(payload, {
         data: { html: '<p>Retry</p>', subject: 'Retry me', to: 'retry@test.com' },
         processImmediately: true,
         queue: 'high',
       })
-      emailId = email.id
+    } catch (error) {
+      caught = error
     } finally {
       payload.email.sendEmail = originalSendEmail
     }
+
+    // The job run itself resolves (Payload records the task error on the job),
+    // so the throw has to come from sendEmail checking the email's status.
+    expect(caught).toBeInstanceOf(ImmediateProcessingError)
+    const immediateError = caught as ImmediateProcessingError
+    expect(immediateError.message).toContain('smtp down')
+    expect(immediateError.email.status).toBe('pending')
+    const emailId = immediateError.email.id
 
     const reloaded = await payload.findByID({ collection: 'emails', id: emailId })
     expect(reloaded.status).toBe('pending')
@@ -166,6 +178,63 @@ describe('Plugin integration tests', () => {
     const waitUntil = new Date(retryJobs[0].waitUntil as string).getTime()
     expect(waitUntil).toBeGreaterThanOrEqual(before + 60000)
     expect(waitUntil).toBeLessThan(Date.now() + 60000 + 1000)
+  })
+
+  test('an email whose immediate send failed is delivered by a later queue run', async () => {
+    const originalSendEmail = payload.email.sendEmail
+    payload.email.sendEmail = () => Promise.reject(new Error('smtp down'))
+    let caught: unknown
+    try {
+      await sendEmail(payload, {
+        data: { html: '<p>Later</p>', subject: 'Delivered later', to: 'later@test.com' },
+        processImmediately: true,
+      })
+    } catch (error) {
+      caught = error
+    } finally {
+      payload.email.sendEmail = originalSendEmail
+    }
+    expect(caught).toBeInstanceOf(ImmediateProcessingError)
+    const emailId = (caught as ImmediateProcessingError).email.id
+
+    // Stand in for retryDelay (one minute in the dev config) having passed:
+    // make the retry job due and move the failed attempt into the past, then
+    // let the normal queue run pick the job up.
+    const jobs = await payload.find({
+      collection: 'payload-jobs',
+      limit: 100,
+      where: { taskSlug: { equals: 'process-email' } },
+    })
+    const retryJob = (jobs.docs as { completedAt?: null | string, id: number | string, input?: { emailId?: string } }[])
+      .find((job) => job.input?.emailId === String(emailId) && !job.completedAt)
+    expect(retryJob).toBeDefined()
+    await payload.update({
+      collection: 'payload-jobs',
+      data: { waitUntil: new Date(Date.now() - 1000).toISOString() },
+      id: retryJob!.id,
+    })
+
+    await payload.jobs.run({ allQueues: true, where: { id: { equals: retryJob!.id } } })
+
+    const reloaded = await payload.findByID({ collection: 'emails', id: emailId })
+    expect(reloaded.status).toBe('sent')
+    expect(reloaded.attempts).toBe(1)
+    expect(reloaded.error).toBeNull()
+  })
+
+  test('sendEmail({ processImmediately: true }) with a future scheduledAt leaves the email scheduled without throwing', async () => {
+    const email = await sendEmail(payload, {
+      data: {
+        html: '<p>Scheduled</p>',
+        scheduledAt: new Date(Date.now() + 3600_000),
+        subject: 'Scheduled immediate send',
+        to: 'scheduled-immediate@test.com',
+      },
+      processImmediately: true,
+    })
+
+    expect(email.status).toBe('pending')
+    expect(email.attempts ?? 0).toBe(0)
   })
 
   test('retryFailedEmails sends an email that used up its attempts', async () => {

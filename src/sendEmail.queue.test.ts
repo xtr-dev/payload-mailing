@@ -7,6 +7,8 @@ const emailData = { html: '<p>hi</p>', subject: 'subject', to: 'user@example.com
 
 const makePayload = (): any => ({
   find: vi.fn().mockResolvedValue({ docs: [] }),
+  // The email as sendEmail reads it back after a successful inline job run.
+  findByID: vi.fn().mockResolvedValue({ id: 'email-1', status: 'sent' }),
   jobs: {
     queue: vi.fn().mockResolvedValue({ id: 'job-1' }),
     run: vi.fn().mockResolvedValue(undefined),
