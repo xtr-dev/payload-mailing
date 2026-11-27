@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 
 import {
   ensureEmailJob,
+  findEmailJobs,
   findExistingJobs,
   updateEmailJobRelationship,
 } from './jobScheduler.js'
@@ -39,7 +40,15 @@ describe('findExistingJobs', () => {
 
     const arg = find.mock.calls[0][0]
     expect(arg.collection).toBe('payload-jobs')
-    expect(arg.where).toEqual({ taskSlug: { equals: 'process-email' } })
+    expect(arg.where).toEqual({
+      and: [
+        { taskSlug: { equals: 'process-email' } },
+        // Only jobs Payload can still run: completed jobs (kept with
+        // deleteJobOnComplete: false) and jobs out of retries are skipped.
+        { completedAt: { exists: false } },
+        { hasError: { not_equals: true } },
+      ],
+    })
     // The nested input.emailId path is not filterable on every adapter, so it
     // must NOT appear in the where clause (it is matched in JS instead).
     expect(arg.where).not.toHaveProperty('input.emailId')
@@ -49,6 +58,13 @@ describe('findExistingJobs', () => {
     expect(typeof arg.limit).toBe('number')
     expect(arg.limit).toBeLessThanOrEqual(100)
     expect(arg.sort).toBe('-createdAt')
+  })
+
+  test('findEmailJobs with includeFinished also returns finished jobs', async () => {
+    const find = vi.fn().mockResolvedValue({ docs: [] })
+    await findEmailJobs({ find } as never, 1, { includeFinished: true })
+
+    expect(find.mock.calls[0][0].where).toEqual({ taskSlug: { equals: 'process-email' } })
   })
 
   test('matches the email id against the input JSON in JS', async () => {

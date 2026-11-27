@@ -15,7 +15,7 @@ import type { MustacheModule, TemplateEngineAdapter } from './templateEngines.js
 import { withIntlFallback } from '../utils/formatOptions.js'
 import { sanitizeDisplayName } from '../utils/helpers.js'
 import { SKIP_EMAIL_JOB_CONTEXT_KEY } from '../utils/jobContext.js'
-import { findExistingJobs } from '../utils/jobScheduler.js'
+import { findEmailJobs } from '../utils/jobScheduler.js'
 import { createContextLogger } from '../utils/logger.js'
 import { resolvePartVariables } from '../utils/perPart.js'
 import { serializeRichTextToHTML, serializeRichTextToText } from '../utils/richTextSerializer.js'
@@ -620,7 +620,9 @@ export class MailingService implements IMailingService {
 
     try {
       let queue = this.config.queue || 'default'
-      const { docs: existingJobs } = await findExistingJobs(this.payload, emailId)
+      // Finished jobs count here: the queue of the email's last job, run or not,
+      // is the one its retry belongs on.
+      const { docs: existingJobs } = await findEmailJobs(this.payload, emailId, { includeFinished: true })
       if (typeof existingJobs[0]?.queue === 'string' && existingJobs[0].queue) {
         queue = existingJobs[0].queue
       }

@@ -247,4 +247,40 @@ describe('Plugin integration tests', () => {
     expect(reloaded.status).toBe('sent')
     expect(reloaded.attempts).toBe(3)
   })
+
+  test('setting a failed email back to pending queues a job even when its old job is kept', async () => {
+    const email = await payload.create({
+      collection: 'emails',
+      data: { html: '<p>Again</p>', subject: 'Send again', to: ['again@test.com'] },
+    })
+    const jobsFor = async () => {
+      const { docs } = await payload.find({
+        collection: 'payload-jobs',
+        limit: 100,
+        where: { taskSlug: { equals: 'process-email' } },
+      })
+      return (docs as { completedAt?: null | string, id: number | string, input?: { emailId?: string } }[])
+        .filter((job) => job.input?.emailId === String(email.id))
+    }
+    const [firstJob] = await jobsFor()
+    expect(firstJob).toBeDefined()
+
+    // A host with deleteJobOnComplete: false keeps the finished job around.
+    await payload.update({
+      id: firstJob.id,
+      collection: 'payload-jobs',
+      data: { completedAt: new Date().toISOString(), processing: false },
+    })
+    await payload.update({
+      id: email.id,
+      collection: 'emails',
+      data: { attempts: 3, status: 'failed' },
+    })
+
+    // An admin puts the email back in the queue.
+    await payload.update({ id: email.id, collection: 'emails', data: { status: 'pending' } })
+
+    const runnable = (await jobsFor()).filter((job) => !job.completedAt)
+    expect(runnable).toHaveLength(1)
+  })
 })
